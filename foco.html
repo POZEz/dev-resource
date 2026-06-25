@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="antialiased dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Foco TADS - Ambiente Virtual</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: { 
+                        // Paleta substituída por um Matte Black / Zinc suave
+                        brand: { 50: '#fafafa', 100: '#f4f4f5', 500: '#71717a', 600: '#52525b', 700: '#3f3f46', 800: '#27272a', 900: '#18181b', 950: '#09090b' },
+                        matte: { bg: '#0a0a0a', card: '#171717', border: '#262626', hover: '#202020' }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { 
+            background-color: #f4f4f5; 
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        body.dark { background-color: #0a0a0a; color: #e5e5e5; }
+        
+        /* Custom Scrollbar - Matte Black adaptative */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #d4d4d8; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a1a1aa; }
+        
+        .dark ::-webkit-scrollbar-thumb { background: #3f3f46; }
+        .dark ::-webkit-scrollbar-thumb:hover { background: #52525b; }
+
+        /* Animações */
+        @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .toast-enter { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+        @keyframes slideDownAlert { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .alert-enter { animation: slideDownAlert 0.4s ease-out forwards; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .modal-enter { animation: fadeIn 0.2s ease-out forwards; }
+
+        .accordion-content {
+            transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out, padding 0.3s ease-in-out;
+            max-height: 0; opacity: 0; overflow: hidden;
+        }
+        .accordion-content.open { max-height: 2000px; opacity: 1; }
+
+        .hide-scroll::-webkit-scrollbar { display: none; }
+        .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden">
+
+    
+    <!-- Alerta de Atraso (Inicia Oculto) -->
+    <div id="missed-alert" class="hidden bg-red-950/80 border-b border-red-900 text-red-200 px-4 py-2.5 flex-col sm:flex-row justify-between items-center z-50 alert-enter shadow-md relative">
+        <div class="flex items-center gap-3 text-sm mb-2 sm:mb-0">
+            <i class="ph-fill ph-warning-circle text-red-500 text-xl animate-pulse"></i>
+            <span>Você tem <b id="missed-count" class="text-white font-bold text-base">0</b> tarefas de dias anteriores pendentes! Não deixe acumular.</span>
+        </div>
+        <button onclick="scrollToFirstMissed()" class="text-xs font-semibold bg-red-900/60 hover:bg-red-800 text-white px-4 py-1.5 rounded-lg transition-colors border border-red-800/50">
+            Revisar Atrasos
+        </button>
+    </div>
+
+    <!-- Header Fixo -->
+    <header class="bg-white dark:bg-matte-card border-b border-slate-200 dark:border-matte-border shadow-sm z-40 relative flex-shrink-0 transition-colors">
+        <div class="max-w-7xl mx-auto px-4 py-3 sm:px-6 lg:px-8 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="bg-slate-100 dark:bg-matte-bg p-2 rounded-lg border border-slate-200 dark:border-matte-border">
+                    <i class="ph ph-student text-2xl text-slate-700 dark:text-zinc-300"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg sm:text-xl font-bold tracking-tight leading-tight text-slate-800 dark:text-white">Foco TADS</h1>
+                    <p class="text-xs text-slate-500 dark:text-zinc-500 hidden sm:block font-medium">26 Dias - Ifes</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2 sm:gap-4">
+                <!-- Progresso Circular com Animação -->
+                <div class="flex items-center gap-3 bg-slate-50 dark:bg-matte-bg px-3 py-1.5 rounded-full border border-slate-200 dark:border-matte-border transition-colors">
+                    <div class="relative w-8 h-8 flex items-center justify-center">
+                        <svg class="w-8 h-8 transform -rotate-90" viewBox="0 0 36 36">
+                            <circle cx="18" cy="18" r="16" fill="none" class="stroke-slate-200 dark:stroke-zinc-800" stroke-width="3"></circle>
+                            <circle id="progress-circle" cx="18" cy="18" r="16" fill="none" class="stroke-emerald-500 dark:stroke-emerald-500" stroke-width="3" stroke-dasharray="100 100" stroke-dashoffset="100" stroke-linecap="round" style="transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1);"></circle>
+                        </svg>
+                        <span id="progress-text" class="absolute text-[10px] font-bold text-slate-700 dark:text-white">0%</span>
+                    </div>
+                    <span class="text-sm font-semibold text-slate-600 dark:text-zinc-400 hidden sm:block pr-1">Global</span>
+                </div>
+
+                <!-- Ações e Tools -->
+                <div class="flex gap-1.5 sm:gap-2">
+                    <button onclick="toggleTheme()" class="p-2 text-slate-500 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-matte-hover rounded-lg transition-colors" title="Alternar Tema">
+                        <i id="theme-icon" class="ph-fill ph-moon text-lg"></i>
+                    </button>
+                    <button onclick="exportData()" class="p-2 text-slate-500 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-matte-hover rounded-lg transition-colors hidden sm:block" title="Fazer Backup">
+                        <i class="ph ph-download-simple text-lg"></i>
+                    </button>
+                    <label class="p-2 text-slate-500 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-matte-hover rounded-lg cursor-pointer transition-colors hidden sm:flex items-center justify-center" title="Restaurar Backup">
+                        <input type="file" id="import-file" class="hidden" accept=".json" onchange="importData(event)">
+                        <i class="ph ph-upload-simple text-lg"></i>
+                    </label>
+                    <button onclick="openModal('reset-modal')" class="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors" title="Zerar Progresso">
+                        <i class="ph ph-trash text-lg"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- Progress Bar Linear Mobile -->
+        <div class="w-full bg-slate-100 dark:bg-matte-bg h-1 sm:hidden">
+            <div id="progress-bar-mobile" class="bg-emerald-500 h-1 transition-all duration-700" style="width: 0%"></div>
+        </div>
+    </header>
+
+    <div class="flex flex-1 overflow-hidden flex-col md:flex-row max-w-7xl mx-auto w-full">
+        
+        <!-- Navegação Lateral (Semanas) -->
+        <aside class="w-full md:w-64 bg-slate-50 dark:bg-matte-bg border-b md:border-b-0 md:border-r border-slate-200 dark:border-matte-border flex-shrink-0 flex flex-col z-10 shadow-sm md:shadow-none transition-colors">
+            <div class="p-4 hidden md:block">
+                <h2 class="text-xs font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Cronograma</h2>
+            </div>
+            <nav id="nav-weeks" class="flex md:flex-col overflow-x-auto md:overflow-y-auto hide-scroll p-2 md:p-3 gap-1 flex-1">
+                <!-- Renderizado dinamicamente -->
+            </nav>
+        </aside>
+
+        <!-- Conteúdo Central -->
+        <main class="flex-1 flex flex-col overflow-y-auto bg-white dark:bg-matte-bg relative transition-colors">
+            <div class="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto w-full pb-32">
+                
+                <!-- Info de Dia Atual -->
+                <div class="mb-4 text-sm text-slate-500 dark:text-zinc-400 flex items-center gap-2">
+                    <i class="ph ph-calendar"></i>
+                    <span>Hoje é <strong id="today-date-display" class="text-slate-700 dark:text-zinc-200">...</strong></span>
+                </div>
+
+                <!-- Estratégia Collapse -->
+                <div class="bg-slate-50 dark:bg-matte-card rounded-xl border border-slate-200 dark:border-matte-border mb-8 overflow-hidden transition-colors">
+                    <button onclick="toggleStrategy()" class="w-full px-5 py-4 flex justify-between items-center hover:bg-slate-100 dark:hover:bg-matte-hover transition-colors">
+                        <div class="flex items-center gap-2">
+                            <i class="ph-fill ph-target text-slate-600 dark:text-zinc-400 text-xl"></i>
+                            <h2 class="font-semibold text-slate-700 dark:text-zinc-200">Estratégia de Rotina Fixa</h2>
+                        </div>
+                        <i id="strategy-icon" class="ph ph-caret-down text-slate-400 dark:text-zinc-500 transition-transform"></i>
+                    </button>
+                    <div id="strategy-content" class="accordion-content px-5 border-t border-slate-200 dark:border-matte-border bg-white dark:bg-matte-card">
+                        <div class="py-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                            <div class="bg-slate-50 dark:bg-matte-bg p-4 rounded-lg border border-slate-100 dark:border-matte-border">
+                                <div class="flex items-center gap-2 text-zinc-700 dark:text-zinc-300 mb-2 font-semibold"><i class="ph ph-sun"></i> Manhã</div>
+                                <p class="text-slate-600 dark:text-zinc-400 leading-relaxed">Treino de caligrafia e escrita ativa de redação (06h - 07h30).</p>
+                            </div>
+                            <div class="bg-slate-50 dark:bg-matte-bg p-4 rounded-lg border border-slate-100 dark:border-matte-border">
+                                <div class="flex items-center gap-2 text-zinc-700 dark:text-zinc-300 mb-2 font-semibold"><i class="ph ph-briefcase"></i> Trabalho</div>
+                                <p class="text-slate-600 dark:text-zinc-400 leading-relaxed">Videoaulas na Glau e leitura de repertórios no tempo livre.</p>
+                            </div>
+                            <div class="bg-slate-50 dark:bg-matte-bg p-4 rounded-lg border border-slate-100 dark:border-matte-border">
+                                <div class="flex items-center gap-2 text-zinc-700 dark:text-zinc-300 mb-2 font-semibold"><i class="ph ph-moon-stars"></i> Noite</div>
+                                <p class="text-slate-600 dark:text-zinc-400 leading-relaxed">Revisão, reescrita de erros e exercícios práticos (18h+).</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Header da Semana -->
+                <div class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <div class="h-8 w-1 bg-zinc-800 dark:bg-zinc-500 rounded-full"></div>
+                        <h2 id="current-week-title" class="text-2xl font-bold text-slate-800 dark:text-white tracking-tight">Semana 1</h2>
+                    </div>
+                    <div class="flex items-center gap-3 pl-4">
+                        <div class="flex-1 max-w-xs bg-slate-200 dark:bg-matte-border h-1.5 rounded-full overflow-hidden">
+                            <div id="week-progress-bar" class="bg-zinc-700 dark:bg-zinc-400 h-full transition-all duration-700" style="width: 0%"></div>
+                        </div>
+                        <span id="week-progress-text" class="text-xs font-medium text-slate-500 dark:text-zinc-400">0/0</span>
+                    </div>
+                </div>
+
+                <!-- Dias e Tarefas -->
+                <div id="days-container" class="space-y-4"></div>
+
+            </div>
+        </main>
+    </div>
+
+    
+    <!-- Modal: Editar/Adicionar Tarefa -->
+    <div id="edit-task-modal" class="fixed inset-0 z-50 hidden items-center justify-center px-4 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm">
+        <div class="bg-white dark:bg-matte-card rounded-2xl shadow-xl border border-slate-200 dark:border-matte-border w-full max-w-lg p-6 modal-enter">
+            <h3 id="modal-task-title" class="text-lg font-bold text-slate-900 dark:text-white mb-4">Gerenciar Tarefa</h3>
+            
+            <input type="hidden" id="modal-wIdx">
+            <input type="hidden" id="modal-dIdx">
+            <input type="hidden" id="modal-tIdx">
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Descrição da Tarefa</label>
+                    <textarea id="modal-task-desc" rows="3" class="w-full bg-slate-50 dark:bg-matte-bg border border-slate-200 dark:border-matte-border rounded-lg p-3 text-slate-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-zinc-500" placeholder="Ex: Resolver 10 questões..."></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Tag / Matéria</label>
+                    <select id="modal-task-tag" class="w-full bg-slate-50 dark:bg-matte-bg border border-slate-200 dark:border-matte-border rounded-lg p-3 text-slate-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-zinc-500">
+                        <option value="Redação">Redação</option>
+                        <option value="Matemática">Matemática</option>
+                        <option value="Caligrafia">Caligrafia</option>
+                        <option value="Sociologia">Sociologia</option>
+                        <option value="Física">Física</option>
+                        <option value="Simulado">Simulado</option>
+                        <option value="Descanso">Descanso</option>
+                        <option value="Geral">Geral</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="flex justify-between items-center mt-6 pt-4 border-t border-slate-100 dark:border-matte-border">
+                <button id="btn-delete-task" onclick="deleteTask()" class="text-red-500 hover:text-red-600 font-medium text-sm hidden flex items-center gap-1 transition-colors">
+                    <i class="ph ph-trash"></i> Excluir
+                </button>
+                <div class="flex gap-3 ml-auto">
+                    <button onclick="closeModal('edit-task-modal')" class="px-4 py-2 rounded-lg font-medium text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-matte-hover transition-colors">Cancelar</button>
+                    <button onclick="saveTask()" class="px-4 py-2 rounded-lg font-medium text-white bg-slate-800 hover:bg-slate-900 dark:bg-zinc-200 dark:text-black dark:hover:bg-white transition-colors">Salvar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Zerar Progresso -->
+    <div id="reset-modal" class="fixed inset-0 z-50 hidden items-center justify-center px-4 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm">
+        <div class="bg-white dark:bg-matte-card rounded-2xl shadow-xl border border-slate-200 dark:border-matte-border w-full max-w-sm p-6 modal-enter">
+            <div class="flex items-center gap-4 mb-4 text-red-500">
+                <i class="ph-fill ph-warning-circle text-3xl"></i>
+                <h3 class="text-lg font-bold text-slate-900 dark:text-white">Zerar Progresso?</h3>
+            </div>
+            <p class="text-slate-600 dark:text-zinc-400 text-sm mb-6">Todas as tarefas voltarão a ficar pendentes. Isso não pode ser desfeito. Tem certeza?</p>
+            <div class="flex justify-end gap-3">
+                <button onclick="closeModal('reset-modal')" class="px-4 py-2 rounded-lg font-medium text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-matte-hover">Cancelar</button>
+                <button onclick="confirmReset()" class="px-4 py-2 rounded-lg font-medium text-white bg-red-600 hover:bg-red-700 transition-colors">Sim, zerar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
+
+    <script>
+        
+        // Cores adaptadas para o Matte Black Premium
+        const tagStyles = {
+            'Redação': 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border-red-200 dark:border-red-900/50',
+            'Matemática': 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/50',
+            'Caligrafia': 'bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-900/50',
+            'Sociologia': 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/50',
+            'Física': 'bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-400 border-cyan-200 dark:border-cyan-900/50',
+            'Simulado': 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-300 dark:border-orange-800/60 font-bold',
+            'Descanso': 'bg-slate-100 dark:bg-matte-bg text-slate-500 dark:text-zinc-500 border-slate-200 dark:border-matte-border',
+            'Geral': 'bg-slate-50 dark:bg-zinc-900/50 text-slate-600 dark:text-zinc-300 border-slate-200 dark:border-zinc-800'
+        };
+
+        // Dados com Datas (Jun 22 a Jul 18 - 2026)
+        const defaultPlan = [
+            { week: 1, title: "Semana 1: A Base e o Desferrujar", days: [
+                { id: "d1", date: "2026-06-22", name: "Dia 1 (Segunda)", tasks: [
+                    { tag: "Redação", desc: "[Vídeo] Assistir aula do Prof. Vinícius Oliveira sobre Introdução e Esqueleto.", completed: false },
+                    { tag: "Caligrafia", desc: "Copiar o esqueleto coringa no caderno (20 min) prestando atenção nas letras.", completed: false },
+                    { tag: "Matemática", desc: "[Glau] Assistir aula de Razões Proporcionais e Regra de Três Simples.", completed: false }
+                ]},
+                { id: "d2", date: "2026-06-23", name: "Dia 2 (Terça)", tasks: [
+                    { tag: "Redação", desc: "Prática: Escrever apenas uma Introdução com base em um tema de Tecnologia.", completed: false },
+                    { tag: "Sociologia", desc: "[Trabalho] Assistir vídeo sobre Zygmunt Bauman (Modernidade Líquida) para usar como argumento.", completed: false }
+                ]},
+                { id: "d3", date: "2026-06-24", name: "Dia 3 (Quarta)", tasks: [
+                    { tag: "Redação", desc: "Prática: Escrever os 2 Parágrafos de Desenvolvimento do tema de ontem.", completed: false },
+                    { tag: "Caligrafia", desc: "Escrever 10 linhas no caderno de caligrafia (foco no espaçamento das palavras).", completed: false },
+                    { tag: "Matemática", desc: "Fazer 5 exercícios de Regra de Três Simples.", completed: false }
+                ]},
+                { id: "d4", date: "2026-06-25", name: "Dia 4 (Quinta)", tasks: [
+                    { tag: "Redação", desc: "Prática: Escrever a Conclusão focando nos 5 elementos obrigatórios.", completed: false },
+                    { tag: "Redação", desc: "[Glau] Colocar a redação inteira na IA, anotar erros de vírgula e crase.", completed: false }
+                ]},
+                { id: "d5", date: "2026-06-26", name: "Dia 5 (Sexta)", tasks: [
+                    { tag: "Redação", desc: "Reescrita: Reescrever a redação de ontem corrigindo todos os erros apontados pela IA.", completed: false },
+                    { tag: "Caligrafia", desc: "Treino livre de 20 min com textos curtos.", completed: false },
+                    { tag: "Física", desc: "[Trabalho] Assistir vídeo curto sobre Cinemática básica.", completed: false }
+                ]},
+                { id: "d6", date: "2026-06-27", name: "Dia 6 (Sábado)", tasks: [
+                    { tag: "Simulado", desc: "Fazer 1 Redação completa do zero em até 1h30m (Tema: Impacto da IA no Mercado).", completed: false },
+                    { tag: "Matemática", desc: "[Glau] Assistir aula básica de Estatística / Leitura de Gráficos.", completed: false }
+                ]},
+                { id: "d7", date: "2026-06-28", name: "Dia 7 (Domingo)", tasks: [
+                    { tag: "Descanso", desc: "Folga total. Organize a mesa para a próxima semana.", completed: false }
+                ]}
+            ]},
+            { week: 2, title: "Semana 2: Argumentação e Sintaxe", days: [
+                { id: "d8", date: "2026-06-29", name: "Dia 8 (Segunda)", tasks: [
+                    { tag: "Redação", desc: "[Glau/Trabalho] Assistir aulas de Sintaxe e Uso de Conectivos.", completed: false },
+                    { tag: "Matemática", desc: "Porcentagem: Entender o conceito e resolver exercícios básicos.", completed: false }
+                ]},
+                { id: "d9", date: "2026-06-30", name: "Dia 9 (Terça)", tasks: [
+                    { tag: "Redação", desc: "Prática: Redação (Tema: Inclusão Digital da Terceira Idade). Foco em NÃO usar 'onde' errado.", completed: false },
+                    { tag: "Sociologia", desc: "[Trabalho] Estudar John Locke ou Contrato Social.", completed: false }
+                ]},
+                { id: "d10", date: "2026-07-01", name: "Dia 10 (Quarta)", tasks: [
+                    { tag: "Redação", desc: "[Glau] Corrigir a redação de ontem e Reescrever os parágrafos com erro.", completed: false },
+                    { tag: "Matemática", desc: "Porcentagem: Fazer 5 exercícios focados em acréscimo e desconto.", completed: false }
+                ]},
+                { id: "d11", date: "2026-07-02", name: "Dia 11 (Quinta)", tasks: [
+                    { tag: "Redação", desc: "[Glau/Trabalho] Assistir aula sobre uso correto da CRASE.", completed: false },
+                    { tag: "Física", desc: "[Trabalho] Energia e Trabalho (vídeos rápidos, foco na lógica).", completed: false }
+                ]},
+                { id: "d12", date: "2026-07-03", name: "Dia 12 (Sexta)", tasks: [
+                    { tag: "Redação", desc: "Prática: Fazer 2 propostas de intervenção isoladas para temas variados.", completed: false },
+                    { tag: "Matemática", desc: "[Glau] Equações do 1º Grau.", completed: false }
+                ]},
+                { id: "d13", date: "2026-07-04", name: "Dia 13 (Sábado)", tasks: [
+                    { tag: "Simulado", desc: "Fazer 1 Redação completa do zero em 1h30m (Tema: Cybersegurança no Brasil).", completed: false },
+                    { tag: "Matemática", desc: "Resolver 5 equações de 1º Grau.", completed: false }
+                ]},
+                { id: "d14", date: "2026-07-05", name: "Dia 14 (Domingo)", tasks: [
+                    { tag: "Descanso", desc: "Folga total. Respire e relaxe a mente.", completed: false }
+                ]}
+            ]},
+            { week: 3, title: "Semana 3: Consistência e Velocidade", days: [
+                { id: "d15", date: "2026-07-06", name: "Dia 15 (Segunda)", tasks: [
+                    { tag: "Redação", desc: "Corrigir simulado de sábado na Glau. Reescrever todo o texto limpo e sem erros.", completed: false },
+                    { tag: "Caligrafia", desc: "Treino de 20 min focando em manter a letra legível escrevendo rápido.", completed: false }
+                ]},
+                { id: "d16", date: "2026-07-07", name: "Dia 16 (Terça)", tasks: [
+                    { tag: "Redação", desc: "[Glau/Trabalho] Assistir aulas de Pontuação (Uso da Vírgula).", completed: false },
+                    { tag: "Matemática", desc: "Regra de Três Composta (Apenas o conceito e 3 exercícios).", completed: false }
+                ]},
+                { id: "d17", date: "2026-07-08", name: "Dia 17 (Quarta)", tasks: [
+                    { tag: "Redação", desc: "Prática: Redação sobre um tema de Meio Ambiente e Tecnologia (Lixo Eletrônico).", completed: false }
+                ]},
+                { id: "d18", date: "2026-07-09", name: "Dia 18 (Quinta)", tasks: [
+                    { tag: "Redação", desc: "[Glau] Corrigir redação de ontem. Anotar os 3 erros que você mais comete.", completed: false },
+                    { tag: "Sociologia", desc: "[Trabalho] Ler resumos sobre 'O Cidadão de Papel'.", completed: false }
+                ]},
+                { id: "d19", date: "2026-07-10", name: "Dia 19 (Sexta)", tasks: [
+                    { tag: "Redação", desc: "Reescrever a redação de quarta prestando atenção nos 3 erros mapeados.", completed: false },
+                    { tag: "Física", desc: "[Trabalho] Óptica básica ou assunto de interesse leve.", completed: false }
+                ]},
+                { id: "d20", date: "2026-07-11", name: "Dia 20 (Sábado)", tasks: [
+                    { tag: "Simulado", desc: "Fazer 1 Redação completa como se fosse o dia da prova (Sem parar, caneta preta).", completed: false },
+                    { tag: "Matemática", desc: "[Glau] Assistir aula de Raciocínio Lógico (Lógica Proposicional básica).", completed: false }
+                ]},
+                { id: "d21", date: "2026-07-12", name: "Dia 21 (Domingo)", tasks: [
+                    { tag: "Descanso", desc: "Folga total. Falta uma semana!", completed: false }
+                ]}
+            ]},
+            { week: 4, title: "Semana 4: Reta Final", days: [
+                { id: "d22", date: "2026-07-13", name: "Dia 22 (Segunda)", tasks: [
+                    { tag: "Redação", desc: "[Glau] Corrigir simulado de sábado. Fazer a reescrita perfeita.", completed: false },
+                    { tag: "Matemática", desc: "Fazer 5 exercícios aleatórios de Raciocínio Lógico.", completed: false }
+                ]},
+                { id: "d23", date: "2026-07-14", name: "Dia 23 (Terça)", tasks: [
+                    { tag: "Redação", desc: "Revisar todos os esqueletos e conectivos. Memorizar a estrutura.", completed: false },
+                    { tag: "Sociologia", desc: "Revisar seus repertórios (Bauman, Locke, Cidadão de Papel).", completed: false }
+                ]},
+                { id: "d24", date: "2026-07-15", name: "Dia 24 (Quarta)", tasks: [
+                    { tag: "Simulado", desc: "ÚLTIMO TREINO: Redação completa (Tema Livre). Foco total em tempo e caligrafia.", completed: false }
+                ]},
+                { id: "d25", date: "2026-07-16", name: "Dia 25 (Quinta)", tasks: [
+                    { tag: "Redação", desc: "Corrigir na Glau, ver pontos fortes e comemorar o progresso.", completed: false },
+                    { tag: "Geral", desc: "Separar documentos da prova (Identidade, canetas, etc).", completed: false }
+                ]},
+                { id: "d26", date: "2026-07-17", name: "Dia 26 (Sexta)", tasks: [
+                    { tag: "Descanso", desc: "NÃO ESTUDE HOJE. Assista a um filme, coma bem, durma cedo. A mente precisa estar afiada.", completed: false }
+                ]},
+                { id: "d27", date: "2026-07-18", name: "Dia 18 de Julho (O Grande Dia)", tasks: [
+                    { tag: "Simulado", desc: "PROVA DO IFES (08h). Chegar às 07h no Polo. Boa sorte!", completed: false }
+                ]}
+            ]}
+        ];
+
+        let studyData = [];
+        let currentWeekIdx = 0;
+        let openDays = {}; 
+        let isDarkMode = true;
+        let lastGlobalProg = 0;
+        let lastWeekProg = 0;
+
+        function init() {
+            initTheme();
+            const savedData = localStorage.getItem('studyPlanMatteV1');
+            if (savedData) {
+                try { studyData = JSON.parse(savedData); } catch(e) { studyData = JSON.parse(JSON.stringify(defaultPlan)); }
+            } else {
+                studyData = JSON.parse(JSON.stringify(defaultPlan));
+            }
+            
+            checkDatesAndMissedTasks();
+            renderNavigation();
+            selectWeek(0);
+            updateProgress(false); // setup inicial
+        }
+
+        // Dark mode padrão forçado no Matte Black
+        function initTheme() {
+            if (localStorage.theme === 'light') {
+                isDarkMode = false;
+                document.documentElement.classList.remove('dark');
+                document.getElementById('theme-icon').className = 'ph-fill ph-moon text-lg text-slate-500';
+            } else {
+                isDarkMode = true;
+                document.documentElement.classList.add('dark');
+                document.getElementById('theme-icon').className = 'ph-fill ph-sun text-lg text-zinc-400';
+                localStorage.theme = 'dark';
+            }
+        }
+
+        function toggleTheme() {
+            isDarkMode = !isDarkMode;
+            if (isDarkMode) {
+                document.documentElement.classList.add('dark');
+                localStorage.theme = 'dark';
+                document.getElementById('theme-icon').className = 'ph-fill ph-sun text-lg text-zinc-400';
+            } else {
+                document.documentElement.classList.remove('dark');
+                localStorage.theme = 'light';
+                document.getElementById('theme-icon').className = 'ph-fill ph-moon text-lg text-slate-500';
+            }
+        }
+
+        
+        // Animação numérica
+        function animateValue(obj, start, end, duration, formatFn = val => val) {
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                const easeOut = 1 - Math.pow(1 - progress, 4); // Quartic ease out
+                const currentVal = Math.floor(easeOut * (end - start) + start);
+                obj.innerHTML = formatFn(currentVal);
+                if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                } else {
+                    obj.innerHTML = formatFn(end);
+                }
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        function updateProgress(animate = true) {
+            let total = 0, completed = 0;
+            studyData.forEach(w => w.days.forEach(d => {
+                d.tasks.forEach(t => { total++; if(t.completed) completed++; });
+            }));
+
+            const percentage = total === 0 ? 0 : Math.round((completed / total) * 100);
+            
+            // Animação Global
+            const progressText = document.getElementById('progress-text');
+            if(animate && lastGlobalProg !== percentage) {
+                animateValue(progressText, lastGlobalProg, percentage, 800, v => v + '%');
+            } else {
+                progressText.innerText = percentage + '%';
+            }
+            lastGlobalProg = percentage;
+            
+            // UI Global SVG e Barra
+            document.getElementById('progress-circle').style.strokeDashoffset = 100 - percentage;
+            document.getElementById('progress-bar-mobile').style.width = percentage + '%';
+
+            updateCurrentWeekSummary(animate);
+            checkDatesAndMissedTasks(); // re-checa atrasos ao concluir algo
+        }
+
+        function updateCurrentWeekSummary(animate) {
+            let total = 0, completed = 0;
+            studyData[currentWeekIdx].days.forEach(d => {
+                d.tasks.forEach(t => { total++; if(t.completed) completed++; });
+            });
+            const perc = total === 0 ? 0 : Math.round((completed / total) * 100);
+            
+            const bar = document.getElementById('week-progress-bar');
+            const text = document.getElementById('week-progress-text');
+            
+            if(animate && lastWeekProg !== perc) {
+                animateValue(text, lastWeekProg, perc, 600, v => `${v}% (${completed}/${total})`);
+            } else {
+                text.innerText = `${perc}% (${completed}/${total})`;
+            }
+            lastWeekProg = perc;
+            
+            bar.style.width = `${perc}%`;
+            if(perc === 100) bar.classList.replace('bg-zinc-400', 'bg-emerald-500');
+            else bar.classList.replace('bg-emerald-500', 'bg-zinc-400');
+        }
+
+        function checkDatesAndMissedTasks() {
+            const todayStr = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+            document.getElementById('today-date-display').innerText = todayStr;
+
+            const today = new Date().setHours(0,0,0,0);
+            let missedCount = 0;
+
+            studyData.forEach(week => {
+                week.days.forEach(day => {
+                    if(day.date) {
+                        // Parse de YYYY-MM-DD
+                        const [y, m, d] = day.date.split('-');
+                        const dayDate = new Date(y, m-1, d).setHours(0,0,0,0);
+                        
+                        if(dayDate < today) {
+                            const pendentes = day.tasks.filter(t => !t.completed).length;
+                            missedCount += pendentes;
+                        }
+                    }
+                });
+            });
+
+            const alertBox = document.getElementById('missed-alert');
+            if(missedCount > 0) {
+                document.getElementById('missed-count').innerText = missedCount;
+                alertBox.classList.remove('hidden');
+                alertBox.classList.add('flex');
+            } else {
+                alertBox.classList.add('hidden');
+                alertBox.classList.remove('flex');
+            }
+        }
+
+        function scrollToFirstMissed() {
+            const today = new Date().setHours(0,0,0,0);
+            for(let w = 0; w < studyData.length; w++) {
+                for(let d = 0; d < studyData[w].days.length; d++) {
+                    const day = studyData[w].days[d];
+                    const [y, m, dt] = day.date.split('-');
+                    const dayDate = new Date(y, m-1, dt).setHours(0,0,0,0);
+                    
+                    if(dayDate < today && day.tasks.some(t => !t.completed)) {
+                        selectWeek(w);
+                        openDays[`${w}-${d}`] = true;
+                        renderDays();
+                        setTimeout(() => {
+                            const headers = document.querySelectorAll('#days-container button');
+                            if(headers[d]) headers[d].scrollIntoView({behavior: 'smooth', block: 'center'});
+                        }, 100);
+                        return;
+                    }
+                }
+            }
+        }
+
+        function renderNavigation() {
+            const nav = document.getElementById('nav-weeks');
+            nav.innerHTML = '';
+            studyData.forEach((week, idx) => {
+                let wTotal = 0, wComp = 0;
+                week.days.forEach(d => d.tasks.forEach(t => { wTotal++; if(t.completed) wComp++; }));
+                const wPerc = wTotal ? Math.round((wComp/wTotal)*100) : 0;
+                const isSelected = idx === currentWeekIdx;
+                
+                const btn = document.createElement('button');
+                btn.onclick = () => selectWeek(idx);
+                btn.className = `
+                    flex items-center justify-between px-3 py-3 rounded-lg text-left transition-all flex-shrink-0 min-w-[140px] md:min-w-0
+                    ${isSelected ? 'bg-white dark:bg-matte-card text-slate-900 dark:text-white border border-slate-200 dark:border-zinc-700 shadow-sm font-semibold' : 'text-slate-500 dark:text-zinc-500 hover:bg-slate-100 dark:hover:bg-matte-hover border border-transparent'}
+                `;
+                btn.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <i class="ph-fill ph-calendar-blank text-lg ${isSelected ? 'text-zinc-800 dark:text-zinc-300' : ''}"></i>
+                        <span class="text-sm">Sem. ${week.week}</span>
+                    </div>
+                    <div class="hidden md:flex items-center justify-center w-8 h-8 rounded text-[10px] font-bold ${wPerc === 100 ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400' : 'bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400'}">
+                        ${wPerc}%
+                    </div>
+                `;
+                nav.appendChild(btn);
+            });
+        }
+
+        function selectWeek(idx) {
+            currentWeekIdx = idx;
+            renderNavigation();
+            document.getElementById('current-week-title').innerText = studyData[idx].title;
+            // Abre primeiro dia se nenhum estiver aberto nesta semana
+            const hasOpen = studyData[idx].days.some((_, d) => openDays[`${idx}-${d}`]);
+            if(!hasOpen && studyData[idx].days.length > 0) openDays[`${idx}-0`] = true;
+            
+            lastWeekProg = -1; // Force animação ressetar
+            updateCurrentWeekSummary(true);
+            renderDays();
+            if(window.innerWidth < 768) document.querySelector('main').scrollTo({top: 0, behavior: 'smooth'});
+        }
+
+        function toggleStrategy() {
+            const content = document.getElementById('strategy-content');
+            const icon = document.getElementById('strategy-icon');
+            const isOpen = content.classList.contains('open');
+            if(!isOpen) {
+                content.classList.add('open'); content.style.paddingBottom = "1rem";
+                icon.style.transform = 'rotate(180deg)';
+            } else {
+                content.classList.remove('open'); content.style.paddingBottom = "0";
+                icon.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        function renderDays() {
+            const container = document.getElementById('days-container');
+            container.innerHTML = '';
+            const week = studyData[currentWeekIdx];
+            const today = new Date().setHours(0,0,0,0);
+
+            week.days.forEach((day, dIdx) => {
+                const isDayOpen = openDays[`${currentWeekIdx}-${dIdx}`];
+                const totalT = day.tasks.length;
+                const compT = day.tasks.filter(t => t.completed).length;
+                const isDayDone = totalT > 0 && totalT === compT;
+                
+                // Formatar Data e Checar se é Hoje/Atrasado
+                const [y, m, dt] = day.date.split('-');
+                const dDate = new Date(y, m-1, dt);
+                const dDateZero = dDate.setHours(0,0,0,0);
+                let dateBadge = `<span class="text-xs font-normal text-slate-400 dark:text-zinc-500">${dt}/${m}</span>`;
+                if(dDateZero === today) dateBadge = `<span class="text-xs font-bold text-emerald-500 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded">HOJE</span>`;
+                else if(dDateZero < today && !isDayDone) dateBadge = `<span class="text-xs font-bold text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-950/30 px-2 py-0.5 rounded">ATRASADO</span>`;
+
+                const dayCard = document.createElement('div');
+                dayCard.className = `bg-white dark:bg-matte-card rounded-xl border ${isDayDone ? 'border-emerald-200 dark:border-emerald-900/50' : 'border-slate-200 dark:border-matte-border'} overflow-hidden transition-all`;
+                
+                const dayHeader = document.createElement('button');
+                dayHeader.className = `w-full px-5 py-4 flex justify-between items-center transition-colors ${isDayOpen ? 'bg-slate-50 dark:bg-matte-bg border-b border-slate-100 dark:border-matte-border' : 'hover:bg-slate-50 dark:hover:bg-matte-hover'}`;
+                dayHeader.onclick = (e) => { if(!e.target.closest('.add-task-btn')) { openDays[`${currentWeekIdx}-${dIdx}`] = !isDayOpen; renderDays(); } };
+                
+                dayHeader.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="flex items-center justify-center w-6 h-6 rounded bg-slate-100 dark:bg-matte-bg text-slate-400 dark:text-zinc-500 transition-colors">
+                            <i class="ph-fill ${isDayDone ? 'ph-check-square text-emerald-500' : 'ph-square'} text-lg"></i>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <h3 class="font-semibold text-base ${isDayDone ? 'text-slate-400 dark:text-zinc-500 line-through decoration-zinc-600' : 'text-slate-800 dark:text-white'}">${day.name}</h3>
+                            ${dateBadge}
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-xs font-medium px-2 py-1 rounded bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 hidden sm:block">${compT}/${totalT}</span>
+                        <i class="ph ph-caret-down text-slate-400 dark:text-zinc-500 transition-transform duration-300 ${isDayOpen ? 'rotate-180' : ''}"></i>
+                    </div>
+                `;
+                dayCard.appendChild(dayHeader);
+
+                const dayContent = document.createElement('div');
+                dayContent.className = `accordion-content ${isDayOpen ? 'open py-2' : ''}`;
+                
+                const tasksList = document.createElement('ul');
+                tasksList.className = 'flex flex-col';
+
+                day.tasks.forEach((task, tIdx) => {
+                    const tagStyle = tagStyles[task.tag] || tagStyles['Geral'];
+                    const li = document.createElement('li');
+                    li.className = 'group flex items-start gap-3 p-3 mx-2 my-1 rounded-lg hover:bg-slate-50 dark:hover:bg-matte-hover transition-colors border border-transparent hover:border-slate-100 dark:hover:border-matte-border relative';
+                    
+                    li.innerHTML = `
+                        <button onclick="toggleTask(${currentWeekIdx}, ${dIdx}, ${tIdx})" class="mt-0.5 flex-shrink-0 text-2xl transition-colors focus:outline-none rounded ${task.completed ? 'text-emerald-500' : 'text-slate-300 dark:text-zinc-600 hover:text-zinc-400'}">
+                            <i class="ph-fill ${task.completed ? 'ph-check-square' : 'ph-square'}"></i>
+                        </button>
+                        
+                        <div class="flex-1 min-w-0 pr-24 cursor-pointer" onclick="toggleTask(${currentWeekIdx}, ${dIdx}, ${tIdx})">
+                            <p class="text-sm leading-snug mb-2 transition-all ${task.completed ? 'text-slate-400 dark:text-zinc-600 line-through' : 'text-slate-700 dark:text-zinc-300 group-hover:text-black dark:group-hover:text-white'}">
+                                ${task.desc}
+                            </p>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold border uppercase tracking-wider ${tagStyle}">
+                                ${task.tag}
+                            </span>
+                        </div>
+
+                        <!-- Tools Admin e User -->
+                        <div class="absolute right-3 top-3 flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity bg-slate-50 dark:bg-matte-hover md:bg-transparent rounded-lg p-1 md:p-0">
+                            <button onclick="openEditModal(${currentWeekIdx}, ${dIdx}, ${tIdx})" class="p-1.5 text-slate-400 dark:text-zinc-500 hover:text-zinc-800 dark:hover:text-white rounded transition-colors" title="Editar Tarefa">
+                                <i class="ph ph-pencil-simple text-lg"></i>
+                            </button>
+                            <button onclick="copyText('${task.desc.replace(/'/g, "\\'")}')" class="p-1.5 text-slate-400 dark:text-zinc-500 hover:text-zinc-800 dark:hover:text-white rounded transition-colors" title="Copiar">
+                                <i class="ph ph-copy text-lg"></i>
+                            </button>
+                        </div>
+                    `;
+                    tasksList.appendChild(li);
+                });
+
+                // Botão de Adicionar Tarefa ao final do dia
+                const addLi = document.createElement('div');
+                addLi.className = 'p-3 mx-2 mt-2 mb-1 flex justify-center';
+                addLi.innerHTML = `
+                    <button onclick="openEditModal(${currentWeekIdx}, ${dIdx}, -1)" class="text-xs font-medium text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-300 flex items-center gap-1 transition-colors px-3 py-1.5 rounded-lg border border-dashed border-slate-300 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-matte-hover">
+                        <i class="ph ph-plus"></i> Adicionar Tarefa
+                    </button>
+                `;
+                tasksList.appendChild(addLi);
+
+                dayContent.appendChild(tasksList);
+                dayCard.appendChild(dayContent);
+                container.appendChild(dayCard);
+            });
+        }
+
+        function toggleTask(wIdx, dIdx, tIdx) {
+            studyData[wIdx].days[dIdx].tasks[tIdx].completed = !studyData[wIdx].days[dIdx].tasks[tIdx].completed;
+            saveState(); renderDays();
+        }
+
+        function saveState() {
+            localStorage.setItem('studyPlanMatteV1', JSON.stringify(studyData));
+            updateProgress(true); renderNavigation();
+        }
+
+        // Modals
+        function openModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+            document.getElementById(id).classList.add('flex');
+        }
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+            document.getElementById(id).classList.remove('flex');
+        }
+
+        function confirmReset() {
+            studyData = JSON.parse(JSON.stringify(defaultPlan));
+            saveState(); selectWeek(0); closeModal('reset-modal');
+            showToast('Progresso zerado.', 'info');
+        }
+
+        // CMS - Gerenciamento de Tarefas
+        function openEditModal(wIdx, dIdx, tIdx) {
+            document.getElementById('modal-wIdx').value = wIdx;
+            document.getElementById('modal-dIdx').value = dIdx;
+            document.getElementById('modal-tIdx').value = tIdx;
+
+            const title = document.getElementById('modal-task-title');
+            const descInput = document.getElementById('modal-task-desc');
+            const tagInput = document.getElementById('modal-task-tag');
+            const btnDelete = document.getElementById('btn-delete-task');
+
+            if(tIdx > -1) {
+                const task = studyData[wIdx].days[dIdx].tasks[tIdx];
+                title.innerText = 'Editar Tarefa';
+                descInput.value = task.desc;
+                tagInput.value = task.tag;
+                btnDelete.classList.remove('hidden');
+            } else {
+                title.innerText = 'Nova Tarefa';
+                descInput.value = '';
+                tagInput.value = 'Geral';
+                btnDelete.classList.add('hidden');
+            }
+            openModal('edit-task-modal');
+            descInput.focus();
+        }
+
+        function saveTask() {
+            const wIdx = parseInt(document.getElementById('modal-wIdx').value);
+            const dIdx = parseInt(document.getElementById('modal-dIdx').value);
+            const tIdx = parseInt(document.getElementById('modal-tIdx').value);
+            const desc = document.getElementById('modal-task-desc').value.trim();
+            const tag = document.getElementById('modal-task-tag').value;
+
+            if(!desc) return showToast('A descrição não pode ser vazia.', 'error');
+
+            if(tIdx > -1) { // Edit
+                studyData[wIdx].days[dIdx].tasks[tIdx].desc = desc;
+                studyData[wIdx].days[dIdx].tasks[tIdx].tag = tag;
+                showToast('Tarefa atualizada!');
+            } else { // Add
+                studyData[wIdx].days[dIdx].tasks.push({ tag: tag, desc: desc, completed: false });
+                showToast('Tarefa adicionada!');
+            }
+            saveState(); renderDays(); closeModal('edit-task-modal');
+        }
+
+        function deleteTask() {
+            if(confirm('Tem certeza que deseja excluir esta tarefa?')) {
+                const wIdx = parseInt(document.getElementById('modal-wIdx').value);
+                const dIdx = parseInt(document.getElementById('modal-dIdx').value);
+                const tIdx = parseInt(document.getElementById('modal-tIdx').value);
+                
+                studyData[wIdx].days[dIdx].tasks.splice(tIdx, 1);
+                saveState(); renderDays(); closeModal('edit-task-modal');
+                showToast('Tarefa excluída.', 'info');
+            }
+        }
+
+        // Utils
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const icons = { success: 'ph-check-circle text-emerald-500', info: 'ph-info text-blue-500', error: 'ph-warning-circle text-red-500' };
+            toast.className = `toast-enter flex items-center gap-3 bg-white dark:bg-matte-card px-4 py-3 rounded-xl shadow border border-slate-200 dark:border-matte-border min-w-[250px]`;
+            toast.innerHTML = `<i class="ph-fill ${icons[type]} text-xl"></i><span class="text-sm font-medium text-slate-800 dark:text-white">${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateY(10px)'; toast.style.transition = 'all 0.3s ease'; setTimeout(() => toast.remove(), 300); }, 3000);
+        }
+
+        function copyText(text) {
+            navigator.clipboard.writeText(text).then(() => showToast('Texto copiado!')).catch(() => {
+                const temp = document.createElement("input"); temp.value = text; document.body.appendChild(temp);
+                temp.select(); document.execCommand("copy"); document.body.removeChild(temp); showToast('Texto copiado!');
+            });
+        }
+
+        function exportData() {
+            const blob = new Blob([JSON.stringify(studyData, null, 2)], { type: "application/json" });
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+            a.download = 'foco-tads-progresso.json'; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            showToast('Backup concluído!');
+        }
+
+        function importData(e) {
+            const file = e.target.files[0]; if(!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if(Array.isArray(imported) && imported.length && imported[0].week) {
+                        studyData = imported; saveState(); selectWeek(0); showToast('Restaurado!');
+                    } else showToast('Arquivo inválido.', 'error');
+                } catch(err) { showToast('Erro de leitura.', 'error'); }
+                e.target.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
