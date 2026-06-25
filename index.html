@@ -2,69 +2,116 @@
 <html lang="pt-PT">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Hub Pessoal - Gestão e Produtividade</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <!-- Define a cor da barra de status do telemóvel para preto -->
+  <meta name="theme-color" content="#09090b">
+  <title>Hub Profissional</title>
   
-  <!-- Tailwind CSS para estilização rápida e responsiva -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- Ícones Phosphor -->
   <script src="https://unpkg.com/@phosphor-icons/web"></script>
   
   <style>
-    /* Prevenir scroll no body para que apenas o iframe role */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
     body, html { 
       margin: 0; 
       padding: 0; 
-      height: 100%; 
       overflow: hidden; 
-      background-color: #f8fafc; 
+      background-color: #09090b; /* Fundo preto para evitar flashes brancos */
       font-family: 'Inter', system-ui, sans-serif;
+      -webkit-tap-highlight-color: transparent; /* Remove highlight azul no mobile */
+    }
+
+    /* Altura segura para mobile (ignora barras de endereço) */
+    .h-screen-dvh {
+      height: 100vh;
+      height: 100dvh;
+    }
+
+    /* Padding para o "Home Indicator" (risca inferior do iPhone) */
+    .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+    .pt-safe { padding-top: env(safe-area-inset-top, 0px); }
+
+    /* --- ESTILOS DOS BOTÕES DA NAVBAR --- */
+    .nav-btn {
+      color: #71717a; /* zinc-500 */
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
     
-    /* Esconder a barra de rolagem da navbar em dispositivos móveis */
+    .nav-btn:hover { color: #d4d4d8; }
+    
+    .nav-btn i {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Estado Ativo (O que está selecionado) */
+    .nav-btn.active-nav {
+      color: #ffffff;
+    }
+    
+    .nav-btn.active-nav i {
+      transform: translateY(-2px) scale(1.15);
+      color: #60a5fa; /* Azul claro para dar destaque premium */
+      text-shadow: 0 0 12px rgba(96, 165, 250, 0.4); /* Leve brilho */
+    }
+
+    .nav-btn.active-nav span {
+      font-weight: 600;
+    }
+
+    /* --- ANIMAÇÕES DO IFRAME (Blur & Scale) --- */
+    #app-frame { 
+      transition: opacity 0.4s ease, transform 0.4s ease, filter 0.4s ease; 
+      transform-origin: center top;
+    }
+    .frame-loading { 
+      opacity: 0; 
+      transform: scale(0.98); 
+      filter: blur(8px); 
+    }
+    .frame-ready { 
+      opacity: 1; 
+      transform: scale(1); 
+      filter: blur(0px); 
+    }
+
+    /* Esconder barra de rolagem mas manter a funcionalidade (Desktop) */
     .hide-scroll::-webkit-scrollbar { display: none; }
     .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
-
-    /* Animação de fade para a transição do iframe */
-    #app-frame {
-      transition: opacity 0.3s ease;
-    }
-    .fade-out { opacity: 0; }
-    .fade-in { opacity: 1; }
   </style>
 </head>
-<body class="flex flex-col h-screen text-slate-800">
 
-  <!-- ================= NAVBAR ================= -->
-  <nav class="bg-white border-b border-slate-200 shadow-sm z-50 flex-shrink-0">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex flex-col sm:flex-row justify-between h-auto sm:h-16 items-center py-2 sm:py-0">
+<body class="flex flex-col-reverse sm:flex-col h-screen-dvh text-slate-100">
+
+  <!-- ================= NAVBAR (BARRA PRETA PREMIUM) ================= -->
+  <nav class="bg-zinc-950/90 backdrop-blur-xl border-t sm:border-t-0 sm:border-b border-zinc-800/50 z-50 flex-shrink-0 pb-safe pt-safe shadow-[0_-5px_20px_rgba(0,0,0,0.2)] sm:shadow-lg">
+    <div class="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8">
+      <div class="flex justify-between items-center h-[64px] sm:h-[70px]">
         
-        <!-- Logótipo / Título -->
-        <div class="flex items-center gap-2 w-full sm:w-auto justify-center sm:justify-start mb-3 sm:mb-0">
-          <div class="bg-blue-600 p-1.5 rounded-lg text-white">
+        <!-- Logótipo / Título (Desktop) -->
+        <div class="hidden sm:flex items-center gap-3">
+          <div class="bg-gradient-to-tr from-blue-600 to-blue-400 p-2 rounded-xl text-white shadow-lg shadow-blue-900/20">
             <i class="ph-fill ph-squares-four text-xl"></i>
           </div>
-          <span class="font-bold text-lg tracking-tight">O Meu Hub</span>
+          <span class="font-bold text-lg tracking-tight text-white">Hub<span class="text-zinc-500 font-medium">Pessoal</span></span>
         </div>
         
         <!-- Botões de Navegação -->
-        <div class="flex space-x-2 items-center overflow-x-auto hide-scroll w-full sm:w-auto justify-start sm:justify-end pb-1 sm:pb-0">
+        <div class="flex w-full sm:w-auto justify-around sm:justify-end sm:space-x-4 h-full items-center px-1">
           
-          <button onclick="loadApp('gestao.html', this)" class="nav-btn active px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 bg-blue-50 text-blue-700 flex items-center gap-2 whitespace-nowrap shadow-sm border border-blue-100">
-            <i class="ph-fill ph-users text-lg"></i> 
-            Gestão de Visitas
+          <button onclick="loadApp('gestao.html', this)" class="nav-btn active-nav flex-1 sm:flex-none flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2.5 py-1 sm:px-4 sm:py-2.5 rounded-2xl text-[10px] sm:text-sm font-medium">
+            <i class="ph-fill ph-users text-[24px] sm:text-[20px] mb-0.5 sm:mb-0"></i> 
+            <span class="tracking-wide">Gestão</span>
           </button>
           
-          <button onclick="loadApp('financas.html', this)" class="nav-btn px-4 py-2 rounded-xl text-sm font-semibold text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-all duration-200 flex items-center gap-2 whitespace-nowrap border border-transparent">
-            <i class="ph-fill ph-currency-dollar text-lg"></i> 
-            Finanças
+          <button onclick="loadApp('financas.html', this)" class="nav-btn flex-1 sm:flex-none flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2.5 py-1 sm:px-4 sm:py-2.5 rounded-2xl text-[10px] sm:text-sm font-medium">
+            <i class="ph-fill ph-currency-dollar text-[24px] sm:text-[20px] mb-0.5 sm:mb-0"></i> 
+            <span class="tracking-wide">Finanças</span>
           </button>
           
-          <button onclick="loadApp('foco.html', this)" class="nav-btn px-4 py-2 rounded-xl text-sm font-semibold text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-all duration-200 flex items-center gap-2 whitespace-nowrap border border-transparent">
-            <i class="ph-fill ph-student text-lg"></i> 
-            Foco TADS
+          <button onclick="loadApp('foco.html', this)" class="nav-btn flex-1 sm:flex-none flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2.5 py-1 sm:px-4 sm:py-2.5 rounded-2xl text-[10px] sm:text-sm font-medium">
+            <i class="ph-fill ph-student text-[24px] sm:text-[20px] mb-0.5 sm:mb-0"></i> 
+            <span class="tracking-wide">Foco TADS</span>
           </button>
           
         </div>
@@ -72,32 +119,26 @@
     </div>
   </nav>
 
-  <!-- ================= ÁREA DE CONTEÚDO (IFRAME) ================= -->
-  <main class="flex-1 w-full relative bg-slate-100">
+  <!-- ================= ÁREA DE CONTEÚDO ================= -->
+  <main class="flex-1 relative w-full h-full overflow-hidden bg-zinc-950">
     
-    <!-- Indicador de carregamento -->
-    <div id="loader" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-100 z-20">
-      <i class="ph ph-spinner-gap animate-spin text-4xl text-blue-600 mb-4"></i>
-      <p class="text-slate-500 font-medium text-sm">A carregar aplicação...</p>
-    </div>
-
-    <!-- Mensagem de aviso (Aparece se os ficheiros não forem encontrados localmente) -->
-    <div id="fallback-msg" class="absolute inset-0 flex-col items-center justify-center bg-white z-0 hidden p-8 text-center">
-      <div class="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mb-4 mx-auto">
-        <i class="ph-fill ph-warning text-3xl"></i>
+    <!-- Loader Premium (Spinner Duplo) -->
+    <div id="loader" class="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950 z-20 transition-opacity duration-300">
+      <div class="relative w-12 h-12 mb-4">
+        <!-- Anel externo -->
+        <div class="absolute inset-0 rounded-full border-t-2 border-zinc-700 animate-[spin_1.5s_linear_infinite]"></div>
+        <!-- Anel interno azul -->
+        <div class="absolute inset-2 rounded-full border-r-2 border-blue-500 animate-[spin_1s_linear_infinite_reverse]"></div>
       </div>
-      <h2 class="text-xl font-bold text-slate-800 mb-2">Aplicação não encontrada</h2>
-      <p class="text-slate-500 max-w-md mx-auto">
-        Para que o Hub funcione corretamente, certifique-se de que os ficheiros <strong>gestao.html</strong>, <strong>financas.html</strong> e <strong>foco.html</strong> estão guardados na mesma pasta que este ficheiro no seu repositório do GitHub.
-      </p>
+      <p class="text-zinc-500 font-semibold text-[11px] tracking-[0.2em] uppercase">A carregar</p>
     </div>
     
-    <!-- Iframe que carrega os outros ficheiros html -->
+    <!-- Iframe -->
     <iframe 
       id="app-frame" 
       src="gestao.html" 
-      class="w-full h-full border-none relative z-10 fade-out" 
-      title="Visualizador de Aplicações" 
+      class="w-full h-full border-none relative z-10 frame-loading" 
+      title="Hub Content" 
       onload="handleIframeLoad()">
     </iframe>
     
@@ -105,61 +146,52 @@
 
   <script>
     /**
-     * Função para alternar entre as aplicações
+     * Alternar entre aplicações com transição suave
      */
     function loadApp(file, btn) {
+      // Evita recarregar se já estiver na tab atual
+      if(btn.classList.contains('active-nav')) return;
+      
       const frame = document.getElementById('app-frame');
       const loader = document.getElementById('loader');
       
-      // Mostrar estado de carregamento
-      loader.style.display = 'flex';
-      frame.classList.remove('fade-in');
-      frame.classList.add('fade-out');
+      // Ativar Loader e iniciar animação de Blur/Fade-out no iframe
+      loader.style.opacity = '1';
+      loader.style.pointerEvents = 'auto';
+      frame.classList.remove('frame-ready');
+      frame.classList.add('frame-loading');
       
-      // Pequeno atraso para a animação ser visível
+      // Aguardar o fim da animação de saída antes de mudar o SRC
       setTimeout(() => {
         frame.src = file;
-      }, 150);
+      }, 250); 
       
-      // Reset de estilos de todos os botões
+      // Atualizar classes visuais (Remover o ativo de todos)
       document.querySelectorAll('.nav-btn').forEach(b => {
-        b.classList.remove('bg-blue-50', 'text-blue-700', 'active', 'shadow-sm', 'border-blue-100');
-        b.classList.add('text-slate-500', 'hover:bg-slate-50', 'hover:text-slate-900', 'border-transparent');
+        b.classList.remove('active-nav');
       });
       
-      // Aplicar estilo de ativo ao botão clicado
-      btn.classList.remove('text-slate-500', 'hover:bg-slate-50', 'hover:text-slate-900', 'border-transparent');
-      btn.classList.add('bg-blue-50', 'text-blue-700', 'active', 'shadow-sm', 'border-blue-100');
+      // Ativar o botão clicado
+      btn.classList.add('active-nav');
     }
 
     /**
-     * Função executada quando o iframe termina de carregar
+     * Disparado quando o Iframe termina de carregar o novo ficheiro
      */
     function handleIframeLoad() {
       const frame = document.getElementById('app-frame');
       const loader = document.getElementById('loader');
-      const fallback = document.getElementById('fallback-msg');
       
-      // Ocultar loader e mostrar iframe com animação
-      loader.style.display = 'none';
-      frame.classList.remove('fade-out');
-      frame.classList.add('fade-in');
-
-      // Verificação simples para detetar se falhou a carregar (ex: ao testar sem os outros ficheiros)
-      try {
-        // Se conseguirmos aceder ao document do iframe, e ele estiver vazio/erro, mostramos o fallback
-        // Nota: Isto pode dar erro de CORS em alguns ambientes locais, o que é normal.
-        const frameDoc = frame.contentDocument || frame.contentWindow.document;
-        if (frameDoc.body.innerHTML.trim() === '' || frameDoc.title === 'Error') {
-          fallback.style.display = 'flex';
-          frame.style.opacity = '0';
-        } else {
-          fallback.style.display = 'none';
-        }
-      } catch (e) {
-        // Ignorar erros de CORS ao testar localmente com file://
-        console.log("A executar em ambiente restrito ou os ficheiros estão alojados corretamente no GitHub.");
-      }
+      // Pequeno atraso artificial para a animação ficar fluída
+      setTimeout(() => {
+        // Desvanecer o loader
+        loader.style.opacity = '0';
+        loader.style.pointerEvents = 'none';
+        
+        // Focar e revelar o iframe
+        frame.classList.remove('frame-loading');
+        frame.classList.add('frame-ready');
+      }, 300);
     }
   </script>
 </body>
