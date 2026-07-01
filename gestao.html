@@ -273,5 +273,144 @@
     </div>
   </div>
 
+  <!-- Container das notificações (Toasts) -->
+  <div id="toast-container" class="fixed bottom-4 right-4 sm:bottom-8 sm:right-8 z-[100] flex flex-col gap-3 pointer-events-none"></div>
+
+  <!-- Modal "Novo Membro" -->
+  <div id="modal-novo-membro" class="fixed inset-0 z-[100] hidden items-center justify-center p-4">
+    <!-- Backdrop Blur -->
+    <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity opacity-0" id="modal-backdrop" onclick="closeModal()"></div>
+    
+    <!-- Caixa do Modal -->
+    <div class="bg-matte-card border border-white/[0.1] w-full max-w-md rounded-3xl p-6 relative z-10 transform scale-95 opacity-0 transition-all shadow-2xl flex flex-col" id="modal-panel">
+       <div class="flex justify-between items-center mb-6">
+         <h3 class="text-xl font-bold text-white flex items-center gap-2"><i class="ph-fill ph-user-plus text-matte-muted"></i> Novo Membro</h3>
+         <button onclick="closeModal()" class="text-matte-muted hover:text-white bg-white/[0.02] hover:bg-white/[0.1] p-1.5 rounded-xl border border-transparent hover:border-white/[0.05] transition-all"><i class="ph ph-x text-lg"></i></button>
+       </div>
+       
+       <div class="space-y-4">
+          <div>
+            <label class="text-[11px] text-matte-muted uppercase tracking-wider font-semibold mb-1.5 block">Nome Completo</label>
+            <input type="text" placeholder="Ex: João Silva" class="w-full bg-[#09090b] border border-white/[0.1] rounded-xl px-4 py-3 text-sm text-white focus:border-white/30 focus:ring-1 focus:ring-white/20 transition-all outline-none placeholder:text-white/20">
+          </div>
+          <div>
+            <label class="text-[11px] text-matte-muted uppercase tracking-wider font-semibold mb-1.5 block">Cargo / Função</label>
+            <input type="text" placeholder="Ex: Desenvolvedor Senior" class="w-full bg-[#09090b] border border-white/[0.1] rounded-xl px-4 py-3 text-sm text-white focus:border-white/30 focus:ring-1 focus:ring-white/20 transition-all outline-none placeholder:text-white/20">
+          </div>
+          <div class="pt-4 flex gap-3">
+             <button onclick="closeModal()" class="flex-1 py-3 rounded-xl border border-white/[0.1] text-sm text-white font-medium hover:bg-white/[0.05] transition-colors active:scale-95">Cancelar</button>
+             <button onclick="salvarMembro()" class="flex-1 py-3 rounded-xl bg-white text-black text-sm font-bold hover:bg-gray-200 transition-colors shadow-[0_0_20px_rgba(255,255,255,0.1)] active:scale-95">Adicionar</button>
+          </div>
+       </div>
+    </div>
+  </div>
+
+  <script>
+    // 1. Sistema de Notificações (Toasts) Premium
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      
+      let icon = 'ph-info';
+      let colorClass = 'text-blue-400 bg-blue-400/10 border-blue-400/20';
+      
+      if(type === 'success') {
+        icon = 'ph-check-circle';
+        colorClass = 'text-green-400 bg-green-400/10 border-green-400/20';
+      } else if (type === 'warning') {
+        icon = 'ph-warning';
+        colorClass = 'text-orange-400 bg-orange-400/10 border-orange-400/20';
+      }
+      
+      toast.className = `transform transition-all duration-500 translate-y-10 opacity-0 flex items-center gap-3 px-4 py-3.5 rounded-2xl shadow-xl border border-white/[0.05] bg-[#18181b] text-white text-sm font-medium pointer-events-auto`;
+      
+      toast.innerHTML = `
+        <div class="p-1.5 rounded-xl border ${colorClass}">
+            <i class="ph-fill ${icon} text-lg"></i>
+        </div>
+        ${message}
+      `;
+      
+      container.appendChild(toast);
+      
+      // Animação de Entrada
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            toast.classList.remove('translate-y-10', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+        });
+      });
+      
+      // Remover após 3 segundos
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-10', 'opacity-0');
+        setTimeout(() => toast.remove(), 500); // Aguarda terminar a transição
+      }, 3000);
+    }
+
+    // 2. Lógica do Modal de Novo Membro
+    const modal = document.getElementById('modal-novo-membro');
+    const backdrop = document.getElementById('modal-backdrop');
+    const panel = document.getElementById('modal-panel');
+
+    function openModal() {
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      
+      // Forçar reflow para a animação disparar corretamente
+      void modal.offsetWidth;
+      
+      backdrop.classList.add('opacity-100');
+      backdrop.classList.remove('opacity-0');
+      
+      panel.classList.add('scale-100', 'opacity-100');
+      panel.classList.remove('scale-95', 'opacity-0');
+    }
+
+    function closeModal() {
+      backdrop.classList.remove('opacity-100');
+      backdrop.classList.add('opacity-0');
+      
+      panel.classList.remove('scale-100', 'opacity-100');
+      panel.classList.add('scale-95', 'opacity-0');
+      
+      // Esperar a animação terminar para esconder display
+      setTimeout(() => {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }, 300);
+    }
+
+    function salvarMembro() {
+      closeModal();
+      setTimeout(() => {
+          showToast('Membro adicionado com sucesso!', 'success');
+      }, 300);
+    }
+
+    // 3. Conectar Botões da UI às Funções (Ao carregar a página)
+    document.addEventListener('DOMContentLoaded', () => {
+       // O botão principal do topo
+       const btnNovoMembro = document.querySelector('header button');
+       if(btnNovoMembro) btnNovoMembro.addEventListener('click', openModal);
+       
+       // O botão de filtros da barra de pesquisa
+       const btnFiltro = document.querySelector('.ph-faders').parentElement;
+       if(btnFiltro) btnFiltro.addEventListener('click', () => showToast('Filtros avançados estarão disponíveis em breve.', 'warning'));
+       
+       // Os botões de ação na tabela (ícones de 3 pontos)
+       const btnsAcao = document.querySelectorAll('td .ph-dots-three');
+       btnsAcao.forEach(btn => {
+           btn.parentElement.addEventListener('click', () => showToast('A abrir opções do membro...'));
+       });
+       
+       // Botão de Paginação
+       const btnProxima = document.querySelectorAll('.p-4.border-t button');
+       if(btnProxima.length > 1) {
+           btnProxima[1].addEventListener('click', () => showToast('A carregar a página 2...'));
+       }
+    });
+  </script>
 </body>
 </html>
