@@ -31,7 +31,6 @@
   </script>
 
   <style>
-    /* Estilização da barra de scroll (elegante e fina) */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 10px; }
@@ -42,7 +41,6 @@
       -webkit-tap-highlight-color: transparent; 
     }
     
-    /* Classes de animação para carregamento inicial suave */
     .slide-up { 
       animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
       opacity: 0; 
@@ -53,7 +51,6 @@
       to { opacity: 1; transform: translateY(0); } 
     }
 
-    /* Delays escalonados para efeito "Cascata" nos elementos */
     .delay-100 { animation-delay: 100ms; }
     .delay-200 { animation-delay: 200ms; }
     .delay-300 { animation-delay: 300ms; }
@@ -63,7 +60,6 @@
 </head>
 <body class="text-matte-text p-4 sm:p-6 lg:p-8 min-h-screen overflow-y-auto pb-24">
 
-  <!-- Header da Página -->
   <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 slide-up">
     <div>
       <h1 class="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
@@ -75,16 +71,13 @@
       <p class="text-matte-muted text-sm mt-2 font-medium">Acompanhamento e gestão de recursos humanos.</p>
     </div>
     
-    <button class="w-full sm:w-auto flex items-center justify-center gap-2 bg-white text-black px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors shadow-[0_0_20px_rgba(255,255,255,0.15)] active:scale-95">
+    <button onclick="openModal()" class="w-full sm:w-auto flex items-center justify-center gap-2 bg-white text-black px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors shadow-[0_0_20px_rgba(255,255,255,0.15)] active:scale-95">
       <i class="ph-bold ph-plus"></i>
       Novo Membro
     </button>
   </header>
 
-  <!-- Grid de Estatísticas (Cards) -->
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-    
-    <!-- Card 1 -->
     <div class="bg-matte-card border border-white/[0.05] p-5 rounded-2xl slide-up delay-100 relative overflow-hidden group hover:border-white/[0.15] hover:bg-[#1c1c20] transition-all duration-300">
       <div class="flex justify-between items-start mb-4 relative z-10">
         <div class="p-2.5 bg-blue-500/10 text-blue-400 rounded-xl border border-blue-500/20">
@@ -92,13 +85,11 @@
         </div>
         <span class="text-xs font-semibold text-green-400 bg-green-500/10 border border-green-500/20 px-2 py-1 rounded-full">+2 este mês</span>
       </div>
-      <h3 class="text-3xl font-bold text-white mb-1 tracking-tight relative z-10">24</h3>
+      <h3 id="membros-ativos-kpi" class="text-3xl font-bold text-white mb-1 tracking-tight relative z-10">24</h3>
       <p class="text-sm text-matte-muted font-medium relative z-10">Membros Ativos</p>
-      <!-- Efeito de brilho/Glow de fundo -->
       <div class="absolute -bottom-8 -right-8 w-32 h-32 bg-blue-500/10 blur-3xl rounded-full group-hover:bg-blue-500/20 transition-colors duration-500"></div>
     </div>
 
-    <!-- Card 2 -->
     <div class="bg-matte-card border border-white/[0.05] p-5 rounded-2xl slide-up delay-200 relative overflow-hidden group hover:border-white/[0.15] hover:bg-[#1c1c20] transition-all duration-300">
       <div class="flex justify-between items-start mb-4 relative z-10">
         <div class="p-2.5 bg-purple-500/10 text-purple-400 rounded-xl border border-purple-500/20">
@@ -110,7 +101,6 @@
       <div class="absolute -bottom-8 -right-8 w-32 h-32 bg-purple-500/10 blur-3xl rounded-full group-hover:bg-purple-500/20 transition-colors duration-500"></div>
     </div>
 
-    <!-- Card 3 -->
     <div class="bg-matte-card border border-white/[0.05] p-5 rounded-2xl slide-up delay-300 relative overflow-hidden group hover:border-white/[0.15] hover:bg-[#1c1c20] transition-all duration-300">
       <div class="flex justify-between items-start mb-4 relative z-10">
         <div class="p-2.5 bg-orange-500/10 text-orange-400 rounded-xl border border-orange-500/20">
@@ -123,7 +113,6 @@
       <div class="absolute -bottom-8 -right-8 w-32 h-32 bg-orange-500/10 blur-3xl rounded-full group-hover:bg-orange-500/20 transition-colors duration-500"></div>
     </div>
 
-    <!-- Card 4 -->
     <div class="bg-matte-card border border-white/[0.05] p-5 rounded-2xl slide-up delay-400 relative overflow-hidden group hover:border-white/[0.15] hover:bg-[#1c1c20] transition-all duration-300">
       <div class="flex justify-between items-start mb-4 relative z-10">
         <div class="p-2.5 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/20">
@@ -136,25 +125,22 @@
     </div>
   </div>
 
-  <!-- Tabela de Membros Recentes -->
   <div class="bg-matte-card border border-white/[0.05] rounded-2xl overflow-hidden slide-up delay-500 shadow-xl">
     
-    <!-- Cabeçalho da Tabela / Filtros -->
     <div class="p-5 border-b border-white/[0.05] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
       <h2 class="text-lg font-semibold text-white">Diretório de Membros</h2>
       
       <div class="w-full sm:w-auto flex gap-2">
         <div class="relative w-full sm:w-64">
           <i class="ph ph-magnifying-glass absolute left-3 top-1/2 transform -translate-y-1/2 text-matte-muted"></i>
-          <input type="text" placeholder="Pesquisar..." class="w-full bg-[#09090b] border border-white/[0.1] text-sm text-white rounded-xl pl-9 pr-3 py-2.5 focus:outline-none focus:border-white/30 focus:ring-1 focus:ring-white/20 transition-all placeholder:text-matte-muted">
+          <input type="text" id="input-pesquisa" placeholder="Pesquisar..." class="w-full bg-[#09090b] border border-white/[0.1] text-sm text-white rounded-xl pl-9 pr-3 py-2.5 focus:outline-none focus:border-white/30 focus:ring-1 focus:ring-white/20 transition-all placeholder:text-matte-muted">
         </div>
-        <button class="px-3 py-2.5 bg-[#09090b] border border-white/[0.1] rounded-xl text-matte-muted hover:text-white hover:border-white/30 transition-all active:scale-95">
+        <button class="px-3 py-2.5 bg-[#09090b] border border-white/[0.1] rounded-xl text-matte-muted hover:text-white hover:border-white/30 transition-all active:scale-95" onclick="showToast('Filtros avançados estarão disponíveis em breve.', 'warning')">
           <i class="ph ph-faders text-lg"></i>
         </button>
       </div>
     </div>
 
-    <!-- Tabela Responsiva -->
     <div class="overflow-x-auto">
       <table class="w-full text-left text-sm whitespace-nowrap">
         <thead class="bg-white/[0.02] border-b border-white/[0.05] text-matte-muted">
@@ -166,9 +152,8 @@
             <th class="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-right">Ações</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-white/[0.05]">
+        <tbody id="tabela-membros" class="divide-y divide-white/[0.05]">
           
-          <!-- Linha 1 -->
           <tr class="hover:bg-white/[0.02] transition-colors group">
             <td class="px-6 py-4">
               <div class="flex items-center gap-3">
@@ -187,11 +172,10 @@
             </td>
             <td class="px-6 py-4 text-matte-muted font-medium">Há 2 horas</td>
             <td class="px-6 py-4 text-right">
-              <button class="text-matte-muted hover:text-white hover:bg-white/5 p-2 rounded-lg transition-colors"><i class="ph ph-dots-three text-xl"></i></button>
+              <button onclick="showToast('A abrir opções do membro...')" class="text-matte-muted hover:text-white hover:bg-white/5 p-2 rounded-lg transition-colors"><i class="ph ph-dots-three text-xl"></i></button>
             </td>
           </tr>
           
-          <!-- Linha 2 -->
           <tr class="hover:bg-white/[0.02] transition-colors group">
             <td class="px-6 py-4">
               <div class="flex items-center gap-3">
@@ -210,11 +194,10 @@
             </td>
             <td class="px-6 py-4 text-matte-muted font-medium">Online agora</td>
             <td class="px-6 py-4 text-right">
-              <button class="text-matte-muted hover:text-white hover:bg-white/5 p-2 rounded-lg transition-colors"><i class="ph ph-dots-three text-xl"></i></button>
+              <button onclick="showToast('A abrir opções do membro...')" class="text-matte-muted hover:text-white hover:bg-white/5 p-2 rounded-lg transition-colors"><i class="ph ph-dots-three text-xl"></i></button>
             </td>
           </tr>
 
-          <!-- Linha 3 -->
           <tr class="hover:bg-white/[0.02] transition-colors group">
             <td class="px-6 py-4">
               <div class="flex items-center gap-3">
@@ -233,11 +216,10 @@
             </td>
             <td class="px-6 py-4 text-matte-muted font-medium">Há 1 dia</td>
             <td class="px-6 py-4 text-right">
-              <button class="text-matte-muted hover:text-white hover:bg-white/5 p-2 rounded-lg transition-colors"><i class="ph ph-dots-three text-xl"></i></button>
+              <button onclick="showToast('A abrir opções do membro...')" class="text-matte-muted hover:text-white hover:bg-white/5 p-2 rounded-lg transition-colors"><i class="ph ph-dots-three text-xl"></i></button>
             </td>
           </tr>
           
-          <!-- Linha 4 -->
           <tr class="hover:bg-white/[0.02] transition-colors group">
             <td class="px-6 py-4">
               <div class="flex items-center gap-3">
@@ -256,32 +238,27 @@
             </td>
             <td class="px-6 py-4 text-matte-muted font-medium">Há 1 semana</td>
             <td class="px-6 py-4 text-right">
-              <button class="text-matte-muted hover:text-white hover:bg-white/5 p-2 rounded-lg transition-colors"><i class="ph ph-dots-three text-xl"></i></button>
+              <button onclick="showToast('A abrir opções do membro...')" class="text-matte-muted hover:text-white hover:bg-white/5 p-2 rounded-lg transition-colors"><i class="ph ph-dots-three text-xl"></i></button>
             </td>
           </tr>
         </tbody>
       </table>
     </div>
     
-    <!-- Rodapé / Paginação -->
     <div class="p-4 border-t border-white/[0.05] flex items-center justify-between text-xs text-matte-muted font-medium">
-      <p>Mostrando <span class="text-white font-bold">1</span> a <span class="text-white font-bold">4</span> de <span class="text-white font-bold">24</span> membros</p>
+      <p id="texto-paginacao">Mostrando <span class="text-white font-bold">1</span> a <span class="text-white font-bold">4</span> de <span class="text-white font-bold">24</span> membros</p>
       <div class="flex gap-1.5">
         <button class="px-3 py-1.5 border border-white/[0.1] rounded-lg bg-white/[0.02] hover:bg-white/[0.06] transition-colors disabled:opacity-30 disabled:hover:bg-white/[0.02]" disabled>Anterior</button>
-        <button class="px-3 py-1.5 border border-white/[0.1] rounded-lg bg-white/[0.02] hover:bg-white/[0.06] transition-colors text-white">Próxima</button>
+        <button class="px-3 py-1.5 border border-white/[0.1] rounded-lg bg-white/[0.02] hover:bg-white/[0.06] transition-colors text-white" onclick="showToast('A carregar página 2...')">Próxima</button>
       </div>
     </div>
   </div>
 
-  <!-- Container das notificações (Toasts) -->
   <div id="toast-container" class="fixed bottom-4 right-4 sm:bottom-8 sm:right-8 z-[100] flex flex-col gap-3 pointer-events-none"></div>
 
-  <!-- Modal "Novo Membro" -->
   <div id="modal-novo-membro" class="fixed inset-0 z-[100] hidden items-center justify-center p-4">
-    <!-- Backdrop Blur -->
     <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity opacity-0" id="modal-backdrop" onclick="closeModal()"></div>
     
-    <!-- Caixa do Modal -->
     <div class="bg-matte-card border border-white/[0.1] w-full max-w-md rounded-3xl p-6 relative z-10 transform scale-95 opacity-0 transition-all shadow-2xl flex flex-col" id="modal-panel">
        <div class="flex justify-between items-center mb-6">
          <h3 class="text-xl font-bold text-white flex items-center gap-2"><i class="ph-fill ph-user-plus text-matte-muted"></i> Novo Membro</h3>
@@ -291,11 +268,11 @@
        <div class="space-y-4">
           <div>
             <label class="text-[11px] text-matte-muted uppercase tracking-wider font-semibold mb-1.5 block">Nome Completo</label>
-            <input type="text" placeholder="Ex: João Silva" class="w-full bg-[#09090b] border border-white/[0.1] rounded-xl px-4 py-3 text-sm text-white focus:border-white/30 focus:ring-1 focus:ring-white/20 transition-all outline-none placeholder:text-white/20">
+            <input type="text" id="novo-nome" placeholder="Ex: Tiago Silva" class="w-full bg-[#09090b] border border-white/[0.1] rounded-xl px-4 py-3 text-sm text-white focus:border-white/30 focus:ring-1 focus:ring-white/20 transition-all outline-none placeholder:text-white/20">
           </div>
           <div>
             <label class="text-[11px] text-matte-muted uppercase tracking-wider font-semibold mb-1.5 block">Cargo / Função</label>
-            <input type="text" placeholder="Ex: Desenvolvedor Senior" class="w-full bg-[#09090b] border border-white/[0.1] rounded-xl px-4 py-3 text-sm text-white focus:border-white/30 focus:ring-1 focus:ring-white/20 transition-all outline-none placeholder:text-white/20">
+            <input type="text" id="novo-cargo" placeholder="Ex: Desenvolvedor Mobile" class="w-full bg-[#09090b] border border-white/[0.1] rounded-xl px-4 py-3 text-sm text-white focus:border-white/30 focus:ring-1 focus:ring-white/20 transition-all outline-none placeholder:text-white/20">
           </div>
           <div class="pt-4 flex gap-3">
              <button onclick="closeModal()" class="flex-1 py-3 rounded-xl border border-white/[0.1] text-sm text-white font-medium hover:bg-white/[0.05] transition-colors active:scale-95">Cancelar</button>
@@ -306,7 +283,7 @@
   </div>
 
   <script>
-    // 1. Sistema de Notificações (Toasts) Premium
+    // --- 1. Toasts (Notificações) ---
     function showToast(message, type = 'info') {
       const container = document.getElementById('toast-container');
       const toast = document.createElement('div');
@@ -323,7 +300,6 @@
       }
       
       toast.className = `transform transition-all duration-500 translate-y-10 opacity-0 flex items-center gap-3 px-4 py-3.5 rounded-2xl shadow-xl border border-white/[0.05] bg-[#18181b] text-white text-sm font-medium pointer-events-auto`;
-      
       toast.innerHTML = `
         <div class="p-1.5 rounded-xl border ${colorClass}">
             <i class="ph-fill ${icon} text-lg"></i>
@@ -333,7 +309,6 @@
       
       container.appendChild(toast);
       
-      // Animação de Entrada
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
             toast.classList.remove('translate-y-10', 'opacity-0');
@@ -341,15 +316,14 @@
         });
       });
       
-      // Remover após 3 segundos
       setTimeout(() => {
         toast.classList.remove('translate-y-0', 'opacity-100');
         toast.classList.add('translate-y-10', 'opacity-0');
-        setTimeout(() => toast.remove(), 500); // Aguarda terminar a transição
+        setTimeout(() => toast.remove(), 500);
       }, 3000);
     }
 
-    // 2. Lógica do Modal de Novo Membro
+    // --- 2. Lógica do Modal ---
     const modal = document.getElementById('modal-novo-membro');
     const backdrop = document.getElementById('modal-backdrop');
     const panel = document.getElementById('modal-panel');
@@ -357,13 +331,9 @@
     function openModal() {
       modal.classList.remove('hidden');
       modal.classList.add('flex');
-      
-      // Forçar reflow para a animação disparar corretamente
-      void modal.offsetWidth;
-      
+      void modal.offsetWidth; 
       backdrop.classList.add('opacity-100');
       backdrop.classList.remove('opacity-0');
-      
       panel.classList.add('scale-100', 'opacity-100');
       panel.classList.remove('scale-95', 'opacity-0');
     }
@@ -371,46 +341,105 @@
     function closeModal() {
       backdrop.classList.remove('opacity-100');
       backdrop.classList.add('opacity-0');
-      
       panel.classList.remove('scale-100', 'opacity-100');
       panel.classList.add('scale-95', 'opacity-0');
-      
-      // Esperar a animação terminar para esconder display
       setTimeout(() => {
         modal.classList.add('hidden');
         modal.classList.remove('flex');
       }, 300);
     }
 
+    // --- 3. Lógica para Adicionar Membro (Manipulação de DOM) ---
     function salvarMembro() {
+      const inputNome = document.getElementById('novo-nome');
+      const inputCargo = document.getElementById('novo-cargo');
+      
+      const nome = inputNome.value.trim();
+      const cargo = inputCargo.value.trim();
+
+      if (!nome || !cargo) {
+        showToast('Por favor, preencha todos os campos.', 'warning');
+        return;
+      }
+
+      // Gerar e-mail e avatar
+      const email = nome.toLowerCase().replace(/\s+/g, '.') + '@nexus.pt';
+      const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(nome)}&background=27272a&color=fafafa&bold=true`;
+
+      // Criar a nova linha (tr) da tabela baseada na tua estrutura original
+      const novaLinha = document.createElement('tr');
+      novaLinha.className = 'hover:bg-white/[0.02] transition-colors group slide-up';
+      novaLinha.innerHTML = `
+        <td class="px-6 py-4">
+          <div class="flex items-center gap-3">
+            <img src="${avatarUrl}" alt="Avatar" class="w-10 h-10 rounded-full border border-white/10 group-hover:border-white/30 transition-colors">
+            <div>
+              <p class="font-semibold text-white">${nome}</p>
+              <p class="text-xs text-matte-muted font-medium mt-0.5">${email}</p>
+            </div>
+          </div>
+        </td>
+        <td class="px-6 py-4 text-matte-muted font-medium">${cargo}</td>
+        <td class="px-6 py-4">
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-green-500/10 text-green-400 border border-green-500/20 uppercase tracking-wide">
+            <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span> Ativo
+          </span>
+        </td>
+        <td class="px-6 py-4 text-matte-muted font-medium">Agora mesmo</td>
+        <td class="px-6 py-4 text-right">
+          <button onclick="showToast('A abrir opções do membro...')" class="text-matte-muted hover:text-white hover:bg-white/5 p-2 rounded-lg transition-colors"><i class="ph ph-dots-three text-xl"></i></button>
+        </td>
+      `;
+
+      // Adicionar ao topo do corpo da tabela
+      const tbody = document.getElementById('tabela-membros');
+      tbody.insertBefore(novaLinha, tbody.firstChild);
+
+      // Atualizar número do KPI "Membros Ativos"
+      const kpi = document.getElementById('membros-ativos-kpi');
+      kpi.innerText = parseInt(kpi.innerText) + 1;
+
+      // Limpar os inputs e fechar o modal
+      inputNome.value = '';
+      inputCargo.value = '';
       closeModal();
-      setTimeout(() => {
-          showToast('Membro adicionado com sucesso!', 'success');
-      }, 300);
+      
+      atualizarContadorRodape();
+      showToast('Membro adicionado com sucesso!', 'success');
     }
 
-    // 3. Conectar Botões da UI às Funções (Ao carregar a página)
-    document.addEventListener('DOMContentLoaded', () => {
-       // O botão principal do topo
-       const btnNovoMembro = document.querySelector('header button');
-       if(btnNovoMembro) btnNovoMembro.addEventListener('click', openModal);
-       
-       // O botão de filtros da barra de pesquisa
-       const btnFiltro = document.querySelector('.ph-faders').parentElement;
-       if(btnFiltro) btnFiltro.addEventListener('click', () => showToast('Filtros avançados estarão disponíveis em breve.', 'warning'));
-       
-       // Os botões de ação na tabela (ícones de 3 pontos)
-       const btnsAcao = document.querySelectorAll('td .ph-dots-three');
-       btnsAcao.forEach(btn => {
-           btn.parentElement.addEventListener('click', () => showToast('A abrir opções do membro...'));
-       });
-       
-       // Botão de Paginação
-       const btnProxima = document.querySelectorAll('.p-4.border-t button');
-       if(btnProxima.length > 1) {
-           btnProxima[1].addEventListener('click', () => showToast('A carregar a página 2...'));
-       }
+    // --- 4. Lógica de Pesquisa/Filtro ---
+    document.getElementById('input-pesquisa').addEventListener('input', function(e) {
+      const termo = e.target.value.toLowerCase();
+      const linhas = document.querySelectorAll('#tabela-membros tr');
+
+      linhas.forEach(linha => {
+        // Obter o texto da linha (Nome, Email, Cargo, etc.)
+        const textoLinha = linha.textContent.toLowerCase();
+        
+        // Se a linha conter o texto digitado, mostrar; caso contrário, ocultar
+        if (textoLinha.includes(termo)) {
+          linha.style.display = '';
+        } else {
+          linha.style.display = 'none';
+        }
+      });
+      
+      atualizarContadorRodape();
     });
+
+    // --- 5. Atualizar Contadores da Tabela (Rodapé) ---
+    function atualizarContadorRodape() {
+      const linhasVisiveis = document.querySelectorAll('#tabela-membros tr:not([style*="display: none"])').length;
+      const totalLinhas = document.querySelectorAll('#tabela-membros tr').length;
+      
+      const texto = document.getElementById('texto-paginacao');
+      if (linhasVisiveis === 0) {
+        texto.innerHTML = `Mostrando <span class="text-white font-bold">0</span> de <span class="text-white font-bold">${totalLinhas}</span> membros`;
+      } else {
+        texto.innerHTML = `Mostrando <span class="text-white font-bold">1</span> a <span class="text-white font-bold">${linhasVisiveis}</span> de <span class="text-white font-bold">${totalLinhas}</span> membros`;
+      }
+    }
   </script>
 </body>
 </html>
