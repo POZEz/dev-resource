@@ -2,7 +2,7 @@
 <html lang="pt-BR" class="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Plano de Estudos - Foco Ifes</title>
     
     <!-- Tailwind CSS -->
@@ -10,7 +10,7 @@
     <!-- Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     
     <script>
         tailwind.config = {
@@ -19,12 +19,10 @@
                 extend: {
                     fontFamily: { sans: ['Inter', 'sans-serif'] },
                     colors: { 
-                        // Tons Matte Black (Zinco)
                         matte: {
                             bg: '#09090b',
                             card: '#18181b',
                             border: '#27272a',
-                            hover: '#27272a',
                             text: '#fafafa',
                             muted: '#a1a1aa'
                         }
@@ -35,7 +33,12 @@
     </script>
 
     <style>
-        body { background-color: #09090b; color: #fafafa; -webkit-tap-highlight-color: transparent; }
+        body { 
+            background-color: #09090b; 
+            color: #fafafa; 
+            -webkit-tap-highlight-color: transparent; 
+            overflow-x: hidden;
+        }
         
         /* Scrollbar elegante */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -43,7 +46,6 @@
         ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: #52525b; }
 
-        /* Utilitários sem scrollbar para menus horizontais */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
@@ -58,213 +60,242 @@
             overflow: hidden;
             opacity: 0;
             transform: translateY(-8px);
-            transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+            transition: opacity 0.3s ease, transform 0.3s ease;
         }
         .day-content.open .day-content-inner {
             opacity: 1;
             transform: translateY(0);
         }
 
-        /* Animações sutis e profissionais */
-        @keyframes fadeInDown { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
-        .alert-anim { animation: fadeInDown 0.35s ease-out forwards; }
+        /* Animações e Transições Premium */
+        @keyframes slideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+        .modal-anim { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         
-        @keyframes slideIn { from { transform: translateY(15px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes slideIn { from { transform: translateY(-15px) translateX(-50%); opacity: 0; } to { transform: translateY(0) translateX(-50%); opacity: 1; } }
         .toast-animate { animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         
-        /* Sino de notificação animado (popBounce) */
         @keyframes popBounce {
             0% { transform: scale(0.5); opacity: 0; }
             50% { transform: scale(1.15); opacity: 1; }
             100% { transform: scale(1); opacity: 1; }
         }
-        .bell-show {
-            display: block !important;
-            animation: popBounce 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        .bell-show { display: block !important; animation: popBounce 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+        /* Estilo da Checklist */
+        .task-checkbox {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .task-item:active .task-checkbox {
+            transform: scale(0.85);
         }
     </style>
 </head>
 <body class="antialiased min-h-screen flex flex-col relative" onclick="closeProfileMenu(event)">
 
-    <!-- Cabeçalho Fixo (Sticky) -->
-    <header class="sticky top-0 z-50 bg-matte-bg/95 backdrop-blur-md border-b border-white/[0.04]">
-        <div class="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center gap-4">
+    <header class="sticky top-0 z-50 bg-matte-bg/90 backdrop-blur-md border-b border-white/[0.04]">
+        <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center gap-4">
             
             <div class="flex items-center gap-3">
-                
                 <!-- Dropdown de Perfil -->
                 <div class="relative">
-                    <button id="profile-btn" onclick="toggleProfileMenu(event)" class="flex items-center gap-2 p-2 -ml-2 rounded-lg hover:bg-white/[0.03] active:scale-[0.98] transition-all duration-200">
-                        <div class="bg-white/[0.04] p-2 rounded-md text-zinc-100 hidden sm:block">
+                    <button id="profile-btn" onclick="toggleProfileMenu(event)" class="flex items-center gap-3 p-1.5 -ml-1.5 rounded-xl hover:bg-white/[0.03] active:scale-[0.98] transition-all duration-200">
+                        <div class="bg-blue-500/10 p-2 rounded-lg text-blue-400 hidden sm:flex items-center justify-center">
                             <i class="ph-fill ph-student text-xl"></i>
                         </div>
                         <div class="text-left">
-                            <h1 class="text-sm sm:text-base font-bold text-matte-text flex items-center gap-1.5">
-                                <span id="current-profile-name">Meu Perfil</span>
-                                <i class="ph-fill ph-caret-down text-matte-muted text-xs"></i>
+                            <h1 class="text-sm sm:text-base font-bold text-white flex items-center gap-1.5 leading-tight">
+                                <span id="current-profile-name">Carregando...</span>
+                                <i class="ph-bold ph-caret-down text-zinc-500 text-[10px]"></i>
                             </h1>
-                            <p class="text-[10px] text-matte-muted tracking-wide">Alternar aluno</p>
+                            <p class="text-[10px] text-zinc-500 font-medium tracking-wide">Plano de Estudos</p>
                         </div>
                     </button>
                     
                     <!-- Menu de Perfis -->
-                    <div id="profile-menu" class="absolute top-full left-0 mt-2 w-64 bg-matte-card border border-white/[0.05] rounded-xl shadow-2xl hidden flex-col overflow-hidden z-50">
+                    <div id="profile-menu" class="absolute top-full left-0 mt-2 w-64 bg-matte-card border border-white/[0.05] rounded-2xl shadow-2xl hidden flex-col overflow-hidden z-50 modal-anim">
+                        <div class="p-3 border-b border-white/[0.05]">
+                            <p class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Meus Perfis</p>
+                        </div>
                         <div id="profile-list" class="max-h-60 overflow-y-auto py-1">
                             <!-- JS renderiza lista -->
                         </div>
                         <div class="border-t border-white/[0.05] p-2">
-                            <button onclick="openNewProfileModal()" class="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-zinc-200 hover:bg-white/[0.03] active:scale-95 rounded-lg transition-all font-medium">
-                                <i class="ph-bold ph-plus text-zinc-400"></i> Criar novo plano
+                            <button onclick="openNewProfileModal()" class="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-zinc-300 hover:text-white hover:bg-white/[0.03] active:scale-95 rounded-xl transition-all font-medium">
+                                <i class="ph-bold ph-plus text-blue-400"></i> Criar novo plano
                             </button>
                         </div>
                     </div>
                 </div>
             </div>
             
-            <!-- Ações e Progresso -->
-            <div class="flex items-center gap-3">
-                <!-- Botão de Sino com animação popBounce via JS -->
-                <button id="mini-alert-badge" onclick="toggleAlertBanner(true)" class="hidden opacity-0 scale-90 relative p-2 text-matte-muted hover:text-red-400 transition-colors rounded-lg" title="Tarefas atrasadas">
-                    <div class="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                    <i class="ph-fill ph-bell text-xl"></i>
+            <!-- Ações e Progresso Resumido -->
+            <div class="flex items-center gap-2 sm:gap-4">
+                <button id="mini-alert-badge" onclick="toggleAlertBanner(true)" class="hidden opacity-0 scale-90 relative p-2 text-zinc-400 hover:text-red-400 bg-white/[0.02] hover:bg-white/[0.05] rounded-xl transition-colors" title="Tarefas atrasadas">
+                    <div class="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 border-2 border-matte-bg rounded-full animate-pulse"></div>
+                    <i class="ph-fill ph-bell text-lg"></i>
                 </button>
 
-                <div class="flex items-center gap-3 bg-white/[0.02] px-3 py-1.5 rounded-full">
-                    <div class="relative w-7 h-7 flex items-center justify-center">
-                        <svg class="w-7 h-7 transform -rotate-90" viewBox="0 0 36 36">
-                            <circle cx="18" cy="18" r="16" fill="none" class="stroke-white/[0.1]" stroke-width="3"></circle>
-                            <circle id="progress-circle" cx="18" cy="18" r="16" fill="none" class="stroke-white" stroke-width="3" stroke-dasharray="100 100" stroke-dashoffset="100" stroke-linecap="round" style="transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1);"></circle>
+                <div class="flex items-center gap-3 bg-white/[0.02] border border-white/[0.03] px-3 py-1.5 rounded-full">
+                    <div class="relative w-8 h-8 flex items-center justify-center">
+                        <svg class="w-8 h-8 transform -rotate-90" viewBox="0 0 36 36">
+                            <circle cx="18" cy="18" r="16" fill="none" class="stroke-white/[0.05]" stroke-width="3"></circle>
+                            <circle id="progress-circle" cx="18" cy="18" r="16" fill="none" class="stroke-blue-500" stroke-width="3" stroke-dasharray="100 100" stroke-dashoffset="100" stroke-linecap="round" style="transition: stroke-dashoffset 1s cubic-bezier(0.4, 0, 0.2, 1);"></circle>
                         </svg>
-                        <span id="progress-text" class="absolute text-[9px] font-bold text-white">0%</span>
+                        <span id="progress-text" class="absolute text-[9px] font-black text-white">0%</span>
                     </div>
-                    <span class="text-xs font-medium hidden sm:block pr-2 text-zinc-400 tracking-wide">Progresso</span>
+                    <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider hidden sm:block pr-2">Concluído</span>
                 </div>
             </div>
         </div>
         
         <!-- Progresso Mobile em linha -->
-        <div class="w-full h-[2px] bg-matte-card sm:hidden">
-            <div id="progress-bar-mobile" class="h-full bg-white transition-all duration-700 ease-out" style="width: 0%"></div>
+        <div class="w-full h-1 bg-white/[0.02] sm:hidden">
+            <div id="progress-bar-mobile" class="h-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)] transition-all duration-1000 ease-out" style="width: 0%"></div>
         </div>
     </header>
 
-    <!-- Estrutura Principal -->
-    <main class="flex-1 max-w-5xl mx-auto w-full flex flex-col md:flex-row pb-24">
+    <main class="flex-1 max-w-6xl mx-auto w-full flex flex-col md:flex-row pb-24 relative">
         
-        <!-- Sidebar de Semanas com Setas Navegáveis no Mobile -->
-        <aside class="w-full md:w-64 flex-shrink-0 z-10 sticky top-[66px] md:h-[calc(100vh-66px)] bg-matte-bg border-b md:border-b-0 md:border-r border-white/[0.04] relative">
+        <!-- Sidebar de Semanas -->
+        <aside class="w-full md:w-64 flex-shrink-0 z-10 sticky top-[66px] md:h-[calc(100vh-66px)] bg-matte-bg md:border-r border-white/[0.04] pt-4 md:pr-4">
             
-            <!-- Botão de Seta Esquerda (Aparece só em mobile) -->
-            <button onclick="scrollNav(-1)" class="md:hidden absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-matte-bg via-matte-bg/80 to-transparent z-20 flex items-center justify-start pl-2 text-zinc-500 hover:text-white transition-colors">
-                <i class="ph-bold ph-caret-left"></i>
-            </button>
+            <p class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-3 px-4 hidden md:block">Navegação</p>
             
-            <nav id="nav-weeks" class="flex md:flex-col overflow-x-auto no-scrollbar scroll-smooth p-4 gap-1 relative z-10 w-full">
-                <!-- JS render -->
-            </nav>
+            <div class="relative w-full">
+                <!-- Seta Esquerda Mobile -->
+                <button onclick="scrollNav(-1)" class="md:hidden absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-matte-bg to-transparent z-20 flex items-center justify-start text-zinc-500">
+                    <i class="ph-bold ph-caret-left"></i>
+                </button>
+                
+                <nav id="nav-weeks" class="flex md:flex-col overflow-x-auto no-scrollbar scroll-smooth px-4 md:px-0 gap-2 relative z-10 w-full pb-4 md:pb-0">
+                    <!-- JS render -->
+                </nav>
 
-            <!-- Botão de Seta Direita (Aparece só em mobile) -->
-            <button onclick="scrollNav(1)" class="md:hidden absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-matte-bg via-matte-bg/80 to-transparent z-20 flex items-center justify-end pr-2 text-zinc-500 hover:text-white transition-colors">
-                <i class="ph-bold ph-caret-right"></i>
-            </button>
+                <!-- Seta Direita Mobile -->
+                <button onclick="scrollNav(1)" class="md:hidden absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-matte-bg to-transparent z-20 flex items-center justify-end text-zinc-500">
+                    <i class="ph-bold ph-caret-right"></i>
+                </button>
+            </div>
         </aside>
 
-        <!-- Área de Tarefas -->
-        <div class="flex-1 p-4 sm:p-6 lg:p-8">
+        <div class="flex-1 p-4 sm:p-6 lg:p-8 overflow-x-hidden">
             
-            <div class="mb-5 flex items-center gap-2 text-xs font-medium text-matte-muted bg-white/[0.02] w-fit px-3 py-1.5 rounded-lg">
-                <i class="ph-fill ph-calendar text-zinc-400"></i> Dia 1 do plano = <span class="text-zinc-200">30 de Junho</span>
-            </div>
+            <!-- Painel de Desempenho (Gamificação) -->
+            <div class="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-5 sm:p-6 mb-8 relative overflow-hidden flex flex-col sm:flex-row gap-6 items-start sm:items-center justify-between">
+                <div class="absolute top-0 right-0 w-48 h-48 bg-blue-500/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
+                
+                <div>
+                    <h2 class="text-lg font-black text-white flex items-center gap-2 mb-1">
+                        <i class="ph-fill ph-rocket-launch text-blue-400"></i> Meu Desempenho
+                    </h2>
+                    <p class="text-sm text-zinc-400">Continue focado, o trabalho duro traz resultados.</p>
+                </div>
 
-            <!-- Banner Atraso Animado -->
-            <div id="delay-alert" class="hidden alert-anim mb-8 bg-red-500/5 rounded-xl p-5 relative">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div>
-                        <h3 class="font-bold text-red-400 flex items-center gap-2"><i class="ph-fill ph-warning-circle text-lg"></i> Pendências Encontradas</h3>
-                        <p class="text-sm text-red-300/70 mt-1">Existem tarefas não concluídas de dias anteriores.</p>
+                <div class="flex gap-4 w-full sm:w-auto">
+                    <div class="bg-black/20 border border-white/[0.03] p-3 rounded-xl flex-1 sm:flex-none sm:min-w-[120px]">
+                        <p class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Tarefas Feitas</p>
+                        <p class="text-2xl font-black text-white leading-none" id="stats-tasks-done">0<span class="text-sm text-zinc-600 font-medium ml-1">/ 0</span></p>
                     </div>
-                    <div class="flex gap-2 w-full sm:w-auto">
-                        <button onclick="goToOldestDelay()" class="flex-1 sm:flex-none whitespace-nowrap bg-red-500/10 hover:bg-red-500/20 text-red-300 px-4 py-2 rounded-lg text-sm font-semibold transition-colors active:scale-[0.98]">
-                            Revisar Atrasos
-                        </button>
+                    <div class="bg-black/20 border border-white/[0.03] p-3 rounded-xl flex-1 sm:flex-none sm:min-w-[120px]">
+                        <p class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Progresso Semanal</p>
+                        <p class="text-2xl font-black text-blue-400 leading-none" id="stats-week-pct">0%</p>
                     </div>
                 </div>
-                <button onclick="toggleAlertBanner(false)" class="absolute top-2 right-2 text-red-500/50 hover:text-red-400 p-2 rounded-md transition-colors">
-                    <i class="ph ph-x text-base"></i>
+            </div>
+
+            <!-- Banner de Atraso -->
+            <div id="delay-alert" class="hidden alert-anim mb-8 bg-amber-500/10 border border-amber-500/20 rounded-2xl p-5 relative">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div class="flex gap-3">
+                        <i class="ph-fill ph-warning-circle text-amber-400 text-2xl shrink-0 mt-0.5"></i>
+                        <div>
+                            <h3 class="font-bold text-amber-400 mb-0.5">Pendências Encontradas</h3>
+                            <p class="text-sm text-amber-200/70">Você tem tarefas não concluídas de dias anteriores.</p>
+                        </div>
+                    </div>
+                    <button onclick="goToOldestDelay()" class="w-full sm:w-auto whitespace-nowrap bg-amber-500 hover:bg-amber-600 text-black px-5 py-2.5 rounded-xl text-sm font-bold transition-colors shadow-lg shadow-amber-500/20 active:scale-95">
+                        Revisar Atrasos
+                    </button>
+                </div>
+                <button onclick="toggleAlertBanner(false)" class="absolute top-3 right-3 text-amber-500/50 hover:text-amber-400 p-2 rounded-lg transition-colors hover:bg-amber-500/10">
+                    <i class="ph-bold ph-x"></i>
                 </button>
             </div>
 
-            <h2 id="current-week-title" class="text-xl sm:text-2xl font-bold text-white tracking-tight mb-6">Semana</h2>
+            <div class="flex items-center justify-between mb-6">
+                <h2 id="current-week-title" class="text-xl sm:text-2xl font-black text-white tracking-tight">Carregando Semana...</h2>
+            </div>
 
-            <!-- Dias da Semana -->
-            <div id="days-container" class="space-y-3">
+            <!-- Container dos Dias -->
+            <div id="days-container" class="space-y-4">
                 <!-- JS render -->
             </div>
         </div>
     </main>
 
-    <!-- Sistema de Avisos (Toast) -->
-    <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none"></div>
+    
+    <!-- Toasts -->
+    <div id="toast-container" class="fixed top-6 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-3 pointer-events-none"></div>
 
-    <!-- Modals -->
-    <div id="profile-modal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm transition-opacity duration-200 opacity-0">
-        <div class="bg-matte-card border border-white/[0.05] rounded-xl shadow-2xl w-full max-w-sm p-6 transform scale-95 transition-transform duration-200" id="profile-modal-content">
-            <h3 class="text-lg font-bold text-white mb-5">Novo Aluno</h3>
+    <!-- Modal Perfil -->
+    <div id="profile-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-end sm:items-center justify-center p-4 transition-opacity duration-300 opacity-0">
+        <div class="bg-matte-card border border-white/[0.05] rounded-t-2xl sm:rounded-3xl shadow-2xl w-full max-w-sm p-6 transform translate-y-full sm:translate-y-0 sm:scale-95 transition-all duration-300" id="profile-modal-content">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-lg font-black text-white flex items-center gap-2"><i class="ph-fill ph-student text-blue-400"></i> Novo Aluno</h3>
+                <button onclick="closeProfileModal()" class="p-2 bg-white/[0.03] hover:bg-white/10 rounded-full text-zinc-400 transition-colors"><i class="ph-bold ph-x text-lg"></i></button>
+            </div>
             
-            <div class="space-y-4 mb-6">
+            <div class="space-y-5 mb-8">
                 <div>
-                    <label class="block text-xs font-semibold text-matte-muted mb-1.5 uppercase tracking-wide">Nome</label>
-                    <input type="text" id="new-profile-name" placeholder="Ex: João, Maria..." class="w-full bg-matte-bg border border-white/[0.05] rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-zinc-500 transition-colors" autocomplete="off">
+                    <label class="block text-xs font-bold text-zinc-500 mb-1.5 uppercase tracking-wide">Nome do Aluno</label>
+                    <input type="text" id="new-profile-name" placeholder="Ex: João, Maria..." class="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl p-3.5 text-sm text-white focus:outline-none focus:border-blue-500/50 transition-colors" autocomplete="off">
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-matte-muted mb-1.5 uppercase tracking-wide">Modelo de Plano</label>
-                    <select id="new-profile-template" class="w-full bg-matte-bg border border-white/[0.05] rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-zinc-500 transition-colors cursor-pointer">
-                        <option value="completo">Plano Completo (Redação + Gramática)</option>
+                    <label class="block text-xs font-bold text-zinc-500 mb-1.5 uppercase tracking-wide">Modelo de Plano</label>
+                    <select id="new-profile-template" class="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl p-3.5 text-sm text-white focus:outline-none focus:border-blue-500/50 transition-colors cursor-pointer appearance-none">
+                        <option value="completo" class="bg-matte-card">Plano Completo (Redação + Gramática)</option>
                     </select>
                 </div>
             </div>
 
-            <div class="flex justify-end gap-2">
-                <button onclick="closeProfileModal()" class="px-4 py-2.5 text-sm font-medium text-zinc-300 hover:text-white hover:bg-white/[0.03] rounded-lg transition-colors active:scale-95">Cancelar</button>
-                <button onclick="createNewProfile()" class="px-4 py-2.5 text-sm font-medium bg-white text-black hover:bg-zinc-200 rounded-lg transition-colors active:scale-95 shadow-sm">Criar Perfil</button>
-            </div>
+            <button onclick="createNewProfile()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3.5 px-4 rounded-xl transition-colors active:scale-95 shadow-lg shadow-blue-500/20">Criar Plano</button>
         </div>
     </div>
 
-    <!-- Modal Editar Tarefa (Admin) -->
-    <div id="admin-modal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm transition-opacity duration-200 opacity-0">
-        <div class="bg-matte-card border border-white/[0.05] rounded-xl shadow-2xl w-full max-w-md p-6 transform scale-95 transition-transform duration-200" id="admin-modal-content">
-            <h3 class="text-lg font-bold text-white mb-5" id="modal-title">Editar Tarefa</h3>
+    <!-- Modal Editar Tarefa -->
+    <div id="admin-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-end sm:items-center justify-center p-4 transition-opacity duration-300 opacity-0">
+        <div class="bg-matte-card border border-white/[0.05] rounded-t-2xl sm:rounded-3xl shadow-2xl w-full max-w-md p-6 transform translate-y-full sm:translate-y-0 sm:scale-95 transition-all duration-300" id="admin-modal-content">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-lg font-black text-white" id="modal-title">Editar Tarefa</h3>
+                <button onclick="closeAdminModal()" class="p-2 bg-white/[0.03] hover:bg-white/10 rounded-full text-zinc-400 transition-colors"><i class="ph-bold ph-x text-lg"></i></button>
+            </div>
             
-            <div class="space-y-4 mb-6">
+            <div class="space-y-5 mb-8">
                 <div>
-                    <label class="block text-xs font-semibold text-matte-muted mb-1.5 uppercase tracking-wide">Conteúdo</label>
-                    <textarea id="modal-desc" rows="3" class="w-full bg-matte-bg border border-white/[0.05] rounded-lg p-3 text-sm text-zinc-200 focus:outline-none focus:border-zinc-500 transition-colors resize-none"></textarea>
+                    <label class="block text-xs font-bold text-zinc-500 mb-1.5 uppercase tracking-wide">O que fazer?</label>
+                    <textarea id="modal-desc" rows="3" class="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl p-3.5 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 transition-colors resize-none"></textarea>
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-matte-muted mb-1.5 uppercase tracking-wide">Vídeo / Material de Apoio (Link)</label>
-                    <input type="url" id="modal-link" placeholder="Ex: https://youtube.com/..." class="w-full bg-matte-bg border border-white/[0.05] rounded-lg p-2.5 text-sm text-zinc-200 focus:outline-none focus:border-zinc-500 transition-colors" autocomplete="off">
+                    <label class="block text-xs font-bold text-zinc-500 mb-1.5 uppercase tracking-wide">Material de Apoio (Link opcional)</label>
+                    <input type="url" id="modal-link" placeholder="Ex: https://youtube.com/..." class="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl p-3.5 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 transition-colors" autocomplete="off">
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-matte-muted mb-1.5 uppercase tracking-wide">Matéria</label>
-                    <select id="modal-tag" class="w-full bg-matte-bg border border-white/[0.05] rounded-lg p-2.5 text-sm text-zinc-200 focus:outline-none focus:border-zinc-500 transition-colors cursor-pointer">
-                        <option value="Redação">Redação</option>
-                        <option value="Gramática">Gramática</option>
-                        <option value="Simulado">Simulado</option>
-                        <option value="Descanso">Descanso</option>
-                        <option value="Geral">Geral</option>
+                    <label class="block text-xs font-bold text-zinc-500 mb-1.5 uppercase tracking-wide">Matéria</label>
+                    <select id="modal-tag" class="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl p-3.5 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 transition-colors cursor-pointer appearance-none">
+                        <option value="Redação" class="bg-matte-card">Redação</option>
+                        <option value="Gramática" class="bg-matte-card">Gramática</option>
+                        <option value="Simulado" class="bg-matte-card">Simulado</option>
+                        <option value="Descanso" class="bg-matte-card">Descanso</option>
+                        <option value="Geral" class="bg-matte-card">Geral</option>
                     </select>
                 </div>
             </div>
             
-            <div class="flex justify-between items-center">
-                <button id="btn-delete-task" class="text-sm font-medium text-red-500 hover:text-red-400 p-2 rounded-lg hover:bg-red-500/10 transition-colors active:scale-95 flex items-center gap-1">
-                    <i class="ph ph-trash"></i> Excluir
+            <div class="flex gap-3">
+                <button id="btn-delete-task" class="py-3.5 px-4 rounded-xl font-bold bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors active:scale-95 flex items-center justify-center gap-2">
+                    <i class="ph-bold ph-trash text-lg"></i>
                 </button>
-                <div class="flex gap-2">
-                    <button onclick="closeAdminModal()" class="px-4 py-2.5 text-sm font-medium text-zinc-300 hover:bg-white/[0.03] rounded-lg transition-colors active:scale-95">Cancelar</button>
-                    <button id="btn-save-task" class="px-4 py-2.5 text-sm font-medium bg-white text-black hover:bg-zinc-200 rounded-lg transition-colors active:scale-95 shadow-sm">Salvar</button>
-                </div>
+                <button id="btn-save-task" class="flex-1 bg-white hover:bg-zinc-200 text-black font-bold py-3.5 px-4 rounded-xl transition-colors active:scale-95 shadow-lg">Salvar Tarefa</button>
             </div>
         </div>
     </div>
@@ -278,10 +309,8 @@
 
         // === DADOS E TEMPLATES ===
         const currentYear = new Date().getFullYear();
-        // Dia 1 = 30 de Junho
-        const FIXED_START_DATE = new Date(currentYear, 5, 30); 
+        const FIXED_START_DATE = new Date(currentYear, 5, 30); // 30 Junho (mês 5 em JS)
         
-        // O novo plano estruturado conforme requisitado
         const novoPlanoData = [
             { week: 1, title: "SEMANA 1: Aquecimento e Fundamentos", days: [
                 { name: "Dia 1 (30/Jun - Terça)", tasks: [
@@ -290,42 +319,42 @@
                 ]},
                 { name: "Dia 2 (01/Jul - Quarta)", tasks: [
                     { tag: "Gramática", desc: "Assistir a aulas sobre Pontuação (foco total em onde NÃO usar vírgula, como separar sujeito do verbo).", completed: false, link: "https://www.youtube.com/results?search_query=onde+nao+usar+virgula+pontuacao" },
-                    { tag: "Redação", desc: "Pegar 3 temas variados e fazer apenas o brainstorm. Listar 2 argumentos e 1 repertório sociocultural (filme, citação ou dado histórico) para cada um. Não precisa escrever o texto completo.", completed: false }
+                    { tag: "Redação", desc: "Pegar 3 temas variados e fazer apenas o brainstorm. Listar 2 argumentos e 1 repertório sociocultural para cada um. Não precisa escrever o texto completo.", completed: false }
                 ]},
                 { name: "Dia 3 (02/Jul - Quinta)", tasks: [
                     { tag: "Gramática", desc: "Aula sobre Coesão e elementos de ligação (Mas, Porém, Contudo, Todavia, Portanto, Ademais).", completed: false, link: "https://www.youtube.com/results?search_query=coesao+e+conectivos+redacao" },
                     { tag: "Redação", desc: "Escrever apenas dois parágrafos de desenvolvimento. Focar em usar os conectivos estudados no início de cada frase para ligar as ideias.", completed: false }
                 ]},
                 { name: "Dia 4 (03/Jul - Sexta)", tasks: [
-                    { tag: "Gramática", desc: "Aula rápida sobre a regra básica da Crase (fusão de preposição + artigo). Dica: substituir a palavra feminina por masculina para testar.", completed: false, link: "https://www.youtube.com/results?search_query=regra+basica+crase" },
-                    { tag: "Redação", desc: "Escrever três parágrafos de conclusão (propostas de intervenção). Garantir os 5 elementos: Agente, Ação, Meio/Modo, Efeito e Detalhamento.", completed: false }
+                    { tag: "Gramática", desc: "Aula rápida sobre a regra básica da Crase. Dica: substituir a palavra feminina por masculina para testar.", completed: false, link: "https://www.youtube.com/results?search_query=regra+basica+crase" },
+                    { tag: "Redação", desc: "Escrever três parágrafos de conclusão (propostas de intervenção). Garantir os 5 elementos.", completed: false }
                 ]},
                 { name: "Dia 5 (04/Jul - Sábado)", tasks: [
                     { tag: "Gramática", desc: "Aula de Concordância Verbal e Nominal (garantir que verbo no plural acompanha sujeito no plural).", completed: false, link: "https://www.youtube.com/results?search_query=concordancia+verbal+e+nominal" },
-                    { tag: "Redação", desc: "Juntar tudo que treinou na semana e fazer 1 redação completa (Tema: Os impactos da Inteligência Artificial no trabalho). Sem cronômetro rígido. Enviar para correção na Glau.", completed: false }
+                    { tag: "Redação", desc: "Juntar tudo que treinou na semana e fazer 1 redação completa (Tema: Os impactos da IA no trabalho).", completed: false }
                 ]},
                 { name: "Dia 6 (05/Jul - Domingo)", tasks: [
-                    { tag: "Descanso", desc: "Ações: Ler a correção da Glau de ontem. Anotar os erros gramaticais cometidos. Ler duas redações nota 1000. Descansar a mão.", completed: false }
+                    { tag: "Descanso", desc: "Ações: Ler a correção anterior. Anotar os erros. Ler duas redações nota 1000. Descansar a mão.", completed: false }
                 ]}
             ]},
-            { week: 2, title: "SEMANA 2: Ritmo de Jogo e Execução", days: [
+            { week: 2, title: "SEMANA 2: Ritmo e Execução", days: [
                 { name: "Dia 7 (06/Jul - Segunda)", tasks: [
-                    { tag: "Redação", desc: "Tema: Desafios da Inclusão Digital na Terceira Idade. Escrever a redação completa, enviar para correção na Glau e focar em uma caligrafia limpa.", completed: false }
+                    { tag: "Redação", desc: "Tema: Desafios da Inclusão Digital na Terceira Idade. Escrever a redação completa.", completed: false }
                 ]},
                 { name: "Dia 8 (07/Jul - Terça)", tasks: [
-                    { tag: "Redação", desc: "Tema: Saúde Mental e o uso excessivo de redes sociais. Escrever a redação completa. Meta: Tentar terminar em 1h30.", completed: false }
+                    { tag: "Redação", desc: "Tema: Saúde Mental e o uso excessivo de redes sociais. Meta: Tentar terminar em 1h30.", completed: false }
                 ]},
                 { name: "Dia 9 (08/Jul - Quarta)", tasks: [
-                    { tag: "Redação", desc: "Tema: A precarização do trabalho em aplicativos. Escrever a redação, corrigir na Glau e verificar se repetiu os mesmos erros de vírgula da semana anterior.", completed: false }
+                    { tag: "Redação", desc: "Tema: A precarização do trabalho em aplicativos.", completed: false }
                 ]},
                 { name: "Dia 10 (09/Jul - Quinta)", tasks: [
-                    { tag: "Redação", desc: "Tema: O papel da tecnologia no acesso à cultura. Escrever a redação e corrigir. Meta: Tentar concluir em 1h15.", completed: false }
+                    { tag: "Redação", desc: "Tema: O papel da tecnologia no acesso à cultura. Meta: Tentar concluir em 1h15.", completed: false }
                 ]},
                 { name: "Dia 11 (10/Jul - Sexta)", tasks: [
-                    { tag: "Redação", desc: "Tema: Caminhos para combater as Fake News no Brasil. Escrever a redação focando em utilizar um vocabulário mais rico e evitar repetição de palavras.", completed: false }
+                    { tag: "Redação", desc: "Tema: Caminhos para combater as Fake News no Brasil.", completed: false }
                 ]},
                 { name: "Dia 12 (11/Jul - Sábado)", tasks: [
-                    { tag: "Simulado", desc: "SIMULADO REAL. Tema: Desafios para a garantia da segurança pública. Fazer a prova completa, utilizando cronômetro, rascunho e passando a limpo com caneta preta, simulando o dia da prova.", completed: false }
+                    { tag: "Simulado", desc: "SIMULADO REAL. Tema: Desafios para a segurança pública. Fazer com cronômetro e caneta preta.", completed: false }
                 ]}
             ]},
             { week: 3, title: "SEMANA 3: Imersão Total", days: [
@@ -333,33 +362,32 @@
                     { tag: "Descanso", desc: "Descanso total. Mente e mãos livres.", completed: false }
                 ]},
                 { name: "Dia 14 (13/Jul - Segunda)", tasks: [
-                    { tag: "Redação", desc: "Dose dupla: Escrever 2 redações (1. O sedentarismo entre jovens / 2. Valorização do professor). Enviar ambas para a Glau.", completed: false }
+                    { tag: "Redação", desc: "Dose dupla: Escrever 2 redações (1. Sedentarismo / 2. Valorização do professor).", completed: false }
                 ]},
                 { name: "Dia 15 (14/Jul - Terça)", tasks: [
-                    { tag: "Redação", desc: "Dose dupla contra o relógio: Escrever 2 redações (1. Lixo Eletrônico / 2. Acesso à moradia digna). Meta: 1 hora para cada.", completed: false }
+                    { tag: "Redação", desc: "Dose dupla contra o relógio: (1. Lixo Eletrônico / 2. Moradia). Meta: 1 hora para cada.", completed: false }
                 ]},
                 { name: "Dia 16 (15/Jul - Quarta)", tasks: [
-                    { tag: "Redação", desc: "O Intensivão. Temas: 1. Publicidade Infantil / 2. Mobilidade Urbana / 3. Vacinação Infantil. Fazer as 2 primeiras completas. Na terceira, fazer apenas o esqueleto e argumentos.", completed: false }
+                    { tag: "Redação", desc: "Intensivão. Temas: 1. Publicidade Infantil / 2. Mobilidade. Fazer as 2 completas.", completed: false }
                 ]},
                 { name: "Dia 17 (16/Jul - Quinta)", tasks: [
-                    { tag: "Redação", desc: "Tema: A superlotação do sistema carcerário. Fazer 1 redação com calma. Organizar RG original e as canetas para o dia da prova.", completed: false }
+                    { tag: "Redação", desc: "Tema livre. Fazer com calma. Organizar RG original e as canetas para a prova.", completed: false }
                 ]},
                 { name: "Dia 18 (17/Jul - Sexta)", tasks: [
-                    { tag: "Descanso", desc: "Véspera. PROIBIDO ESTUDAR. Assistir a um filme, comer bem e dormir cedo.", completed: false }
+                    { tag: "Descanso", desc: "Véspera. PROIBIDO ESTUDAR. Assistir a um filme e dormir cedo.", completed: false }
                 ]},
                 { name: "Dia 19 (18/Jul - Sábado)", tasks: [
-                    { tag: "Simulado", desc: "A PROVA. Chegar ao polo do Ifes com 1 hora de antecedência. Respirar fundo. O trabalho pesado já foi feito nas últimas semanas. Agora é apenas executar.", completed: false }
+                    { tag: "Simulado", desc: "A PROVA. Chegar ao polo com 1 hora de antecedência. O trabalho pesado já foi feito.", completed: false }
                 ]}
             ]}
         ];
 
-        // Cores suaves para as Tags
         const tagStyles = {
-            'Redação': 'text-red-400 bg-red-400/10',
-            'Gramática': 'text-blue-400 bg-blue-400/10',
-            'Simulado': 'text-orange-400 bg-orange-400/10 font-bold',
-            'Descanso': 'text-zinc-400 bg-white/5',
-            'Geral': 'text-zinc-300 bg-white/5'
+            'Redação': 'text-red-400 bg-red-500/10 border border-red-500/20',
+            'Gramática': 'text-blue-400 bg-blue-500/10 border border-blue-500/20',
+            'Simulado': 'text-amber-400 bg-amber-500/10 border border-amber-500/20',
+            'Descanso': 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20',
+            'Geral': 'text-zinc-300 bg-white/5 border border-white/10'
         };
 
         // Estado Global
@@ -371,7 +399,6 @@
         let delayedInfo = null;
         let isAlertDismissed = false;
 
-        // Utilitário para lidar com semanas de tamanhos variáveis (6 ou 7 dias)
         function getAbsoluteDay(wIdx, dIdx) {
             let abs = 0;
             for(let i=0; i<wIdx; i++) abs += studyData[i].days.length;
@@ -393,11 +420,28 @@
                 studyData = JSON.parse(JSON.stringify(novoPlanoData));
                 saveState();
             }
-            currentWeekIdx = 0; 
-            openDays = { '0-0': true };
+            
+            // Abre automaticamente o dia de hoje, ou o dia 1
+            const today = new Date(); today.setHours(0,0,0,0);
+            let foundToday = false;
+            
+            for (let w = 0; w < studyData.length; w++) {
+                for (let d = 0; d < studyData[w].days.length; d++) {
+                    const expectedDate = new Date(FIXED_START_DATE);
+                    expectedDate.setDate(expectedDate.getDate() + getAbsoluteDay(w, d));
+                    if (expectedDate.getTime() === today.getTime()) {
+                        currentWeekIdx = w;
+                        openDays = { [`${w}-${d}`]: true };
+                        foundToday = true; break;
+                    }
+                }
+                if(foundToday) break;
+            }
+            
+            if(!foundToday) { currentWeekIdx = 0; openDays = { '0-0': true }; }
             
             renderNavigation(); 
-            selectWeek(0); 
+            selectWeek(currentWeekIdx); 
             updateProgressUI(); 
             checkDelays();
         }
@@ -409,11 +453,15 @@
             checkDelays();
         }
 
-        // --- Menu Dropdown ---
+        // --- Interações Visuais (Menu e Modal) ---
         function toggleProfileMenu(e) {
             e.stopPropagation();
             const menu = document.getElementById('profile-menu');
-            menu.classList.toggle('hidden'); menu.classList.toggle('flex');
+            if(menu.classList.contains('hidden')) {
+                menu.classList.remove('hidden'); menu.classList.add('flex');
+            } else {
+                menu.classList.add('hidden'); menu.classList.remove('flex');
+            }
         }
 
         function closeProfileMenu(e) {
@@ -428,9 +476,9 @@
             profiles.forEach(p => {
                 const isSelected = p.id === activeProfileId;
                 list.innerHTML += `
-                    <button onclick="switchProfile('${p.id}')" class="w-full text-left px-3 py-2 text-sm flex items-center justify-between transition-colors ${isSelected ? 'text-white font-medium bg-white/[0.03]' : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.02]'}">
+                    <button onclick="switchProfile('${p.id}')" class="w-full text-left px-4 py-3 text-sm flex items-center justify-between transition-colors ${isSelected ? 'text-white font-bold bg-white/[0.05]' : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.02]'}">
                         <span class="truncate">${p.name}</span>
-                        ${isSelected ? '<i class="ph-bold ph-check text-white"></i>' : ''}
+                        ${isSelected ? '<i class="ph-bold ph-check text-blue-400"></i>' : ''}
                     </button>`;
             });
         }
@@ -438,10 +486,8 @@
         function switchProfile(profileId) {
             activeProfileId = profileId;
             localStorage.setItem('tads_active_profile', activeProfileId);
-            updateProfileUI(); 
-            renderProfileList(); 
-            loadProfileData(profileId);
-            showToast(`Perfil alterado para: ${profiles.find(p=>p.id===profileId).name}`);
+            updateProfileUI(); renderProfileList(); loadProfileData(profileId);
+            showToast('Perfil alterado.');
         }
 
         function updateProfileUI() {
@@ -449,42 +495,39 @@
             document.getElementById('current-profile-name').innerText = p ? p.name : 'Aluno';
         }
 
-        // --- Modals ---
-        function showModal(id) {
-            const modal = document.getElementById(id);
-            const content = document.getElementById(`${id}-content`);
-            modal.classList.remove('hidden');
+        function showModalEl(id) {
+            const m = document.getElementById(id); const c = document.getElementById(`${id}-content`);
+            m.classList.remove('hidden');
             setTimeout(() => {
-                modal.classList.remove('opacity-0');
-                content.classList.remove('scale-95');
+                m.classList.remove('opacity-0');
+                if(c.classList.contains('translate-y-full')) c.classList.remove('translate-y-full');
+                if(c.classList.contains('scale-95')) c.classList.remove('scale-95');
             }, 10);
         }
 
-        function hideModal(id) {
-            const modal = document.getElementById(id);
-            const content = document.getElementById(`${id}-content`);
-            modal.classList.add('opacity-0');
-            content.classList.add('scale-95');
-            setTimeout(() => modal.classList.add('hidden'), 200);
+        function hideModalEl(id) {
+            const m = document.getElementById(id); const c = document.getElementById(`${id}-content`);
+            m.classList.add('opacity-0');
+            c.classList.add('translate-y-full', 'scale-95');
+            setTimeout(() => m.classList.add('hidden'), 300);
         }
 
-        function openNewProfileModal() { showModal('profile-modal'); document.getElementById('new-profile-name').focus(); }
-        function closeProfileModal() { hideModal('profile-modal'); document.getElementById('new-profile-name').value = ''; }
+        function openNewProfileModal() { showModalEl('profile-modal'); document.getElementById('new-profile-name').focus(); }
+        function closeProfileModal() { hideModalEl('profile-modal'); document.getElementById('new-profile-name').value = ''; }
 
         function createNewProfile() {
             const name = document.getElementById('new-profile-name').value.trim();
-            if (!name) return showToast('Digite um nome válido.');
+            if (!name) return showToast('Digite um nome válido.', 'error');
             
             const newId = 'prof_' + Date.now();
             profiles.push({ id: newId, name: name });
             localStorage.setItem('tads_profiles', JSON.stringify(profiles));
             localStorage.setItem(`tads_data_${newId}`, JSON.stringify(novoPlanoData));
             
-            closeProfileModal();
-            switchProfile(newId);
+            closeProfileModal(); switchProfile(newId);
         }
 
-        // === LÓGICA DE DADOS E RENDERIZAÇÃO ===
+        // === LÓGICA CORE ===
         function checkDelays() {
             const today = new Date(); today.setHours(0,0,0,0);
             delayedInfo = null;
@@ -508,54 +551,46 @@
             const bell = document.getElementById('mini-alert-badge');
             
             if (delayedInfo) {
-                if (isAlertDismissed) { 
-                    banner.classList.add('hidden'); 
-                    showBell(bell);
-                } else { 
-                    banner.classList.remove('hidden'); 
-                    hideBell(bell);
-                }
+                if (isAlertDismissed) { banner.classList.add('hidden'); bell.classList.remove('hidden'); bell.classList.add('bell-show'); } 
+                else { banner.classList.remove('hidden'); bell.classList.add('hidden'); bell.classList.remove('bell-show'); }
             } else { 
-                banner.classList.add('hidden'); 
-                hideBell(bell);
+                banner.classList.add('hidden'); bell.classList.add('hidden'); bell.classList.remove('bell-show'); 
             }
         }
 
-        function showBell(bell) {
-            bell.classList.remove('hidden');
-            bell.classList.add('bell-show');
-        }
-
-        function hideBell(bell) {
-            bell.classList.remove('bell-show');
-            bell.classList.add('hidden');
-        }
-
         function toggleAlertBanner(show) { isAlertDismissed = !show; updateAlertUI(); }
+        
         function goToOldestDelay() {
             if (!delayedInfo) return;
             const { w, d } = delayedInfo;
             if (currentWeekIdx !== w) selectWeek(w);
-            openDays[`${w}-${d}`] = true; 
-            renderDays();
-            
+            openDays[`${w}-${d}`] = true; renderDays();
             setTimeout(() => {
                 const el = document.getElementById(`day-card-${w}-${d}`);
                 if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }, 50);
-        }
-
-        function getProgress() {
-            let total = 0, comp = 0;
-            studyData.forEach(w => w.days.forEach(d => { d.tasks.forEach(t => { total++; if(t.completed) comp++; }); }));
-            return total ? Math.round((comp / total) * 100) : 0;
+            }, 100);
         }
 
         function updateProgressUI() {
-            const pct = getProgress();
+            let total = 0, comp = 0;
+            let weekTotal = 0, weekComp = 0;
+            
+            studyData.forEach((w, wIdx) => w.days.forEach(d => { 
+                d.tasks.forEach(t => { 
+                    total++; if(t.completed) comp++; 
+                    if(wIdx === currentWeekIdx) { weekTotal++; if(t.completed) weekComp++; }
+                }); 
+            }));
+            
+            const pct = total ? Math.round((comp / total) * 100) : 0;
+            const weekPct = weekTotal ? Math.round((weekComp / weekTotal) * 100) : 0;
+
             document.getElementById('progress-text').innerText = `${pct}%`;
             document.getElementById('progress-circle').style.strokeDashoffset = 100 - pct;
             document.getElementById('progress-bar-mobile').style.width = `${pct}%`;
+            
+            document.getElementById('stats-tasks-done').innerHTML = `${comp}<span class="text-sm text-zinc-600 font-medium ml-1">/ ${total}</span>`;
+            document.getElementById('stats-week-pct').innerText = `${weekPct}%`;
         }
 
         function renderNavigation() {
@@ -563,12 +598,12 @@
             studyData.forEach((week, idx) => {
                 const isSelected = idx === currentWeekIdx;
                 let t=0, c=0; week.days.forEach(d => d.tasks.forEach(task => { t++; if(task.completed) c++; }));
-                const pct = t ? Math.round((c/t)*100) : 0;
+                const isDone = t > 0 && t === c;
                 
                 nav.innerHTML += `
-                    <button onclick="selectWeek(${idx})" class="flex items-center justify-between px-4 py-3 rounded-xl text-left transition-colors flex-shrink-0 min-w-[140px] md:min-w-0 ${isSelected ? 'bg-white/10 text-white shadow-sm' : 'bg-transparent text-zinc-500 hover:text-zinc-300 hover:bg-white/5'}">
-                        <span class="text-sm font-medium">Semana ${week.week}</span>
-                        <div class="hidden md:flex items-center justify-center text-[10px] font-bold ${pct === 100 ? 'text-zinc-200' : 'text-zinc-600'}">${pct}%</div>
+                    <button onclick="selectWeek(${idx})" class="flex items-center justify-between px-4 py-3.5 rounded-xl text-left transition-colors flex-shrink-0 min-w-[140px] md:min-w-0 border ${isSelected ? 'bg-blue-500/10 border-blue-500/30 text-blue-400 shadow-sm' : 'bg-transparent border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.02]'}">
+                        <span class="text-sm font-bold">Semana ${week.week}</span>
+                        ${isDone ? '<i class="ph-bold ph-check text-emerald-400 hidden md:block"></i>' : ''}
                     </button>`;
             });
         }
@@ -576,6 +611,7 @@
         function selectWeek(idx) {
             currentWeekIdx = idx; renderNavigation();
             document.getElementById('current-week-title').innerText = studyData[idx].title;
+            updateProgressUI(); // Atualiza a % da semana
             renderDays();
             window.scrollTo({ top: 0, behavior: 'smooth' }); 
         }
@@ -599,79 +635,73 @@
                 realDate.setDate(realDate.getDate() + getAbsoluteDay(currentWeekIdx, dIdx));
                 const dateStr = realDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
 
-                // Status Minimalista (Hoje / Pendente)
                 const today = new Date(); today.setHours(0,0,0,0);
                 const realDateMidnight = new Date(realDate); realDateMidnight.setHours(0,0,0,0);
-                let statusBadge = '';
+                const isToday = realDateMidnight.getTime() === today.getTime();
                 
-                if (realDateMidnight.getTime() === today.getTime()) {
-                    statusBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-500/20 text-blue-400 uppercase tracking-wider ml-2">Hoje</span>`;
-                } else if (realDateMidnight < today && !isDone) {
-                    statusBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-500/20 text-red-400 uppercase tracking-wider ml-2">Pendente</span>`;
-                }
+                let statusBadge = '';
+                if (isToday) statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500 border border-blue-400 text-white uppercase tracking-wider ml-2 shadow-[0_0_10px_rgba(59,130,246,0.3)]">Hoje</span>`;
+                else if (realDateMidnight < today && !isDone && total > 0) statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/10 border border-red-500/20 text-red-400 uppercase tracking-wider ml-2">Atrasado</span>`;
+
+                const cardStyle = isToday 
+                    ? 'bg-blue-500/5 border border-blue-500/30 shadow-[0_0_20px_rgba(59,130,246,0.05)]' 
+                    : (isDone ? 'bg-white/[0.01] border border-white/[0.03] opacity-60 hover:opacity-100' : 'bg-white/[0.02] border border-white/[0.05]');
 
                 const card = document.createElement('div');
                 card.id = `day-card-${currentWeekIdx}-${dIdx}`;
-                card.className = `bg-white/[0.02] rounded-xl transition-colors duration-300 overflow-hidden`;
+                card.className = `rounded-2xl transition-all duration-300 overflow-hidden ${cardStyle}`;
                 
-                let tasksHTML = total === 0 ? '<div class="text-center p-6 text-sm text-zinc-600">Nenhuma tarefa definida para este dia.</div>' : '';
+                let tasksHTML = total === 0 ? '<div class="text-center p-6 text-sm text-zinc-600">Dia livre. Nenhuma tarefa.</div>' : '';
                 
                 day.tasks.forEach((t, tIdx) => {
                     const tagClass = tagStyles[t.tag] || tagStyles['Geral'];
-                    
-                    const ytButtonHTML = t.link ? `
-                        <a href="${t.link}" target="_blank" onclick="event.stopPropagation()" class="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-white/5 rounded transition-colors" title="Assistir Vídeo">
-                            <i class="ph-fill ph-youtube-logo text-lg"></i>
-                        </a>
-                    ` : '';
+                    const ytBtn = t.link ? `<a href="${t.link}" target="_blank" onclick="event.stopPropagation()" class="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-white/10 rounded-lg transition-colors"><i class="ph-fill ph-youtube-logo text-lg"></i></a>` : '';
 
                     tasksHTML += `
-                        <div class="flex items-start gap-3 p-3 mx-2 my-1 rounded-lg hover:bg-white/5 transition-colors group">
+                        <div class="task-item flex items-start gap-3 p-3 mx-2 my-1 rounded-xl hover:bg-white/[0.03] transition-colors group">
                             
-                            <button onclick="toggleTask(${currentWeekIdx}, ${dIdx}, ${tIdx})" class="mt-0.5 text-2xl focus:outline-none transition-colors ${t.completed ? 'text-zinc-500' : 'text-zinc-600 hover:text-zinc-400'}">
-                                <i class="ph-fill ${t.completed ? 'ph-check-circle' : 'ph-circle'}"></i>
+                            <button onclick="toggleTask(${currentWeekIdx}, ${dIdx}, ${tIdx})" class="mt-1 task-checkbox focus:outline-none ${t.completed ? 'text-emerald-400' : 'text-zinc-600 hover:text-blue-400'}">
+                                <i class="ph-fill ${t.completed ? 'ph-check-circle' : 'ph-circle'} text-[22px]"></i>
                             </button>
                             
-                            <div class="flex-1 min-w-0 pt-0.5 cursor-pointer" onclick="toggleTask(${currentWeekIdx}, ${dIdx}, ${tIdx})">
-                                <p class="text-sm leading-relaxed mb-2 transition-colors ${t.completed ? 'text-zinc-600 line-through' : 'text-zinc-300'}">${t.desc}</p>
-                                <span class="inline-block px-2 py-0.5 rounded text-[10px] font-semibold tracking-wide uppercase ${tagClass}">${t.tag}</span>
+                            <div class="flex-1 min-w-0 pt-1 cursor-pointer" onclick="toggleTask(${currentWeekIdx}, ${dIdx}, ${tIdx})">
+                                <p class="text-sm leading-relaxed mb-2 transition-colors ${t.completed ? 'text-zinc-500 line-through decoration-zinc-700' : 'text-zinc-200'}">${t.desc}</p>
+                                <span class="inline-block px-2.5 py-0.5 rounded-lg text-[10px] font-bold tracking-wide uppercase ${tagClass}">${t.tag}</span>
                             </div>
                             
-                            <!-- Opacidade em hover no desktop, visível no mobile -->
-                            <div class="flex items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                                ${ytButtonHTML}
-                                <button onclick="copyText('${t.desc.replace(/'/g, "\\'")}')" class="p-1.5 text-zinc-500 hover:text-white hover:bg-white/5 rounded transition-colors" title="Copiar"><i class="ph ph-copy text-[16px]"></i></button>
-                                <button onclick="openAdminModal(${currentWeekIdx}, ${dIdx}, ${tIdx})" class="p-1.5 text-zinc-500 hover:text-white hover:bg-white/5 rounded transition-colors" title="Editar"><i class="ph-fill ph-pencil-simple text-[16px]"></i></button>
+                            <div class="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                                ${ytBtn}
+                                <button onclick="openAdminModal(${currentWeekIdx}, ${dIdx}, ${tIdx})" class="p-1.5 text-zinc-500 hover:text-white hover:bg-white/10 rounded-lg transition-colors" title="Editar"><i class="ph-bold ph-pencil-simple text-[16px]"></i></button>
                             </div>
                         </div>`;
                 });
 
                 card.innerHTML = `
-                    <button class="w-full px-5 py-4 flex justify-between items-center bg-transparent hover:bg-white/5 transition-colors focus:outline-none" onclick="toggleDay(${currentWeekIdx}, ${dIdx})">
+                    <button class="w-full px-5 py-4 flex justify-between items-center bg-transparent hover:bg-white/[0.02] transition-colors focus:outline-none" onclick="toggleDay(${currentWeekIdx}, ${dIdx})">
                         <div class="flex items-center gap-4">
-                            <div class="w-6 h-6 rounded-full flex items-center justify-center transition-colors ${isDone ? 'bg-zinc-200 text-black' : 'bg-white/5 text-zinc-500'}">
-                                <i class="ph-bold ${isDone ? 'ph-check' : 'ph-dots-three'} text-sm"></i>
+                            <div class="w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${isDone && total>0 ? 'bg-emerald-500/20 text-emerald-400' : (isToday ? 'bg-blue-500 text-white' : 'bg-white/[0.05] text-zinc-400')}">
+                                <i class="ph-bold ${isDone && total>0 ? 'ph-check' : 'ph-calendar-blank'} text-lg"></i>
                             </div>
                             <div class="text-left">
-                                <h3 class="font-semibold text-base transition-colors ${isDone ? 'text-zinc-500' : 'text-zinc-100'}">${day.name}</h3>
+                                <h3 class="font-bold text-base transition-colors ${isDone && total>0 ? 'text-zinc-500' : (isToday ? 'text-blue-400' : 'text-white')}">${day.name}</h3>
                                 <div class="flex items-center mt-0.5">
-                                    <p class="text-[11px] text-zinc-500 uppercase tracking-wider">${dateStr}</p>
+                                    <p class="text-xs font-medium text-zinc-500 tracking-wide">${dateStr}</p>
                                     ${statusBadge}
                                 </div>
                             </div>
                         </div>
                         <div class="flex items-center gap-4">
-                            <span class="text-xs font-medium px-2.5 py-1 rounded-md bg-white/5 text-zinc-400 hidden sm:block">${comp}/${total}</span>
-                            <div class="text-zinc-500 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}"><i class="ph ph-caret-down"></i></div>
+                            <span class="text-xs font-bold px-3 py-1.5 rounded-lg bg-white/[0.05] text-zinc-400 hidden sm:block">${comp}/${total}</span>
+                            <div class="text-zinc-500 transition-transform duration-300 ${isOpen ? 'rotate-180 text-white' : ''}"><i class="ph-bold ph-caret-down"></i></div>
                         </div>
                     </button>
                     
                     <div class="day-content ${isOpen ? 'open' : ''}">
-                        <div class="day-content-inner">
-                            <div class="py-2">
+                        <div class="day-content-inner border-t border-white/[0.02] bg-black/20">
+                            <div class="py-3">
                                 ${tasksHTML}
-                                <div class="px-5 py-3">
-                                    <button onclick="openAdminModal(${currentWeekIdx}, ${dIdx}, null)" class="text-xs font-medium text-zinc-500 hover:text-white flex items-center gap-1.5 transition-colors"><i class="ph-bold ph-plus"></i> Nova Tarefa</button>
+                                <div class="px-5 py-3 border-t border-white/[0.02] mt-2">
+                                    <button onclick="openAdminModal(${currentWeekIdx}, ${dIdx}, null)" class="text-xs font-bold text-zinc-500 hover:text-white flex items-center gap-1.5 transition-colors uppercase tracking-wider"><i class="ph-bold ph-plus"></i> Nova Tarefa</button>
                                 </div>
                             </div>
                         </div>
@@ -680,18 +710,15 @@
             });
         }
 
-        function copyText(text) { navigator.clipboard.writeText(text).then(() => showToast('Copiado com sucesso!')).catch(()=>showToast('Erro ao copiar.')); }
-        function showToast(msg) {
+        function showToast(msg, type='success') {
             const cont = document.getElementById('toast-container');
             const el = document.createElement('div');
-            el.className = 'toast-animate flex items-center gap-3 bg-zinc-800 border border-white/[0.05] px-4 py-3 rounded-lg shadow-xl pointer-events-auto';
-            el.innerHTML = `<i class="ph-fill ph-check-circle text-white text-lg"></i><span class="text-sm font-medium text-zinc-200">${msg}</span>`;
+            el.className = 'toast-animate flex items-center gap-3 bg-zinc-800 border border-white/[0.05] px-4 py-3 rounded-xl shadow-2xl pointer-events-auto';
+            el.innerHTML = `<i class="ph-fill ${type === 'error' ? 'ph-warning-circle text-red-500' : 'ph-check-circle text-blue-400'} text-lg"></i><span class="text-sm font-medium text-zinc-200">${msg}</span>`;
             cont.appendChild(el);
             setTimeout(() => { 
-                el.style.opacity = '0'; 
-                el.style.transform = 'translateY(10px)'; 
-                el.style.transition = 'all 0.2s'; 
-                setTimeout(()=>el.remove(), 200); 
+                el.style.opacity = '0'; el.style.transform = 'translateY(-15px) translateX(-50%)'; el.style.transition = 'all 0.3s'; 
+                setTimeout(()=>el.remove(), 300); 
             }, 2500);
         }
 
@@ -710,17 +737,17 @@
                 document.getElementById('modal-link').value = '';
                 document.getElementById('btn-delete-task').classList.add('hidden');
             }
-            showModal('admin-modal');
+            showModalEl('admin-modal');
             setTimeout(() => document.getElementById('modal-desc').focus(), 100);
         }
         
-        function closeAdminModal() { hideModal('admin-modal'); }
+        function closeAdminModal() { hideModalEl('admin-modal'); }
 
         document.getElementById('btn-save-task').addEventListener('click', () => {
             const desc = document.getElementById('modal-desc').value.trim();
             const link = document.getElementById('modal-link').value.trim();
             const tag = document.getElementById('modal-tag').value;
-            if(!desc) return;
+            if(!desc) return showToast('Descreva a tarefa.', 'error');
             
             const taskObj = { tag, desc, link: link || null, completed: false };
 
@@ -732,17 +759,14 @@
             }
             
             openDays[`${editCtx.w}-${editCtx.d}`] = true;
-            saveState(); renderDays(); closeAdminModal();
+            saveState(); renderDays(); closeAdminModal(); showToast('Salvo!');
         });
 
         document.getElementById('btn-delete-task').addEventListener('click', () => {
-            if(confirm("Excluir definitivamente esta tarefa?")) { 
-                studyData[editCtx.w].days[editCtx.d].tasks.splice(editCtx.t, 1); 
-                saveState(); renderDays(); closeAdminModal(); 
-            }
+            studyData[editCtx.w].days[editCtx.d].tasks.splice(editCtx.t, 1); 
+            saveState(); renderDays(); closeAdminModal(); showToast('Excluído.');
         });
 
-        // Inicializa a página
         window.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
