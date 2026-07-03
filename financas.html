@@ -1,508 +1,706 @@
 <!DOCTYPE html>
-<html lang="pt-PT" class="dark">
+<html lang="pt-BR" class="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Finanças - Nexus OS</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Controlo Financeiro</title>
   
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Phosphor Icons -->
   <script src="https://unpkg.com/@phosphor-icons/web"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
+  <!-- React & ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- Babel -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
   <script>
-      tailwind.config = {
-          darkMode: 'class',
-          theme: {
-              extend: {
-                  fontFamily: { sans: ['Inter', 'sans-serif'] },
-                  colors: { 
-                      matte: {
-                          bg: '#09090b',
-                          card: '#18181b',
-                          border: '#27272a',
-                          hover: '#27272a',
-                          text: '#fafafa',
-                          muted: '#a1a1aa'
-                      }
-                  }
-              }
-          }
-      }
+    tailwind.config = {
+        darkMode: 'class',
+        theme: {
+            extend: {
+                fontFamily: { sans: ['Inter', 'sans-serif'] },
+                colors: { 
+                    matte: {
+                        bg: '#09090b',
+                        card: '#18181b',
+                        border: '#27272a',
+                        text: '#fafafa',
+                        muted: '#a1a1aa'
+                    }
+                }
+            }
+        }
+    }
   </script>
 
   <style>
+    body { 
+        background-color: #09090b; 
+        color: #fafafa; 
+        -webkit-tap-highlight-color: transparent; 
+        overflow-x: hidden;
+    }
+    
+    /* Scrollbar elegante */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 10px; }
-    ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+    ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: #52525b; }
 
-    body { 
-      background-color: #09090b; 
-      -webkit-tap-highlight-color: transparent; 
-    }
-    
-    .slide-up { 
-      animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
-      opacity: 0; 
-      transform: translateY(20px);
-    }
-    
-    @keyframes slideUp { 
-      to { opacity: 1; transform: translateY(0); } 
+    /* Utilitários sem scrollbar para menus horizontais */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    /* Inputs Modernos Customizados */
+    input[type="text"], input[type="number"], select {
+        color-scheme: dark;
     }
 
-    .delay-100 { animation-delay: 100ms; }
-    .delay-200 { animation-delay: 200ms; }
-    .delay-300 { animation-delay: 300ms; }
-    .delay-400 { animation-delay: 400ms; }
-    .delay-500 { animation-delay: 500ms; }
+    /* Animações suaves para os modais e toasts */
+    @keyframes slideUp {
+      from { transform: translateY(15px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes slideIn { 
+      from { transform: translateY(-15px) translateX(-50%); opacity: 0; } 
+      to { transform: translateY(0) translateX(-50%); opacity: 1; } 
+    }
+    
+    .modal-anim { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    .toast-anim { animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    
+    /* Progress Circle Animation */
+    .circle-progress {
+        transition: stroke-dashoffset 1s ease-out;
+    }
   </style>
 </head>
-<body class="text-matte-text p-4 sm:p-6 lg:p-8 min-h-screen overflow-y-auto pb-24">
+<body class="antialiased min-h-screen">
+  <div id="root"></div>
 
-  <!-- HEADER -->
-  <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 slide-up">
-    <div>
-      <h1 class="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-        <div class="p-1.5 bg-white/[0.04] border border-white/[0.05] rounded-lg">
-          <i class="ph-fill ph-wallet text-white"></i>
-        </div>
-        Gestão Financeira
-      </h1>
-      <p class="text-matte-muted text-sm mt-2 font-medium">Controlo de saldos, despesas e receitas.</p>
-    </div>
-    
-    <div class="w-full sm:w-auto flex gap-3">
-      <button onclick="showToast('A compilar dados para exportação (PDF)...', 'info')" class="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white/[0.05] border border-white/[0.1] text-white px-4 py-2.5 rounded-xl font-semibold text-sm hover:bg-white/[0.1] transition-colors active:scale-95">
-        <i class="ph-bold ph-export"></i>
-        Exportar
-      </button>
-      <button onclick="openModal()" class="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white text-black px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors shadow-[0_0_20px_rgba(255,255,255,0.15)] active:scale-95">
-        <i class="ph-bold ph-plus"></i>
-        Transação
-      </button>
-    </div>
-  </header>
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
 
-  <!-- CARDS DE RESUMO -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-    
-    <!-- Card 1: Saldo -->
-    <div class="bg-matte-card border border-white/[0.05] p-5 rounded-2xl slide-up delay-100 relative overflow-hidden group hover:border-white/[0.15] transition-all duration-300">
-      <div class="flex justify-between items-start mb-4 relative z-10">
-        <div class="flex items-center gap-2 text-matte-muted font-medium text-sm">
-          <i class="ph-fill ph-bank text-lg"></i>
-          Saldo Disponível
-        </div>
-        <i onclick="showToast('A abrir opções de conta...', 'info')" class="ph ph-dots-three text-matte-muted hover:text-white cursor-pointer"></i>
-      </div>
-      <h3 id="saldo-total" class="text-3xl font-bold text-white mb-1 tracking-tight relative z-10">€ 12.450,00</h3>
-      <div class="flex items-center gap-1.5 mt-2 relative z-10">
-        <span class="inline-flex items-center gap-1 bg-green-500/10 text-green-400 text-[10px] font-bold px-1.5 py-0.5 rounded">
-          <i class="ph-bold ph-trend-up"></i> +4.2%
-        </span>
-        <span class="text-xs text-matte-muted">vs mês passado</span>
-      </div>
-      <div class="absolute -top-8 -right-8 w-32 h-32 bg-white/5 blur-3xl rounded-full group-hover:bg-white/10 transition-colors duration-500"></div>
-    </div>
+    const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    const MONTHS_SHORT = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const CURRENT_YEAR = new Date().getFullYear();
+    const CURRENT_MONTH = new Date().getMonth();
 
-    <!-- Card 2: Receitas -->
-    <div class="bg-matte-card border border-white/[0.05] p-5 rounded-2xl slide-up delay-200 relative overflow-hidden group hover:border-white/[0.15] transition-all duration-300">
-      <div class="flex justify-between items-start mb-4 relative z-10">
-        <div class="flex items-center gap-2 text-matte-muted font-medium text-sm">
-          <i class="ph-fill ph-arrow-circle-up text-lg text-emerald-400"></i>
-          Receitas
-        </div>
-      </div>
-      <h3 id="receitas-total" class="text-2xl font-bold text-white mb-1 tracking-tight relative z-10">€ 4.200,50</h3>
-      <p class="text-sm text-matte-muted font-medium relative z-10">Neste mês</p>
-      <div class="absolute -bottom-8 -right-8 w-32 h-32 bg-emerald-500/10 blur-3xl rounded-full group-hover:bg-emerald-500/20 transition-colors duration-500"></div>
-    </div>
+    const ICONS_LIST = ['ph-piggy-bank', 'ph-car', 'ph-airplane-tilt', 'ph-house', 'ph-graduation-cap', 'ph-laptop', 'ph-heart', 'ph-wallet'];
 
-    <!-- Card 3: Despesas -->
-    <div class="bg-matte-card border border-white/[0.05] p-5 rounded-2xl slide-up delay-300 relative overflow-hidden group hover:border-white/[0.15] transition-all duration-300">
-      <div class="flex justify-between items-start mb-4 relative z-10">
-        <div class="flex items-center gap-2 text-matte-muted font-medium text-sm">
-          <i class="ph-fill ph-arrow-circle-down text-lg text-red-400"></i>
-          Despesas
-        </div>
-      </div>
-      <h3 id="despesas-total" class="text-2xl font-bold text-white mb-1 tracking-tight relative z-10">€ 1.840,20</h3>
-      <p class="text-sm text-matte-muted font-medium relative z-10">Neste mês</p>
-      <div class="absolute -bottom-8 -right-8 w-32 h-32 bg-red-500/10 blur-3xl rounded-full group-hover:bg-red-500/20 transition-colors duration-500"></div>
-    </div>
+    const formatMoney = (val) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+    const generateId = () => crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
 
-    <!-- Card 4: Cartão de Crédito -->
-    <div class="bg-matte-card border border-white/[0.05] p-5 rounded-2xl slide-up delay-400 relative overflow-hidden group hover:border-white/[0.15] transition-all duration-300 flex flex-col justify-between">
-      <div class="flex justify-between items-start mb-2 relative z-10">
-        <div class="flex items-center gap-2 text-matte-muted font-medium text-sm">
-          <i class="ph-fill ph-credit-card text-lg text-blue-400"></i>
-          Fatura Atual
-        </div>
-      </div>
-      <h3 class="text-2xl font-bold text-white mb-3 tracking-tight relative z-10">€ 450,00</h3>
-      
-      <!-- Barra de Limite -->
-      <div class="w-full relative z-10 mt-auto">
-        <div class="flex justify-between text-[10px] text-matte-muted mb-1 font-semibold uppercase tracking-wider">
-          <span>Limite Usado</span>
-          <span>30%</span>
-        </div>
-        <div class="w-full bg-[#09090b] rounded-full h-1.5 overflow-hidden">
-          <div class="bg-blue-500 h-1.5 rounded-full w-[30%]"></div>
-        </div>
-      </div>
-      <div class="absolute -bottom-8 -left-8 w-32 h-32 bg-blue-500/10 blur-3xl rounded-full group-hover:bg-blue-500/20 transition-colors duration-500"></div>
-    </div>
-  </div>
-
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 slide-up delay-500">
-    
-    <!-- Tabela de Transações -->
-    <div class="lg:col-span-2 bg-matte-card border border-white/[0.05] rounded-2xl overflow-hidden shadow-xl flex flex-col">
-      <div class="p-5 border-b border-white/[0.05] flex justify-between items-center">
-        <h2 class="text-lg font-semibold text-white">Transações Recentes</h2>
-        <button onclick="showToast('A carregar histórico completo...', 'info')" class="text-xs font-semibold text-white hover:text-matte-muted transition-colors bg-white/[0.05] px-3 py-1.5 rounded-lg border border-white/[0.05]">Ver Tudo</button>
-      </div>
-
-      <div class="flex-1 overflow-x-auto">
-        <table class="w-full text-left text-sm whitespace-nowrap">
-          <tbody id="tabela-transacoes" class="divide-y divide-white/[0.05]">
-            
-            <!-- Transação 1 -->
-            <tr class="hover:bg-white/[0.02] transition-colors group">
-              <td class="px-5 py-4 w-12">
-                <div class="w-10 h-10 rounded-full bg-[#09090b] border border-white/[0.05] flex items-center justify-center text-white">
-                  <i class="ph-fill ph-apple-logo text-lg"></i>
-                </div>
-              </td>
-              <td class="px-4 py-4">
-                <p class="font-semibold text-white">Apple Store</p>
-                <p class="text-xs text-matte-muted mt-0.5">Equipamentos</p>
-              </td>
-              <td class="px-4 py-4 text-matte-muted text-xs">Hoje, 14:30</td>
-              <td class="px-4 py-4 text-right">
-                <p class="font-bold text-white">- € 1.200,00</p>
-                <span class="text-[10px] text-matte-muted">Cartão final 4021</span>
-              </td>
-            </tr>
-
-            <!-- Transação 2 -->
-            <tr class="hover:bg-white/[0.02] transition-colors group">
-              <td class="px-5 py-4 w-12">
-                <div class="w-10 h-10 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-                  <i class="ph-fill ph-briefcase text-lg"></i>
-                </div>
-              </td>
-              <td class="px-4 py-4">
-                <p class="font-semibold text-white">Pagamento Cliente: Silva SA</p>
-                <p class="text-xs text-matte-muted mt-0.5">Serviços</p>
-              </td>
-              <td class="px-4 py-4 text-matte-muted text-xs">Ontem</td>
-              <td class="px-4 py-4 text-right">
-                <p class="font-bold text-emerald-400">+ € 3.450,00</p>
-                <span class="text-[10px] text-matte-muted">Transferência Bancária</span>
-              </td>
-            </tr>
-
-            <!-- Transação 3 -->
-            <tr class="hover:bg-white/[0.02] transition-colors group">
-              <td class="px-5 py-4 w-12">
-                <div class="w-10 h-10 rounded-full bg-[#09090b] border border-white/[0.05] flex items-center justify-center text-white">
-                  <i class="ph-fill ph-coffee text-lg"></i>
-                </div>
-              </td>
-              <td class="px-4 py-4">
-                <p class="font-semibold text-white">Starbucks</p>
-                <p class="text-xs text-matte-muted mt-0.5">Alimentação</p>
-              </td>
-              <td class="px-4 py-4 text-matte-muted text-xs">24 Fev, 2024</td>
-              <td class="px-4 py-4 text-right">
-                <p class="font-bold text-white">- € 8,50</p>
-                <span class="text-[10px] text-matte-muted">Cartão final 4021</span>
-              </td>
-            </tr>
-
-            <!-- Transação 4 -->
-            <tr class="hover:bg-white/[0.02] transition-colors group">
-              <td class="px-5 py-4 w-12">
-                <div class="w-10 h-10 rounded-full bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
-                  <i class="ph-fill ph-monitor-play text-lg"></i>
-                </div>
-              </td>
-              <td class="px-4 py-4">
-                <p class="font-semibold text-white">Subscrição Netflix</p>
-                <p class="text-xs text-matte-muted mt-0.5">Lazer</p>
-              </td>
-              <td class="px-4 py-4 text-matte-muted text-xs">22 Fev, 2024</td>
-              <td class="px-4 py-4 text-right">
-                <p class="font-bold text-white">- € 15,99</p>
-                <span class="text-[10px] text-matte-muted">Débito Direto</span>
-              </td>
-            </tr>
-
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Gastos por Categoria -->
-    <div class="bg-matte-card border border-white/[0.05] rounded-2xl p-5 shadow-xl">
-      <h2 class="text-lg font-semibold text-white mb-6">Despesas por Categoria</h2>
-      
-      <div class="space-y-5">
-        <!-- Categoria 1 -->
-        <div>
-          <div class="flex justify-between text-sm mb-2">
-            <span class="font-medium text-white flex items-center gap-2"><i class="ph-fill ph-house text-matte-muted"></i> Habitação</span>
-            <span class="font-bold text-white">€ 850</span>
-          </div>
-          <div class="w-full bg-[#09090b] rounded-full h-2 overflow-hidden">
-            <div class="bg-white h-2 rounded-full w-[60%]"></div>
-          </div>
-        </div>
-
-        <!-- Categoria 2 -->
-        <div>
-          <div class="flex justify-between text-sm mb-2">
-            <span class="font-medium text-white flex items-center gap-2"><i class="ph-fill ph-car text-matte-muted"></i> Transportes</span>
-            <span class="font-bold text-white">€ 240</span>
-          </div>
-          <div class="w-full bg-[#09090b] rounded-full h-2 overflow-hidden">
-            <div class="bg-white/70 h-2 rounded-full w-[25%]"></div>
-          </div>
-        </div>
-
-        <!-- Categoria 3 -->
-        <div>
-          <div class="flex justify-between text-sm mb-2">
-            <span class="font-medium text-white flex items-center gap-2"><i class="ph-fill ph-fork-knife text-matte-muted"></i> Alimentação</span>
-            <span class="font-bold text-white">€ 420</span>
-          </div>
-          <div class="w-full bg-[#09090b] rounded-full h-2 overflow-hidden">
-            <div class="bg-white/50 h-2 rounded-full w-[45%]"></div>
-          </div>
-        </div>
-
-        <!-- Categoria 4 -->
-        <div>
-          <div class="flex justify-between text-sm mb-2">
-            <span class="font-medium text-white flex items-center gap-2"><i class="ph-fill ph-shopping-bag text-matte-muted"></i> Compras</span>
-            <span class="font-bold text-white">€ 180</span>
-          </div>
-          <div class="w-full bg-[#09090b] rounded-full h-2 overflow-hidden">
-            <div class="bg-white/30 h-2 rounded-full w-[15%]"></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="mt-8 pt-5 border-t border-white/[0.05]">
-        <button onclick="showToast('A gerar relatório completo em PDF...', 'info')" class="w-full py-2.5 rounded-xl border border-white/[0.1] text-sm font-medium text-white hover:bg-white/[0.02] transition-colors active:scale-95">
-          Ver Relatório Completo
-        </button>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- CONTAINER DE NOTIFICAÇÕES -->
-  <div id="toast-container" class="fixed bottom-4 right-4 sm:bottom-8 sm:right-8 z-[100] flex flex-col gap-3 pointer-events-none"></div>
-
-  <!-- MODAL: NOVA TRANSAÇÃO -->
-  <div id="modal-nova-transacao" class="fixed inset-0 z-[100] hidden items-center justify-center p-4">
-    <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity opacity-0" id="modal-backdrop" onclick="closeModal()"></div>
-    
-    <div class="bg-matte-card border border-white/[0.1] w-full max-w-md rounded-3xl p-6 relative z-10 transform scale-95 opacity-0 transition-all shadow-2xl flex flex-col" id="modal-panel">
-       <div class="flex justify-between items-center mb-6">
-         <h3 class="text-xl font-bold text-white flex items-center gap-2"><i class="ph-fill ph-plus-circle text-matte-muted"></i> Nova Transação</h3>
-         <button onclick="closeModal()" class="text-matte-muted hover:text-white bg-white/[0.02] hover:bg-white/[0.1] p-1.5 rounded-xl border border-transparent hover:border-white/[0.05] transition-all"><i class="ph ph-x text-lg"></i></button>
-       </div>
-       
-       <div class="space-y-4">
-          <div>
-            <label class="text-[11px] text-matte-muted uppercase tracking-wider font-semibold mb-1.5 block">Descrição</label>
-            <input type="text" id="input-desc" placeholder="Ex: Material de Escritório" class="w-full bg-[#09090b] border border-white/[0.1] rounded-xl px-4 py-3 text-sm text-white focus:border-white/30 focus:ring-1 focus:ring-white/20 transition-all outline-none placeholder:text-white/20">
-          </div>
-          
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="text-[11px] text-matte-muted uppercase tracking-wider font-semibold mb-1.5 block">Valor (€)</label>
-              <input type="number" step="0.01" id="input-valor" placeholder="0.00" class="w-full bg-[#09090b] border border-white/[0.1] rounded-xl px-4 py-3 text-sm text-white focus:border-white/30 focus:ring-1 focus:ring-white/20 transition-all outline-none placeholder:text-white/20">
-            </div>
-            <div>
-              <label class="text-[11px] text-matte-muted uppercase tracking-wider font-semibold mb-1.5 block">Tipo</label>
-              <select id="input-tipo" class="w-full bg-[#09090b] border border-white/[0.1] rounded-xl px-4 py-3 text-sm text-white focus:border-white/30 focus:ring-1 focus:ring-white/20 transition-all outline-none appearance-none cursor-pointer">
-                <option value="despesa">Despesa</option>
-                <option value="receita">Receita</option>
-              </select>
-            </div>
-          </div>
-          
-          <div class="pt-4 flex gap-3">
-             <button onclick="closeModal()" class="flex-1 py-3 rounded-xl border border-white/[0.1] text-sm text-white font-medium hover:bg-white/[0.05] transition-colors active:scale-95">Cancelar</button>
-             <button onclick="salvarTransacao()" class="flex-1 py-3 rounded-xl bg-white text-black text-sm font-bold hover:bg-gray-200 transition-colors shadow-[0_0_20px_rgba(255,255,255,0.1)] active:scale-95">Adicionar</button>
-          </div>
-       </div>
-    </div>
-  </div>
-
-  <!-- LÓGICA E INTERAÇÕES -->
-  <script>
-    
-    // Funções auxiliares para formatar moeda e extrair números do HTML
-    function parseCurrency(str) {
-      return parseFloat(str.replace(/[^0-9,-]+/g,"").replace(",", "."));
-    }
-
-    function formatCurrency(val) {
-      return '€ ' + val.toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    }
-
-    // Sistema de Notificações (Toasts) Premium
-    function showToast(message, type = 'info') {
-      const container = document.getElementById('toast-container');
-      const toast = document.createElement('div');
-      
-      let icon = 'ph-info';
-      let colorClass = 'text-blue-400 bg-blue-400/10 border-blue-400/20';
-      
-      if(type === 'success') {
-        icon = 'ph-check-circle';
-        colorClass = 'text-green-400 bg-green-400/10 border-green-400/20';
-      } else if (type === 'warning') {
-        icon = 'ph-warning';
-        colorClass = 'text-orange-400 bg-orange-400/10 border-orange-400/20';
-      }
-      
-      toast.className = `transform transition-all duration-500 translate-y-10 opacity-0 flex items-center gap-3 px-4 py-3.5 rounded-2xl shadow-xl border border-white/[0.05] bg-[#18181b] text-white text-sm font-medium pointer-events-auto`;
-      toast.innerHTML = `
-        <div class="p-1.5 rounded-xl border ${colorClass}">
-            <i class="ph-fill ${icon} text-lg"></i>
-        </div>
-        ${message}
-      `;
-      
-      container.appendChild(toast);
-      
-      // Animação de Entrada
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-            toast.classList.remove('translate-y-10', 'opacity-0');
-            toast.classList.add('translate-y-0', 'opacity-100');
-        });
-      });
-      
-      // Remover após 3 segundos
-      setTimeout(() => {
-        toast.classList.remove('translate-y-0', 'opacity-100');
-        toast.classList.add('translate-y-10', 'opacity-0');
-        setTimeout(() => toast.remove(), 500); 
-      }, 3000);
-    }
-
-    
-    // Controlo do Modal
-    const modal = document.getElementById('modal-nova-transacao');
-    const backdrop = document.getElementById('modal-backdrop');
-    const panel = document.getElementById('modal-panel');
-
-    function openModal() {
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-      void modal.offsetWidth; // Force reflow
-      
-      backdrop.classList.add('opacity-100');
-      backdrop.classList.remove('opacity-0');
-      panel.classList.add('scale-100', 'opacity-100');
-      panel.classList.remove('scale-95', 'opacity-0');
-    }
-
-    function closeModal() {
-      backdrop.classList.remove('opacity-100');
-      backdrop.classList.add('opacity-0');
-      panel.classList.remove('scale-100', 'opacity-100');
-      panel.classList.add('scale-95', 'opacity-0');
-      
-      setTimeout(() => {
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
+    function App() {
+      // ESTADO PRINCIPAL (Atualizado para suportar metas/goals)
+      const [data, setData] = useState(() => {
+        const saved = localStorage.getItem('finances_premium_v1');
+        if (saved) return JSON.parse(saved);
         
-        // Limpar inputs após fechar
-        document.getElementById('input-desc').value = '';
-        document.getElementById('input-valor').value = '';
-        document.getElementById('input-tipo').value = 'despesa';
-      }, 300);
+        // Estrutura inicial com migração automática caso exista dado antigo
+        const oldSaved = localStorage.getItem('finances_simple_data_pt');
+        if (oldSaved) {
+            const oldData = JSON.parse(oldSaved);
+            return { ...oldData, goals: [] };
+        }
+        
+        return { year: CURRENT_YEAR, items: [], goals: [] };
+      });
+
+      // ESTATES DE INTERFACE
+      const [expandedMonths, setExpandedMonths] = useState(new Set([CURRENT_MONTH]));
+      
+      const [txModal, setTxModal] = useState({ isOpen: false, item: null });
+      const [goalModal, setGoalModal] = useState({ isOpen: false, item: null });
+      const [depositModal, setDepositModal] = useState({ isOpen: false, goal: null });
+      
+      const [confirmDelete, setConfirmDelete] = useState(false);
+      const [showClearConfirm, setShowClearConfirm] = useState(false);
+      const [toast, setToast] = useState(null);
+      
+      const fileInputRef = useRef(null);
+
+      const showToast = (message, type = 'success') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 3500);
+      };
+
+      useEffect(() => {
+        localStorage.setItem('finances_premium_v1', JSON.stringify(data));
+      }, [data]);
+
+      const stats = useMemo(() => {
+        let totalIncome = 0;
+        let totalExpense = 0;
+        const monthly = Array(12).fill(null).map(() => ({ income: 0, expense: 0, items: [] }));
+
+        data.items.forEach(item => {
+          if (item.type === 'income') {
+            totalIncome += item.value;
+            monthly[item.month].income += item.value;
+          } else {
+            totalExpense += item.value;
+            monthly[item.month].expense += item.value;
+          }
+          monthly[item.month].items.push(item);
+        });
+
+        // Cálculos Globais
+        const balance = totalIncome - totalExpense;
+        const totalSaved = (data.goals || []).reduce((acc, g) => acc + (g.current || 0), 0);
+        const freeBalance = balance - totalSaved; // Dinheiro que não está nas metas
+
+        // Alerta de Gastos
+        let prevExpenseSum = 0;
+        let prevMonthsCount = 0;
+        for (let i = 0; i < CURRENT_MONTH; i++) {
+          if (monthly[i].expense > 0 || monthly[i].income > 0) {
+            prevExpenseSum += monthly[i].expense;
+            prevMonthsCount++;
+          }
+        }
+        const avgPrevExpense = prevMonthsCount > 0 ? prevExpenseSum / prevMonthsCount : 0;
+        const isSpendingMoreThanAvg = prevMonthsCount > 0 && monthly[CURRENT_MONTH].expense > avgPrevExpense;
+
+        return { 
+            totalIncome, totalExpense, balance, freeBalance, totalSaved, 
+            monthly, isSpendingMoreThanAvg, avgPrevExpense 
+        };
+      }, [data]);
+
+      const handleSaveTx = (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        let valorInput = parseFloat(formData.get('value').replace(',', '.'));
+        
+        const newItem = {
+          id: txModal.item?.id || generateId(),
+          name: formData.get('name'),
+          value: valorInput,
+          type: formData.get('type'),
+          month: parseInt(formData.get('month')),
+          year: data.year
+        };
+
+        setData(prev => {
+          const filtered = prev.items.filter(i => i.id !== newItem.id);
+          return { ...prev, items: [...filtered, newItem] };
+        });
+        
+        setExpandedMonths(prev => new Set([...prev, newItem.month]));
+        setTxModal({ isOpen: false, item: null });
+        showToast('Registo salvo com sucesso.');
+      };
+
+      const handleDeleteTx = (id) => {
+        setData(prev => ({ ...prev, items: prev.items.filter(i => i.id !== id) }));
+        setTxModal({ isOpen: false, item: null });
+        showToast('Registo apagado.', 'error');
+      };
+
+      const handleSaveGoal = (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        let targetValue = parseFloat(formData.get('target').replace(',', '.'));
+        
+        const newGoal = {
+          id: goalModal.item?.id || generateId(),
+          name: formData.get('name'),
+          target: targetValue,
+          current: goalModal.item?.current || 0,
+          icon: formData.get('icon'),
+          color: formData.get('color')
+        };
+
+        setData(prev => {
+          const goals = prev.goals || [];
+          const filtered = goals.filter(g => g.id !== newGoal.id);
+          return { ...prev, goals: [...filtered, newGoal] };
+        });
+        
+        setGoalModal({ isOpen: false, item: null });
+        showToast('Meta financeira definida!');
+      };
+
+      const handleDeleteGoal = (id) => {
+        setData(prev => ({ ...prev, goals: (prev.goals || []).filter(g => g.id !== id) }));
+        setGoalModal({ isOpen: false, item: null });
+        showToast('Meta financeira apagada.', 'error');
+      };
+
+      const handleDeposit = (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        let amount = parseFloat(formData.get('amount').replace(',', '.'));
+        const action = formData.get('action'); // add ou remove
+
+        if(action === 'remove') amount = -amount;
+
+        setData(prev => {
+            const goals = [...(prev.goals || [])];
+            const idx = goals.findIndex(g => g.id === depositModal.goal.id);
+            if(idx !== -1) {
+                let newCurrent = goals[idx].current + amount;
+                if(newCurrent < 0) newCurrent = 0; // Impede saldo negativo na meta
+                goals[idx] = { ...goals[idx], current: newCurrent };
+            }
+            return { ...prev, goals };
+        });
+
+        setDepositModal({ isOpen: false, goal: null });
+        showToast(action === 'add' ? 'Dinheiro guardado!' : 'Dinheiro resgatado!');
+      };
+
+      const downloadBackup = () => {
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = `financas_backup_${data.year}.json`;
+        a.click(); URL.revokeObjectURL(url); showToast('Backup exportado!');
+      };
+
+      const handleImportJson = (e) => {
+        const file = e.target.files[0]; if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const imported = JSON.parse(event.target.result);
+            if (imported.year && Array.isArray(imported.items)) {
+              setData({ ...imported, goals: imported.goals || [] });
+              showToast('Dados restaurados!');
+            } else throw new Error();
+          } catch (err) { showToast('Ficheiro inválido.', 'error'); }
+        };
+        reader.readAsText(file); e.target.value = '';
+      };
+
+      const handleResetData = () => {
+        setData({ year: CURRENT_YEAR, items: [], goals: [] });
+        setShowClearConfirm(false); showToast('Dados formatados.');
+      };
+
+      const toggleMonth = (idx) => {
+        setExpandedMonths(prev => { const n = new Set(prev); n.has(idx) ? n.delete(idx) : n.add(idx); return n; });
+      };
+
+      return (
+        <div className="pb-24 font-sans relative">
+          
+          {/* TOAST NOTIFICATION */}
+          {toast && (
+            <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-[100] px-4 py-3 rounded-xl shadow-2xl border border-white/[0.05] flex items-center gap-3 toast-anim pointer-events-auto bg-zinc-800`}>
+              <i className={`ph-fill ${toast.type === 'error' ? 'ph-warning-circle text-red-500' : 'ph-check-circle text-blue-400'} text-lg`}></i>
+              <span className="text-sm font-medium text-zinc-200 whitespace-nowrap">{toast.message}</span>
+            </div>
+          )}
+
+          {/* CABEÇALHO */}
+          <header className="sticky top-0 z-40 bg-matte-bg/90 backdrop-blur-md border-b border-white/[0.04]">
+            <div className="max-w-2xl mx-auto px-4 py-3 flex justify-between items-center gap-4">
+              <div className="flex items-center gap-3">
+                <div className="bg-emerald-500/10 p-2 rounded-lg text-emerald-400">
+                  <i className="ph-fill ph-wallet text-xl"></i>
+                </div>
+                <div>
+                  <h1 className="text-base font-bold text-white leading-tight">Finanças</h1>
+                  <p className="text-[10px] text-zinc-500 font-medium tracking-wide">Painel de {data.year}</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <input type="file" accept=".json" ref={fileInputRef} onChange={handleImportJson} className="hidden" />
+                <button onClick={() => fileInputRef.current.click()} title="Restaurar Backup" className="p-2 bg-white/[0.03] hover:bg-white/10 rounded-lg text-zinc-400 hover:text-white transition-colors">
+                  <i className="ph-bold ph-upload-simple text-lg"></i>
+                </button>
+                <button onClick={downloadBackup} title="Criar Backup" className="p-2 bg-white/[0.03] hover:bg-white/10 rounded-lg text-zinc-400 hover:text-white transition-colors">
+                  <i className="ph-bold ph-download-simple text-lg"></i>
+                </button>
+                <div className="w-px h-5 bg-white/[0.1] mx-1"></div>
+                <button onClick={() => setShowClearConfirm(true)} title="Apagar Tudo" className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors">
+                  <i className="ph-bold ph-trash text-lg"></i>
+                </button>
+              </div>
+            </div>
+          </header>
+
+          <main className="max-w-2xl mx-auto px-4 sm:px-6 mt-6 space-y-8">
+            
+            {/* NOVO PAINEL GERAL (Saldo, Livre e Guardado) */}
+            <div className="bg-white/[0.02] rounded-2xl shadow-sm p-6 border border-white/[0.05] relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-40 h-40 bg-emerald-500/5 rounded-full blur-3xl -mr-10 -mt-10"></div>
+              
+              <div className="text-center mb-6 relative z-10">
+                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Patrimônio Líquido</p>
+                <p className={`text-4xl font-black tracking-tight ${stats.balance < 0 ? 'text-red-400' : 'text-white'}`}>
+                  {formatMoney(stats.balance)}
+                </p>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 pt-5 border-t border-white/[0.05] relative z-10">
+                <div className="bg-blue-500/5 p-3 rounded-xl border border-blue-500/10">
+                  <p className="text-[10px] font-bold text-blue-400/70 uppercase tracking-wider flex items-center gap-1.5 mb-1">
+                    <i className="ph-fill ph-lock-key"></i> Guardado (Metas)
+                  </p>
+                  <p className="text-lg font-bold text-blue-400 truncate">{formatMoney(stats.totalSaved)}</p>
+                </div>
+                <div className="bg-emerald-500/5 p-3 rounded-xl border border-emerald-500/10">
+                  <p className="text-[10px] font-bold text-emerald-400/70 uppercase tracking-wider flex items-center gap-1.5 mb-1">
+                    <i className="ph-fill ph-money"></i> Livre (Disponível)
+                  </p>
+                  <p className="text-lg font-bold text-emerald-400 truncate">{formatMoney(stats.freeBalance)}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* SEÇÃO DE METAS & POUPANÇA */}
+            <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                    <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                        <i class="ph-fill ph-target text-blue-400 text-lg"></i> Metas & Poupança
+                    </h2>
+                    <button onClick={() => { setConfirmDelete(false); setGoalModal({ isOpen: true, item: null }); }} className="text-[10px] font-bold bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 px-3 py-1.5 rounded-lg transition-colors uppercase tracking-wider">
+                        Nova Meta
+                    </button>
+                </div>
+
+                {(!data.goals || data.goals.length === 0) ? (
+                    <div className="bg-white/[0.01] border border-white/[0.03] rounded-2xl p-6 text-center border-dashed">
+                        <i className="ph ph-piggy-bank text-3xl text-zinc-600 mb-2"></i>
+                        <p className="text-sm text-zinc-500">Nenhuma meta definida.</p>
+                        <p className="text-[10px] text-zinc-600 mt-1">Crie metas para organizar o seu dinheiro guardado.</p>
+                    </div>
+                ) : (
+                    <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2 snap-x">
+                        {data.goals.map(goal => {
+                            const pct = Math.min(100, Math.round((goal.current / goal.target) * 100));
+                            const strokeDashoffset = 100 - pct;
+                            const isCompleted = pct === 100;
+
+                            return (
+                                <div key={goal.id} className="min-w-[240px] w-[240px] bg-white/[0.02] border border-white/[0.05] rounded-2xl p-4 snap-start relative flex flex-col justify-between">
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${goal.color || 'bg-blue-500'}/20 text-${goal.color ? goal.color.split('-')[1] : 'blue'}-400`}>
+                                            <i className={`ph-fill ${goal.icon || 'ph-target'} text-xl`}></i>
+                                        </div>
+                                        <button onClick={() => { setConfirmDelete(false); setGoalModal({ isOpen: true, item: goal }); }} className="text-zinc-500 hover:text-white p-1">
+                                            <i className="ph-bold ph-pencil-simple"></i>
+                                        </button>
+                                    </div>
+                                    
+                                    <div>
+                                        <h3 className="font-bold text-white text-base truncate mb-1">{goal.name}</h3>
+                                        <p className="text-xs text-zinc-500 font-medium">
+                                            <span className="text-zinc-300">{formatMoney(goal.current)}</span> / {formatMoney(goal.target)}
+                                        </p>
+                                    </div>
+
+                                    <div className="mt-4 pt-4 border-t border-white/[0.05] flex items-center justify-between gap-3">
+                                        {/* Barra de Progresso */}
+                                        <div className="flex-1">
+                                            <div className="flex justify-between text-[10px] font-bold mb-1.5">
+                                                <span className={isCompleted ? 'text-emerald-400' : 'text-zinc-500'}>{isCompleted ? 'Concluída!' : 'Progresso'}</span>
+                                                <span className="text-zinc-400">{pct}%</span>
+                                            </div>
+                                            <div className="h-1.5 w-full bg-white/[0.05] rounded-full overflow-hidden">
+                                                <div className={`h-full rounded-full transition-all duration-1000 ${isCompleted ? 'bg-emerald-400' : 'bg-blue-500'}`} style={{ width: `${pct}%` }}></div>
+                                            </div>
+                                        </div>
+
+                                        <button onClick={() => setDepositModal({isOpen: true, goal})} className="w-8 h-8 rounded-full bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 flex items-center justify-center shrink-0 transition-colors">
+                                            <i className="ph-bold ph-plus"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            )
+                        })}
+                    </div>
+                )}
+            </div>
+
+            {/* ALERTA INTELIGENTE */}
+            {stats.isSpendingMoreThanAvg && (
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 flex items-start gap-3 alert-anim">
+                <i className="ph-fill ph-warning-circle text-amber-400 text-xl shrink-0 mt-0.5"></i>
+                <div className="text-sm leading-relaxed text-amber-200/80">
+                  <strong className="text-amber-400 block mb-0.5">Atenção ao ritmo de gastos</strong>
+                  Os seus gastos este mês ({formatMoney(stats.monthly[CURRENT_MONTH].expense)}) 
+                  já superam a sua média anterior ({formatMoney(stats.avgPrevExpense)}).
+                </div>
+              </div>
+            )}
+
+            {/* LISTA DE MESES (ACCORDION) */}
+            <div className="space-y-4 pt-2">
+              <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 mb-2">
+                  <i class="ph-fill ph-calendar-blank text-zinc-400 text-lg"></i> Extrato Mensal
+              </h2>
+
+              {MONTHS.map((monthName, idx) => {
+                const mData = stats.monthly[idx];
+                const isExpanded = expandedMonths.has(idx);
+                const hasItems = mData.items.length > 0;
+                
+                const sobra = mData.income - mData.expense;
+                const isPositive = sobra >= 0;
+
+                // Não mostra meses vazios do futuro
+                if (!hasItems && idx > CURRENT_MONTH && !isExpanded) return null;
+
+                return (
+                  <div key={idx} className={`bg-white/[0.02] rounded-xl border ${idx === CURRENT_MONTH ? 'border-white/[0.1] shadow-[0_0_15px_rgba(255,255,255,0.03)]' : 'border-white/[0.05]'} overflow-hidden transition-colors`}>
+                    <button onClick={() => toggleMonth(idx)} className="w-full px-4 py-4 flex items-center justify-between outline-none hover:bg-white/[0.02] transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${idx === CURRENT_MONTH ? 'bg-zinc-200 text-black' : 'bg-white/[0.05] text-zinc-400'}`}>
+                          {MONTHS_SHORT[idx]}
+                        </div>
+                        <div className="text-left">
+                          <p className="font-bold text-white leading-tight">{monthName}</p>
+                          {hasItems ? (
+                              <p className={`text-[10px] font-bold uppercase tracking-wider mt-0.5 ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+                                  Sobra: {formatMoney(sobra)}
+                              </p>
+                          ) : (
+                              <p className="text-[10px] font-medium text-zinc-600 mt-0.5">Sem movimentos</p>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-4 text-zinc-500">
+                        {hasItems && (
+                            <div className="hidden sm:flex flex-col items-end text-[10px] font-semibold mr-2">
+                                <span className="text-emerald-400/80">+{formatMoney(mData.income)}</span>
+                                <span className="text-red-400/80">-{formatMoney(mData.expense)}</span>
+                            </div>
+                        )}
+                        <i className={`ph-bold ph-caret-down transition-transform duration-300 ${isExpanded ? 'rotate-180 text-white' : ''}`}></i>
+                      </div>
+                    </button>
+
+                    {/* CONTEÚDO DO MÊS */}
+                    <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${isExpanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+                      <div className="overflow-hidden">
+                        <div className="bg-black/20 border-t border-white/[0.02]">
+                          {!hasItems ? (
+                            <div className="text-center py-6">
+                              <i className="ph ph-receipt text-2xl text-zinc-700 mb-2"></i>
+                              <p className="text-sm text-zinc-600">Nenhum registo neste mês.</p>
+                            </div>
+                          ) : (
+                            <ul className="divide-y divide-white/[0.02]">
+                              {mData.items.sort((a,b) => b.value - a.value).map(item => (
+                                <li 
+                                  key={item.id} 
+                                  onClick={() => { setConfirmDelete(false); setTxModal({ isOpen: true, item }); }}
+                                  className="px-4 py-3.5 flex justify-between items-center cursor-pointer hover:bg-white/[0.02] transition-colors"
+                                >
+                                  <div className="flex items-center gap-3 truncate pr-4">
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${item.type === 'income' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+                                      <i className={`ph-bold ${item.type === 'income' ? 'ph-arrow-down-left' : 'ph-arrow-up-right'} text-sm`}></i>
+                                    </div>
+                                    <span className="text-zinc-200 font-medium truncate text-sm">{item.name}</span>
+                                  </div>
+                                  <span className={`font-bold text-sm whitespace-nowrap ${item.type === 'income' ? 'text-emerald-400' : 'text-zinc-100'}`}>
+                                    {item.type === 'expense' ? '- ' : '+ '}{formatMoney(item.value)}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </main>
+
+          {/* BOTÃO FLUTUANTE (FAB) PARA TRANSAÇÃO */}
+          <button 
+            onClick={() => { setConfirmDelete(false); setTxModal({ isOpen: true, item: null }); }}
+            className="fixed bottom-6 right-6 w-14 h-14 bg-zinc-200 hover:bg-white text-black rounded-full shadow-[0_0_20px_rgba(255,255,255,0.15)] flex items-center justify-center transition-transform active:scale-90 z-30"
+          >
+            <i className="ph-bold ph-plus text-2xl"></i>
+          </button>
+
+          {/* ================= MODALS ================= */}
+
+          {/* MODAL TRANSAÇÃO (NOVO / EDITAR) */}
+          <div className={`fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center transition-opacity duration-300 ${txModal.isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+            {txModal.isOpen && (
+              <div className="bg-matte-card w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl border border-white/[0.05] p-6 shadow-2xl modal-anim">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-lg font-bold text-white">{txModal.item ? 'Editar Registo' : 'Novo Registo'}</h2>
+                  <button onClick={() => setTxModal({isOpen: false, item: null})} className="p-2 bg-white/[0.03] hover:bg-white/10 rounded-full text-zinc-400 transition-colors"><i className="ph-bold ph-x text-lg"></i></button>
+                </div>
+
+                <form onSubmit={handleSaveTx} className="space-y-5">
+                  <div className="flex gap-2 p-1.5 bg-white/[0.02] border border-white/[0.05] rounded-xl">
+                    <label className="flex-1 cursor-pointer">
+                      <input type="radio" name="type" value="expense" defaultChecked={txModal.item?.type !== 'income'} className="peer sr-only" />
+                      <div className="text-center py-2.5 text-sm font-bold rounded-lg text-zinc-500 hover:text-zinc-300 peer-checked:bg-red-500/10 peer-checked:text-red-400 peer-checked:border-red-500/20 border border-transparent transition-all">Gasto</div>
+                    </label>
+                    <label className="flex-1 cursor-pointer">
+                      <input type="radio" name="type" value="income" defaultChecked={txModal.item?.type === 'income'} className="peer sr-only" />
+                      <div className="text-center py-2.5 text-sm font-bold rounded-lg text-zinc-500 hover:text-zinc-300 peer-checked:bg-emerald-500/10 peer-checked:text-emerald-400 peer-checked:border-emerald-500/20 border border-transparent transition-all">Receita</div>
+                    </label>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-500 uppercase mb-1.5 tracking-wide">Descrição</label>
+                    <input type="text" name="name" required autoFocus defaultValue={txModal.item?.name} placeholder="Ex: Supermercado, Salário..." className="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-zinc-500 transition-colors" />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-500 uppercase mb-1.5 tracking-wide">Valor (R$)</label>
+                      <input type="number" name="value" required step="0.01" min="0" defaultValue={txModal.item?.value} placeholder="0.00" className="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-zinc-500 transition-colors font-semibold" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-500 uppercase mb-1.5 tracking-wide">Mês</label>
+                      <select name="month" defaultValue={txModal.item?.month ?? CURRENT_MONTH} className="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-zinc-500 transition-colors cursor-pointer appearance-none">
+                        {MONTHS.map((m, i) => <option key={i} value={i} className="bg-matte-card">{m}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex gap-3">
+                    {txModal.item && (
+                      <button type="button" onClick={() => { confirmDelete ? handleDeleteTx(txModal.item.id) : setConfirmDelete(true) }} className={`py-3.5 rounded-xl transition-all flex items-center justify-center font-bold text-sm ${confirmDelete ? 'bg-red-500 hover:bg-red-600 text-white flex-1' : 'bg-red-500/10 text-red-400 hover:bg-red-500/20 px-4'}`}>
+                        {confirmDelete ? 'Excluir?' : <i className="ph-bold ph-trash text-lg"></i>}
+                      </button>
+                    )}
+                    {(!confirmDelete || !txModal.item) && (
+                      <button type="submit" className="flex-1 bg-zinc-200 hover:bg-white text-black font-bold py-3.5 px-4 rounded-xl transition-colors active:scale-95">Salvar</button>
+                    )}
+                  </div>
+                </form>
+              </div>
+            )}
+          </div>
+
+          {/* MODAL META (CRIAR / EDITAR) */}
+          <div className={`fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center transition-opacity duration-300 ${goalModal.isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+            {goalModal.isOpen && (
+              <div className="bg-matte-card w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl border border-white/[0.05] p-6 shadow-2xl modal-anim">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-lg font-bold text-white">{goalModal.item ? 'Editar Meta' : 'Criar Nova Meta'}</h2>
+                  <button onClick={() => setGoalModal({isOpen: false, item: null})} className="p-2 bg-white/[0.03] hover:bg-white/10 rounded-full text-zinc-400 transition-colors"><i className="ph-bold ph-x text-lg"></i></button>
+                </div>
+
+                <form onSubmit={handleSaveGoal} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-500 uppercase mb-1.5 tracking-wide">Nome da Meta</label>
+                    <input type="text" name="name" required autoFocus defaultValue={goalModal.item?.name} placeholder="Ex: Viagem, Carro Novo..." className="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500/50 transition-colors" />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-500 uppercase mb-1.5 tracking-wide">Valor Alvo (R$)</label>
+                    <input type="number" name="target" required step="0.01" min="1" defaultValue={goalModal.item?.target} placeholder="Ex: 5000.00" className="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500/50 transition-colors font-semibold" />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-xs font-semibold text-zinc-500 uppercase mb-1.5 tracking-wide">Cor</label>
+                        <select name="color" defaultValue={goalModal.item?.color || 'bg-blue-500'} className="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500/50 transition-colors cursor-pointer appearance-none">
+                            <option value="bg-blue-500" className="bg-matte-card text-blue-400">Azul</option>
+                            <option value="bg-emerald-500" className="bg-matte-card text-emerald-400">Verde</option>
+                            <option value="bg-purple-500" className="bg-matte-card text-purple-400">Roxo</option>
+                            <option value="bg-amber-500" className="bg-matte-card text-amber-400">Laranja</option>
+                            <option value="bg-pink-500" className="bg-matte-card text-pink-400">Rosa</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-semibold text-zinc-500 uppercase mb-1.5 tracking-wide">Ícone</label>
+                        <select name="icon" defaultValue={goalModal.item?.icon || 'ph-target'} className="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500/50 transition-colors cursor-pointer appearance-none">
+                            <option value="ph-target" className="bg-matte-card">Alvo</option>
+                            <option value="ph-piggy-bank" className="bg-matte-card">Porco</option>
+                            <option value="ph-car" className="bg-matte-card">Carro</option>
+                            <option value="ph-airplane-tilt" className="bg-matte-card">Avião</option>
+                            <option value="ph-house" className="bg-matte-card">Casa</option>
+                            <option value="ph-laptop" className="bg-matte-card">PC</option>
+                        </select>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex gap-3">
+                    {goalModal.item && (
+                      <button type="button" onClick={() => { confirmDelete ? handleDeleteGoal(goalModal.item.id) : setConfirmDelete(true) }} className={`py-3.5 rounded-xl transition-all flex items-center justify-center font-bold text-sm ${confirmDelete ? 'bg-red-500 hover:bg-red-600 text-white flex-1' : 'bg-red-500/10 text-red-400 hover:bg-red-500/20 px-4'}`}>
+                        {confirmDelete ? 'Excluir Meta?' : <i className="ph-bold ph-trash text-lg"></i>}
+                      </button>
+                    )}
+                    {(!confirmDelete || !goalModal.item) && (
+                      <button type="submit" className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3.5 px-4 rounded-xl transition-colors active:scale-95 shadow-lg shadow-blue-500/20">Salvar Meta</button>
+                    )}
+                  </div>
+                </form>
+              </div>
+            )}
+          </div>
+
+          {/* MODAL ADICIONAR FUNDOS NA META */}
+          <div className={`fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-opacity duration-300 ${depositModal.isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+            {depositModal.isOpen && (
+              <div className="bg-matte-card max-w-sm w-full rounded-2xl border border-white/[0.05] p-6 shadow-2xl modal-anim">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                    <i className="ph-fill ph-coins text-yellow-500"></i> Gerir Fundos
+                  </h2>
+                  <button onClick={() => setDepositModal({isOpen: false, goal: null})} className="p-2 bg-white/[0.03] hover:bg-white/10 rounded-full text-zinc-400 transition-colors"><i className="ph-bold ph-x text-lg"></i></button>
+                </div>
+                
+                <p className="text-sm text-zinc-400 mb-4">Meta selecionada: <strong className="text-white">{depositModal.goal?.name}</strong></p>
+
+                <form onSubmit={handleDeposit} className="space-y-4">
+                  <div className="flex gap-2 p-1.5 bg-white/[0.02] border border-white/[0.05] rounded-xl mb-4">
+                    <label className="flex-1 cursor-pointer">
+                      <input type="radio" name="action" value="add" defaultChecked className="peer sr-only" />
+                      <div className="text-center py-2.5 text-sm font-bold rounded-lg text-zinc-500 hover:text-zinc-300 peer-checked:bg-emerald-500/10 peer-checked:text-emerald-400 peer-checked:border-emerald-500/20 border border-transparent transition-all">Guardar (+)</div>
+                    </label>
+                    <label className="flex-1 cursor-pointer">
+                      <input type="radio" name="action" value="remove" className="peer sr-only" />
+                      <div className="text-center py-2.5 text-sm font-bold rounded-lg text-zinc-500 hover:text-zinc-300 peer-checked:bg-red-500/10 peer-checked:text-red-400 peer-checked:border-red-500/20 border border-transparent transition-all">Resgatar (-)</div>
+                    </label>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-500 uppercase mb-1.5 tracking-wide">Valor a movimentar (R$)</label>
+                    <input type="number" name="amount" required step="0.01" min="0.01" placeholder="Ex: 100.00" autoFocus className="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-zinc-500 transition-colors font-semibold" />
+                  </div>
+
+                  <button type="submit" className="w-full mt-2 bg-zinc-200 hover:bg-white text-black font-bold py-3.5 px-4 rounded-xl transition-colors active:scale-95">Confirmar</button>
+                </form>
+              </div>
+            )}
+          </div>
+
+          {/* MODAL LIMPAR DADOS */}
+          <div className={`fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-opacity duration-300 ${showClearConfirm ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+            {showClearConfirm && (
+              <div className="bg-matte-card max-w-sm w-full rounded-2xl border border-white/[0.05] p-6 text-center shadow-2xl modal-anim">
+                <div className="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <i className="ph-fill ph-warning-circle text-2xl text-red-500"></i>
+                </div>
+                <h2 className="text-lg font-bold text-white mb-2">Eliminar todos os dados?</h2>
+                <p className="text-zinc-400 text-sm mb-6">Esta ação não pode ser desfeita. Todos os seus registos e metas serão apagados permanentemente.</p>
+                <div className="flex gap-3">
+                  <button onClick={() => setShowClearConfirm(false)} className="flex-1 py-3 rounded-xl font-bold bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 transition-colors">Cancelar</button>
+                  <button onClick={handleResetData} className="flex-1 py-3 rounded-xl font-bold bg-red-500 hover:bg-red-600 text-white transition-colors">Sim, Eliminar</button>
+                </div>
+              </div>
+            )}
+          </div>
+
+        </div>
+      );
     }
 
-    function salvarTransacao() {
-      const desc = document.getElementById('input-desc').value.trim();
-      const valorInput = document.getElementById('input-valor').value;
-      const tipo = document.getElementById('input-tipo').value;
-      
-      if(!desc || !valorInput) {
-        showToast('Por favor, preencha todos os campos.', 'warning');
-        return;
-      }
-
-      const valorNum = parseFloat(valorInput);
-      if(isNaN(valorNum) || valorNum <= 0) {
-        showToast('Introduza um valor válido maior que zero.', 'warning');
-        return;
-      }
-
-      // 1. Atualizar Tabela HTML
-      const tbody = document.getElementById('tabela-transacoes');
-      const tr = document.createElement('tr');
-      tr.className = 'hover:bg-white/[0.02] transition-colors group slide-up';
-      
-      // Setup condicional de design (Receita vs Despesa)
-      const isReceita = tipo === 'receita';
-      const valorFormatado = (isReceita ? '+ ' : '- ') + formatCurrency(valorNum);
-      const colorTextClass = isReceita ? 'text-emerald-400' : 'text-white';
-      
-      const iconHTML = isReceita 
-        ? `<div class="w-10 h-10 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400"><i class="ph-fill ph-arrow-down-left text-lg"></i></div>`
-        : `<div class="w-10 h-10 rounded-full bg-[#09090b] border border-white/[0.05] flex items-center justify-center text-white"><i class="ph-fill ph-receipt text-lg"></i></div>`;
-      
-      const categoria = isReceita ? 'Transferência / Depósito' : 'Manual';
-
-      tr.innerHTML = `
-        <td class="px-5 py-4 w-12">${iconHTML}</td>
-        <td class="px-4 py-4">
-          <p class="font-semibold text-white">${desc}</p>
-          <p class="text-xs text-matte-muted mt-0.5">${categoria}</p>
-        </td>
-        <td class="px-4 py-4 text-matte-muted text-xs">Agora mesmo</td>
-        <td class="px-4 py-4 text-right">
-          <p class="font-bold ${colorTextClass}">${valorFormatado}</p>
-          <span class="text-[10px] text-matte-muted">Adicionado manualmente</span>
-        </td>
-      `;
-      
-      // Inserir no topo da tabela
-      tbody.insertBefore(tr, tbody.firstChild);
-
-      // 2. Atualizar Saldos e KPIs
-      const elSaldo = document.getElementById('saldo-total');
-      const elReceitas = document.getElementById('receitas-total');
-      const elDespesas = document.getElementById('despesas-total');
-      
-      let saldoAtual = parseCurrency(elSaldo.innerText);
-      
-      if (isReceita) {
-          let receitasTotais = parseCurrency(elReceitas.innerText);
-          elReceitas.innerText = formatCurrency(receitasTotais + valorNum);
-          elSaldo.innerText = formatCurrency(saldoAtual + valorNum);
-      } else {
-          let despesasTotais = parseCurrency(elDespesas.innerText);
-          elDespesas.innerText = formatCurrency(despesasTotais + valorNum);
-          elSaldo.innerText = formatCurrency(saldoAtual - valorNum);
-      }
-
-      // 3. Fechar e Notificar
-      closeModal();
-      showToast('Transação registada com sucesso!', 'success');
-    }
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
   </script>
 </body>
 </html>
