@@ -1,445 +1,878 @@
 <!DOCTYPE html>
-<html lang="pt-PT" class="dark">
+<html lang="pt-BR" class="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Gestão - Nexus OS</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Gestão de Visitas</title>
   
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Phosphor Icons -->
   <script src="https://unpkg.com/@phosphor-icons/web"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   
   <script>
-      tailwind.config = {
-          darkMode: 'class',
-          theme: {
-              extend: {
-                  fontFamily: { sans: ['Inter', 'sans-serif'] },
-                  colors: { 
-                      matte: {
-                          bg: '#09090b',
-                          card: '#18181b',
-                          border: '#27272a',
-                          hover: '#27272a',
-                          text: '#fafafa',
-                          muted: '#a1a1aa'
-                      }
-                  }
-              }
-          }
-      }
+    tailwind.config = {
+        darkMode: 'class',
+        theme: {
+            extend: {
+                fontFamily: { sans: ['Inter', 'sans-serif'] },
+                colors: { 
+                    matte: {
+                        bg: '#09090b',
+                        card: '#18181b',
+                        border: '#27272a',
+                        text: '#fafafa',
+                        muted: '#a1a1aa'
+                    }
+                }
+            }
+        }
+    }
   </script>
 
   <style>
+    body { 
+        background-color: #09090b; 
+        color: #fafafa; 
+        -webkit-tap-highlight-color: transparent; 
+        padding-bottom: 100px;
+        overflow-x: hidden;
+    }
+    
+    /* Scrollbar elegante */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 10px; }
-    ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+    ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: #52525b; }
 
-    body { 
-      background-color: #09090b; 
-      -webkit-tap-highlight-color: transparent; 
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    /* Acordeão de detalhes do Card */
+    .card-details {
+        display: grid;
+        grid-template-rows: 0fr;
+        transition: grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .card-details-inner { overflow: hidden; opacity: 0; transition: opacity 0.3s ease; }
+    .card.expanded .card-details { grid-template-rows: 1fr; }
+    .card.expanded .card-details-inner { opacity: 1; padding-bottom: 16px; }
+    
+    .chevron { transition: transform 0.3s ease; }
+    .card.expanded .chevron { transform: rotate(180deg); }
+
+    /* Inputs Modernos Customizados */
+    input[type="text"], input[type="tel"], input[type="url"], select, textarea {
+        color-scheme: dark;
     }
     
-    .slide-up { 
-      animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
-      opacity: 0; 
-      transform: translateY(20px);
-    }
-    
-    @keyframes slideUp { 
-      to { opacity: 1; transform: translateY(0); } 
-    }
+    .avatar-preview { background-size: cover; background-position: center; }
 
-    .delay-100 { animation-delay: 100ms; }
-    .delay-200 { animation-delay: 200ms; }
-    .delay-300 { animation-delay: 300ms; }
-    .delay-400 { animation-delay: 400ms; }
-    .delay-500 { animation-delay: 500ms; }
+    /* Animações e Transições */
+    @keyframes slideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+    @keyframes slideIn { from { transform: translateY(-15px) translateX(-50%); opacity: 0; } to { transform: translateY(0) translateX(-50%); opacity: 1; } }
+    .toast-animate { animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+    /* FAB */
+    .fab { box-shadow: 0 8px 30px rgba(59, 130, 246, 0.3); }
+
+    /* Progresso Suave */
+    .progress-bar-fill { transition: width 1s cubic-bezier(0.4, 0, 0.2, 1); }
+
+    /* ================= IMPRESSÃO ================= */
+    #printContainer { display: none; }
+    @media print {
+      body { background: #fff !important; color: #000 !important; padding: 0 !important; overflow: auto !important; }
+      header, main, .fab, .modal-overlay, #toast-container { display: none !important; }
+      #printContainer { display: block !important; padding: 10px; }
+      
+      .print-header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+      .print-header h1 { font-size: 20px; margin: 0 0 5px 0; text-transform: uppercase; font-weight: bold; }
+      .print-header p { font-size: 14px; margin: 0; color: #555; }
+      
+      .print-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+      .print-card { border: 1px solid #aaa; padding: 10px; border-radius: 6px; page-break-inside: avoid; font-size: 12px; line-height: 1.4; }
+      .print-card strong { font-size: 14px; display: block; margin-bottom: 6px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
+      .print-card p { margin: 2px 0; }
+      .print-card .label { font-weight: bold; color: #333; margin-right: 4px; }
+    }
   </style>
 </head>
-<body class="text-matte-text p-4 sm:p-6 lg:p-8 min-h-screen overflow-y-auto pb-24">
+<body class="antialiased flex flex-col relative min-h-screen">
 
-  <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 slide-up">
-    <div>
-      <h1 class="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-        <div class="p-1.5 bg-white/[0.04] border border-white/[0.05] rounded-lg">
-          <i class="ph-fill ph-users text-white"></i>
+  <!-- ================= HEADER (STICKY BLUR) ================= -->
+  <header class="sticky top-0 z-40 bg-matte-bg/90 backdrop-blur-md border-b border-white/[0.04]">
+    <div class="max-w-3xl mx-auto px-4 py-3 flex justify-between items-center gap-4">
+      <div class="flex items-center gap-3">
+        <div class="bg-blue-500/10 p-2 rounded-lg text-blue-400">
+          <i class="ph-fill ph-users-three text-xl"></i>
         </div>
-        Gestão de Equipa
-      </h1>
-      <p class="text-matte-muted text-sm mt-2 font-medium">Acompanhamento e gestão de recursos humanos.</p>
-    </div>
-    
-    <button onclick="openModal()" class="w-full sm:w-auto flex items-center justify-center gap-2 bg-white text-black px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors shadow-[0_0_20px_rgba(255,255,255,0.15)] active:scale-95">
-      <i class="ph-bold ph-plus"></i>
-      Novo Membro
-    </button>
-  </header>
-
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-    <div class="bg-matte-card border border-white/[0.05] p-5 rounded-2xl slide-up delay-100 relative overflow-hidden group hover:border-white/[0.15] hover:bg-[#1c1c20] transition-all duration-300">
-      <div class="flex justify-between items-start mb-4 relative z-10">
-        <div class="p-2.5 bg-blue-500/10 text-blue-400 rounded-xl border border-blue-500/20">
-          <i class="ph-fill ph-user-circle text-xl"></i>
-        </div>
-        <span class="text-xs font-semibold text-green-400 bg-green-500/10 border border-green-500/20 px-2 py-1 rounded-full">+2 este mês</span>
-      </div>
-      <h3 id="membros-ativos-kpi" class="text-3xl font-bold text-white mb-1 tracking-tight relative z-10">24</h3>
-      <p class="text-sm text-matte-muted font-medium relative z-10">Membros Ativos</p>
-      <div class="absolute -bottom-8 -right-8 w-32 h-32 bg-blue-500/10 blur-3xl rounded-full group-hover:bg-blue-500/20 transition-colors duration-500"></div>
-    </div>
-
-    <div class="bg-matte-card border border-white/[0.05] p-5 rounded-2xl slide-up delay-200 relative overflow-hidden group hover:border-white/[0.15] hover:bg-[#1c1c20] transition-all duration-300">
-      <div class="flex justify-between items-start mb-4 relative z-10">
-        <div class="p-2.5 bg-purple-500/10 text-purple-400 rounded-xl border border-purple-500/20">
-          <i class="ph-fill ph-kanban text-xl"></i>
+        <div>
+          <h1 class="text-base font-bold text-white leading-tight">Gestão de Visitas</h1>
+          <p class="text-[10px] text-zinc-500 font-medium tracking-wide">Controle mensal</p>
         </div>
       </div>
-      <h3 class="text-3xl font-bold text-white mb-1 tracking-tight relative z-10">8</h3>
-      <p class="text-sm text-matte-muted font-medium relative z-10">Projetos em Curso</p>
-      <div class="absolute -bottom-8 -right-8 w-32 h-32 bg-purple-500/10 blur-3xl rounded-full group-hover:bg-purple-500/20 transition-colors duration-500"></div>
-    </div>
-
-    <div class="bg-matte-card border border-white/[0.05] p-5 rounded-2xl slide-up delay-300 relative overflow-hidden group hover:border-white/[0.15] hover:bg-[#1c1c20] transition-all duration-300">
-      <div class="flex justify-between items-start mb-4 relative z-10">
-        <div class="p-2.5 bg-orange-500/10 text-orange-400 rounded-xl border border-orange-500/20">
-          <i class="ph-fill ph-warning-circle text-xl"></i>
-        </div>
-        <span class="text-xs font-semibold text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-1 rounded-full">Atenção</span>
-      </div>
-      <h3 class="text-3xl font-bold text-white mb-1 tracking-tight relative z-10">12</h3>
-      <p class="text-sm text-matte-muted font-medium relative z-10">Tarefas Pendentes</p>
-      <div class="absolute -bottom-8 -right-8 w-32 h-32 bg-orange-500/10 blur-3xl rounded-full group-hover:bg-orange-500/20 transition-colors duration-500"></div>
-    </div>
-
-    <div class="bg-matte-card border border-white/[0.05] p-5 rounded-2xl slide-up delay-400 relative overflow-hidden group hover:border-white/[0.15] hover:bg-[#1c1c20] transition-all duration-300">
-      <div class="flex justify-between items-start mb-4 relative z-10">
-        <div class="p-2.5 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/20">
-          <i class="ph-fill ph-check-circle text-xl"></i>
-        </div>
-      </div>
-      <h3 class="text-3xl font-bold text-white mb-1 tracking-tight relative z-10">94%</h3>
-      <p class="text-sm text-matte-muted font-medium relative z-10">Taxa de Conclusão</p>
-      <div class="absolute -bottom-8 -right-8 w-32 h-32 bg-emerald-500/10 blur-3xl rounded-full group-hover:bg-emerald-500/20 transition-colors duration-500"></div>
-    </div>
-  </div>
-
-  <div class="bg-matte-card border border-white/[0.05] rounded-2xl overflow-hidden slide-up delay-500 shadow-xl">
-    
-    <div class="p-5 border-b border-white/[0.05] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-      <h2 class="text-lg font-semibold text-white">Diretório de Membros</h2>
       
-      <div class="w-full sm:w-auto flex gap-2">
-        <div class="relative w-full sm:w-64">
-          <i class="ph ph-magnifying-glass absolute left-3 top-1/2 transform -translate-y-1/2 text-matte-muted"></i>
-          <input type="text" id="input-pesquisa" placeholder="Pesquisar..." class="w-full bg-[#09090b] border border-white/[0.1] text-sm text-white rounded-xl pl-9 pr-3 py-2.5 focus:outline-none focus:border-white/30 focus:ring-1 focus:ring-white/20 transition-all placeholder:text-matte-muted">
-        </div>
-        <button class="px-3 py-2.5 bg-[#09090b] border border-white/[0.1] rounded-xl text-matte-muted hover:text-white hover:border-white/30 transition-all active:scale-95" onclick="showToast('Filtros avançados estarão disponíveis em breve.', 'warning')">
-          <i class="ph ph-faders text-lg"></i>
+      <div class="flex items-center gap-2">
+        <input type="file" id="fileInput" accept=".json" class="hidden">
+        
+        <button onclick="App.printData()" class="p-2 bg-white/[0.03] hover:bg-white/10 rounded-lg text-blue-400 transition-colors" title="Imprimir Relatório">
+          <i class="ph-bold ph-printer text-lg"></i>
+        </button>
+        <button onclick="document.getElementById('fileInput').click()" class="p-2 bg-white/[0.03] hover:bg-white/10 rounded-lg text-zinc-400 hover:text-white transition-colors" title="Restaurar Backup">
+          <i class="ph-bold ph-upload-simple text-lg"></i>
+        </button>
+        <button onclick="App.exportData()" class="p-2 bg-white/[0.03] hover:bg-white/10 rounded-lg text-zinc-400 hover:text-white transition-colors" title="Criar Backup">
+          <i class="ph-bold ph-download-simple text-lg"></i>
         </button>
       </div>
     </div>
+  </header>
 
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-sm whitespace-nowrap">
-        <thead class="bg-white/[0.02] border-b border-white/[0.05] text-matte-muted">
-          <tr>
-            <th class="px-6 py-4 font-semibold text-xs uppercase tracking-wider">Membro</th>
-            <th class="px-6 py-4 font-semibold text-xs uppercase tracking-wider">Cargo / Função</th>
-            <th class="px-6 py-4 font-semibold text-xs uppercase tracking-wider">Status</th>
-            <th class="px-6 py-4 font-semibold text-xs uppercase tracking-wider">Última Atividade</th>
-            <th class="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-right">Ações</th>
-          </tr>
-        </thead>
-        <tbody id="tabela-membros" class="divide-y divide-white/[0.05]">
-          
-          <tr class="hover:bg-white/[0.02] transition-colors group">
-            <td class="px-6 py-4">
-              <div class="flex items-center gap-3">
-                <img src="https://ui-avatars.com/api/?name=Joao+Silva&background=27272a&color=fafafa&bold=true" alt="Avatar" class="w-10 h-10 rounded-full border border-white/10 group-hover:border-white/30 transition-colors">
-                <div>
-                  <p class="font-semibold text-white">João Silva</p>
-                  <p class="text-xs text-matte-muted font-medium mt-0.5">joao.silva@nexus.pt</p>
-                </div>
-              </div>
-            </td>
-            <td class="px-6 py-4 text-matte-muted font-medium">Desenvolvedor Frontend</td>
-            <td class="px-6 py-4">
-              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-green-500/10 text-green-400 border border-green-500/20 uppercase tracking-wide">
-                <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span> Ativo
-              </span>
-            </td>
-            <td class="px-6 py-4 text-matte-muted font-medium">Há 2 horas</td>
-            <td class="px-6 py-4 text-right">
-              <button onclick="showToast('A abrir opções do membro...')" class="text-matte-muted hover:text-white hover:bg-white/5 p-2 rounded-lg transition-colors"><i class="ph ph-dots-three text-xl"></i></button>
-            </td>
-          </tr>
-          
-          <tr class="hover:bg-white/[0.02] transition-colors group">
-            <td class="px-6 py-4">
-              <div class="flex items-center gap-3">
-                <img src="https://ui-avatars.com/api/?name=Maria+Santos&background=27272a&color=fafafa&bold=true" alt="Avatar" class="w-10 h-10 rounded-full border border-white/10 group-hover:border-white/30 transition-colors">
-                <div>
-                  <p class="font-semibold text-white">Maria Santos</p>
-                  <p class="text-xs text-matte-muted font-medium mt-0.5">maria.santos@nexus.pt</p>
-                </div>
-              </div>
-            </td>
-            <td class="px-6 py-4 text-matte-muted font-medium">Product Manager</td>
-            <td class="px-6 py-4">
-              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-green-500/10 text-green-400 border border-green-500/20 uppercase tracking-wide">
-                <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span> Ativo
-              </span>
-            </td>
-            <td class="px-6 py-4 text-matte-muted font-medium">Online agora</td>
-            <td class="px-6 py-4 text-right">
-              <button onclick="showToast('A abrir opções do membro...')" class="text-matte-muted hover:text-white hover:bg-white/5 p-2 rounded-lg transition-colors"><i class="ph ph-dots-three text-xl"></i></button>
-            </td>
-          </tr>
-
-          <tr class="hover:bg-white/[0.02] transition-colors group">
-            <td class="px-6 py-4">
-              <div class="flex items-center gap-3">
-                <img src="https://ui-avatars.com/api/?name=Pedro+Costa&background=27272a&color=fafafa&bold=true" alt="Avatar" class="w-10 h-10 rounded-full border border-white/10 group-hover:border-white/30 transition-colors">
-                <div>
-                  <p class="font-semibold text-white">Pedro Costa</p>
-                  <p class="text-xs text-matte-muted font-medium mt-0.5">pedro.costa@nexus.pt</p>
-                </div>
-              </div>
-            </td>
-            <td class="px-6 py-4 text-matte-muted font-medium">Designer UX/UI</td>
-            <td class="px-6 py-4">
-              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 uppercase tracking-wide">
-                <span class="w-1.5 h-1.5 rounded-full bg-yellow-500"></span> Ausente
-              </span>
-            </td>
-            <td class="px-6 py-4 text-matte-muted font-medium">Há 1 dia</td>
-            <td class="px-6 py-4 text-right">
-              <button onclick="showToast('A abrir opções do membro...')" class="text-matte-muted hover:text-white hover:bg-white/5 p-2 rounded-lg transition-colors"><i class="ph ph-dots-three text-xl"></i></button>
-            </td>
-          </tr>
-          
-          <tr class="hover:bg-white/[0.02] transition-colors group">
-            <td class="px-6 py-4">
-              <div class="flex items-center gap-3">
-                <img src="https://ui-avatars.com/api/?name=Ana+Ribeiro&background=27272a&color=fafafa&bold=true" alt="Avatar" class="w-10 h-10 rounded-full border border-white/10 group-hover:border-white/30 transition-colors">
-                <div>
-                  <p class="font-semibold text-white">Ana Ribeiro</p>
-                  <p class="text-xs text-matte-muted font-medium mt-0.5">ana.ribeiro@nexus.pt</p>
-                </div>
-              </div>
-            </td>
-            <td class="px-6 py-4 text-matte-muted font-medium">Marketing Digital</td>
-            <td class="px-6 py-4">
-              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-white/5 text-matte-muted border border-white/10 uppercase tracking-wide">
-                <span class="w-1.5 h-1.5 rounded-full bg-matte-muted"></span> Inativo
-              </span>
-            </td>
-            <td class="px-6 py-4 text-matte-muted font-medium">Há 1 semana</td>
-            <td class="px-6 py-4 text-right">
-              <button onclick="showToast('A abrir opções do membro...')" class="text-matte-muted hover:text-white hover:bg-white/5 p-2 rounded-lg transition-colors"><i class="ph ph-dots-three text-xl"></i></button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+  <main class="flex-1 w-full max-w-3xl mx-auto p-4 sm:p-6">
     
-    <div class="p-4 border-t border-white/[0.05] flex items-center justify-between text-xs text-matte-muted font-medium">
-      <p id="texto-paginacao">Mostrando <span class="text-white font-bold">1</span> a <span class="text-white font-bold">4</span> de <span class="text-white font-bold">24</span> membros</p>
-      <div class="flex gap-1.5">
-        <button class="px-3 py-1.5 border border-white/[0.1] rounded-lg bg-white/[0.02] hover:bg-white/[0.06] transition-colors disabled:opacity-30 disabled:hover:bg-white/[0.02]" disabled>Anterior</button>
-        <button class="px-3 py-1.5 border border-white/[0.1] rounded-lg bg-white/[0.02] hover:bg-white/[0.06] transition-colors text-white" onclick="showToast('A carregar página 2...')">Próxima</button>
+    <!-- ================= PAINEL SUPERIOR (MÊS E PROGRESSO GERAL) ================= -->
+    <div class="bg-white/[0.02] rounded-2xl shadow-sm p-5 border border-white/[0.05] relative overflow-hidden mb-6">
+        <div class="absolute top-0 right-0 w-40 h-40 bg-blue-500/5 rounded-full blur-3xl -mr-10 -mt-10"></div>
+        
+        <!-- Navegador de Meses -->
+        <div class="flex items-center justify-between relative z-10 mb-5">
+            <button class="p-2 bg-white/[0.03] hover:bg-white/[0.08] rounded-xl text-zinc-400 hover:text-white transition-colors" onclick="App.changeMonth(-1)">
+                <i class="ph-bold ph-caret-left text-lg"></i>
+            </button>
+            
+            <div class="flex flex-col items-center cursor-pointer group" onclick="App.goToCurrentMonth()" title="Voltar ao mês atual">
+                <h2 id="monthDisplayLabel" class="text-lg font-black text-white capitalize group-hover:text-blue-400 transition-colors">Carregando...</h2>
+                <span id="btnCurrentMonth" class="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mt-0.5 transition-opacity opacity-0 group-hover:text-blue-500">Ir para Hoje</span>
+            </div>
+
+            <button class="p-2 bg-white/[0.03] hover:bg-white/[0.08] rounded-xl text-zinc-400 hover:text-white transition-colors" onclick="App.changeMonth(1)">
+                <i class="ph-bold ph-caret-right text-lg"></i>
+            </button>
+        </div>
+
+        <!-- Barra de Progresso Global do Mês -->
+        <div class="relative z-10">
+            <div class="flex justify-between items-end mb-2">
+                <span class="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <i class="ph-fill ph-flag-checkered text-blue-400"></i> Progresso do Mês
+                </span>
+                <span id="monthProgressText" class="text-sm font-black text-white">0%</span>
+            </div>
+            <div class="h-2 w-full bg-black/40 rounded-full overflow-hidden border border-white/[0.02]">
+                <div id="monthProgressBar" class="h-full bg-gradient-to-r from-blue-600 to-blue-400 rounded-full progress-bar-fill" style="width: 0%"></div>
+            </div>
+            <p id="monthProgressSubtext" class="text-[10px] text-zinc-500 font-medium text-right mt-1.5">0 de 0 visitas realizadas</p>
+        </div>
+    </div>
+
+    <!-- ================= PAINEL DE ESTATÍSTICAS (CARDS) ================= -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8" id="statsContainer">
+      <!-- Renderizado via JS -->
+    </div>
+
+    <!-- ================= FILTROS E BUSCA ================= -->
+    <div class="space-y-5 mb-6">
+      <!-- Busca -->
+      <div class="relative group">
+        <i class="ph-bold ph-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 text-lg group-focus-within:text-blue-400 transition-colors"></i>
+        <input type="text" id="searchInput" placeholder="Buscar criança ou responsável..." oninput="App.handleSearch(event)" 
+          class="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl py-3.5 pl-12 pr-4 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-blue-500/50 focus:bg-white/[0.04] transition-all shadow-sm">
+      </div>
+
+      <!-- Filtro de Status -->
+      <div>
+        <span class="block text-[10px] uppercase font-bold text-zinc-500 tracking-wider mb-2 flex items-center gap-1.5">
+            <i class="ph-fill ph-funnel"></i> Filtrar por Estado
+        </span>
+        <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1" id="visitFilterContainer">
+          <button class="pill active px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border border-transparent" onclick="App.setVisitFilter('Todos')">Todos</button>
+          <button class="pill px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border border-transparent flex items-center gap-1.5" onclick="App.setVisitFilter('Pendentes')"><i class="ph-fill ph-x-circle text-red-400"></i> Pendentes (0)</button>
+          <button class="pill px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border border-transparent flex items-center gap-1.5" onclick="App.setVisitFilter('Parciais')"><i class="ph-fill ph-warning-circle text-amber-400"></i> Parciais (1)</button>
+          <button class="pill px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border border-transparent flex items-center gap-1.5" onclick="App.setVisitFilter('Concluidos')"><i class="ph-fill ph-check-circle text-emerald-400"></i> Concluídos (2)</button>
+        </div>
+      </div>
+
+      <!-- Filtro de Localidade -->
+      <div>
+        <span class="block text-[10px] uppercase font-bold text-zinc-500 tracking-wider mb-2 flex items-center gap-1.5">
+            <i class="ph-fill ph-map-pin"></i> Localidade
+        </span>
+        <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1" id="locFilterContainer">
+          <button class="pill active px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent" onclick="App.setLocFilter('Todas')">Todas Áreas</button>
+          <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent" onclick="App.setLocFilter('Rive')">Rive</button>
+          <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent" onclick="App.setLocFilter('Vila Alta')">Vila Alta</button>
+          <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent" onclick="App.setLocFilter('Vila do Sul')">Vila do Sul</button>
+          <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent" onclick="App.setLocFilter('Querosene')">Querosene</button>
+          <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent" onclick="App.setLocFilter('Café')">Café</button>
+          <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent" onclick="App.setLocFilter('Celina')">Celina</button>
+          <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent" onclick="App.setLocFilter('Centro')">Centro</button>
+          <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent" onclick="App.setLocFilter('Pendente')">Pendente</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= LISTA DE CARDS ================= -->
+    <div id="listContainer" class="space-y-4 transition-opacity duration-200"></div>
+    
+    <!-- Estado Vazio -->
+    <div id="emptyState" class="hidden text-center py-16 px-4 bg-white/[0.01] border border-white/[0.03] border-dashed rounded-2xl mt-4">
+      <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/[0.02] text-zinc-600 mb-4 shadow-inner">
+        <i class="ph-fill ph-users text-3xl"></i>
+      </div>
+      <h3 class="text-base font-bold text-zinc-300">Nenhum registo encontrado</h3>
+      <p class="text-sm text-zinc-500 mt-1 max-w-xs mx-auto">Ajuste os filtros ou adicione uma nova criança para começar.</p>
+    </div>
+  </main>
+
+  <!-- ================= FAB (Novo) ================= -->
+  <button class="fab fixed bottom-6 right-6 w-14 h-14 bg-blue-600 hover:bg-blue-500 text-white rounded-full flex items-center justify-center z-30 transition-transform active:scale-90" onclick="App.openFormModal()">
+    <i class="ph-bold ph-plus text-2xl"></i>
+  </button>
+
+  <!-- ================= DIV OCULTA PARA IMPRESSÃO ================= -->
+  <div id="printContainer"></div>
+
+  <!-- ================= MODAL: FORMULÁRIO ================= -->
+  <div class="modal-overlay fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300" id="formModal">
+    <div class="modal-content bg-matte-card w-full sm:max-w-md h-[90vh] sm:h-auto sm:max-h-[90vh] rounded-t-3xl sm:rounded-3xl border border-white/[0.05] shadow-2xl flex flex-col transform translate-y-full sm:scale-95 transition-all duration-300">
+      
+      <div class="flex justify-between items-center p-6 border-b border-white/[0.05]">
+        <h2 class="text-lg font-black text-white" id="formModalTitle">Nova Criança</h2>
+        <button class="p-2 bg-white/[0.03] hover:bg-white/10 rounded-full text-zinc-400 transition-colors" onclick="App.closeModals()">
+          <i class="ph-bold ph-x text-lg"></i>
+        </button>
+      </div>
+      
+      <div class="flex-1 overflow-y-auto p-6 no-scrollbar">
+        <form id="kidForm" class="space-y-5">
+          <input type="hidden" id="formId">
+          
+          <!-- Avatar Upload -->
+          <div class="flex flex-col items-center mb-4">
+            <input type="file" id="formPhoto" accept="image/*" capture="environment" class="hidden" onchange="App.handlePhotoUpload(event)">
+            <div class="avatar-preview w-24 h-24 rounded-full bg-white/[0.02] border border-dashed border-white/10 flex items-center justify-center cursor-pointer relative overflow-hidden group shadow-inner" id="photoPreview" onclick="document.getElementById('formPhoto').click()">
+              <i class="ph-fill ph-camera text-3xl text-zinc-600 group-hover:opacity-0 transition-opacity"></i>
+              <div class="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
+                <i class="ph-bold ph-upload-simple text-white text-xl"></i>
+              </div>
+            </div>
+            <span class="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mt-3">Toque para Foto</span>
+          </div>
+          
+          <!-- Checkbox de Gravidez -->
+          <label class="flex items-center gap-3 p-4 bg-pink-500/5 hover:bg-pink-500/10 border border-pink-500/20 rounded-xl cursor-pointer transition-colors group">
+            <input type="checkbox" id="formPregnancy" onchange="App.handlePregnancyChange(this)" class="w-5 h-5 accent-pink-500 rounded border-white/20 bg-matte-bg cursor-pointer">
+            <span class="text-sm font-bold text-pink-400 group-hover:text-pink-300 transition-colors">Registar como Gestação</span>
+          </label>
+
+          <div>
+            <label class="block text-xs font-bold text-zinc-500 mb-1.5 uppercase tracking-wide" id="nameLabelText">Nome da Criança <span class="text-red-500">*</span></label>
+            <input type="text" id="formName" placeholder="Ex: João da Silva" class="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl p-3.5 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 focus:bg-white/[0.04] transition-all">
+          </div>
+          
+          <!-- Data de Nascimento -->
+          <div id="birthDateGroup">
+            <label class="block text-xs font-bold text-zinc-500 mb-1.5 uppercase tracking-wide">Data de Nascimento <span class="text-red-500">*</span></label>
+            <input type="tel" id="formBirthDate" placeholder="DD/MM/AAAA" maxlength="10" oninput="Utils.maskDate(this)" class="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl p-3.5 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 focus:bg-white/[0.04] transition-all">
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-zinc-500 mb-1.5 uppercase tracking-wide">Nome do Responsável <span class="text-red-500">*</span></label>
+            <input type="text" id="formResp" required placeholder="Nome da mãe ou pai" class="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl p-3.5 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 focus:bg-white/[0.04] transition-all">
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-zinc-500 mb-1.5 uppercase tracking-wide">Localidade <span class="text-red-500">*</span></label>
+            <select id="formLocality" required onchange="App.handleLocalityChange(this)" class="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl p-3.5 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 focus:bg-white/[0.04] transition-all cursor-pointer appearance-none">
+              <option value="" disabled selected class="text-zinc-500">Selecione a área...</option>
+              <option value="Rive" class="bg-matte-card">Rive</option>
+              <option value="Vila Alta" class="bg-matte-card">Vila Alta</option>
+              <option value="Vila do Sul" class="bg-matte-card">Vila do Sul</option>
+              <option value="Querosene" class="bg-matte-card">Querosene</option>
+              <option value="Café" class="bg-matte-card">Café</option>
+              <option value="Celina" class="bg-matte-card">Celina</option>
+              <option value="Centro" class="bg-matte-card">Centro</option>
+              <option value="Pendente" class="bg-matte-card">Pendente</option>
+            </select>
+          </div>
+
+          <div class="hidden" id="refGroup">
+            <label class="block text-xs font-bold text-zinc-500 mb-1.5 uppercase tracking-wide">Ponto de Referência <span class="text-red-500">*</span></label>
+            <input type="text" id="formRef" placeholder="Ex: Perto da padaria X..." class="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl p-3.5 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 focus:bg-white/[0.04] transition-all">
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-zinc-500 mb-1.5 uppercase tracking-wide">Telefone</label>
+              <input type="tel" id="formPhone" placeholder="(00) 00000-0000" oninput="Utils.maskPhone(this)" class="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl p-3.5 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 focus:bg-white/[0.04] transition-all">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-zinc-500 mb-1.5 uppercase tracking-wide">CPF Resp.</label>
+              <input type="tel" id="formCpf" placeholder="000.000.000-00" oninput="Utils.maskCpf(this)" class="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl p-3.5 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 focus:bg-white/[0.04] transition-all">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-zinc-500 mb-1.5 uppercase tracking-wide">Observações</label>
+            <textarea id="formNotes" rows="3" placeholder="Alergias, necessidades especiais..." class="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl p-3.5 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 focus:bg-white/[0.04] transition-all resize-none"></textarea>
+          </div>
+        </form>
+      </div>
+      
+      <div class="p-5 border-t border-white/[0.05] bg-matte-card/80 backdrop-blur-md">
+        <button type="button" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-4 rounded-xl transition-colors active:scale-95 shadow-lg shadow-blue-900/20" onclick="App.handleFormSubmit()">Salvar Registo</button>
       </div>
     </div>
   </div>
 
-  <div id="toast-container" class="fixed bottom-4 right-4 sm:bottom-8 sm:right-8 z-[100] flex flex-col gap-3 pointer-events-none"></div>
-
-  <div id="modal-novo-membro" class="fixed inset-0 z-[100] hidden items-center justify-center p-4">
-    <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity opacity-0" id="modal-backdrop" onclick="closeModal()"></div>
-    
-    <div class="bg-matte-card border border-white/[0.1] w-full max-w-md rounded-3xl p-6 relative z-10 transform scale-95 opacity-0 transition-all shadow-2xl flex flex-col" id="modal-panel">
-       <div class="flex justify-between items-center mb-6">
-         <h3 class="text-xl font-bold text-white flex items-center gap-2"><i class="ph-fill ph-user-plus text-matte-muted"></i> Novo Membro</h3>
-         <button onclick="closeModal()" class="text-matte-muted hover:text-white bg-white/[0.02] hover:bg-white/[0.1] p-1.5 rounded-xl border border-transparent hover:border-white/[0.05] transition-all"><i class="ph ph-x text-lg"></i></button>
-       </div>
-       
-       <div class="space-y-4">
-          <div>
-            <label class="text-[11px] text-matte-muted uppercase tracking-wider font-semibold mb-1.5 block">Nome Completo</label>
-            <input type="text" id="novo-nome" placeholder="Ex: Tiago Silva" class="w-full bg-[#09090b] border border-white/[0.1] rounded-xl px-4 py-3 text-sm text-white focus:border-white/30 focus:ring-1 focus:ring-white/20 transition-all outline-none placeholder:text-white/20">
-          </div>
-          <div>
-            <label class="text-[11px] text-matte-muted uppercase tracking-wider font-semibold mb-1.5 block">Cargo / Função</label>
-            <input type="text" id="novo-cargo" placeholder="Ex: Desenvolvedor Mobile" class="w-full bg-[#09090b] border border-white/[0.1] rounded-xl px-4 py-3 text-sm text-white focus:border-white/30 focus:ring-1 focus:ring-white/20 transition-all outline-none placeholder:text-white/20">
-          </div>
-          <div class="pt-4 flex gap-3">
-             <button onclick="closeModal()" class="flex-1 py-3 rounded-xl border border-white/[0.1] text-sm text-white font-medium hover:bg-white/[0.05] transition-colors active:scale-95">Cancelar</button>
-             <button onclick="salvarMembro()" class="flex-1 py-3 rounded-xl bg-white text-black text-sm font-bold hover:bg-gray-200 transition-colors shadow-[0_0_20px_rgba(255,255,255,0.1)] active:scale-95">Adicionar</button>
-          </div>
-       </div>
+  <!-- ================= MODAIS DE ALERTA ================= -->
+  <div class="modal-overlay modal-alert fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300 p-4" id="deleteModal">
+    <div class="modal-content bg-matte-card max-w-sm w-full rounded-3xl border border-white/[0.05] p-6 text-center transform scale-95 transition-all duration-300 shadow-2xl">
+      <div class="w-14 h-14 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-5">
+        <i class="ph-fill ph-warning-circle text-3xl text-red-500"></i>
+      </div>
+      <h2 class="text-xl font-black text-white mb-2">Excluir Registo?</h2>
+      <p class="text-zinc-400 text-sm mb-8 leading-relaxed">Esta ação apagará todo o histórico de visitas desta criança permanentemente. Não é possível desfazer.</p>
+      <div class="flex gap-3">
+        <button onclick="App.closeModals()" class="flex-1 py-3.5 rounded-xl font-bold bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 transition-colors">Cancelar</button>
+        <button id="confirmDeleteBtn" class="flex-1 py-3.5 rounded-xl font-bold bg-red-600 hover:bg-red-500 text-white transition-colors shadow-lg shadow-red-900/20">Sim, Excluir</button>
+      </div>
     </div>
   </div>
 
+  <div class="modal-overlay modal-alert fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300 p-4" id="importModal">
+    <div class="modal-content bg-matte-card max-w-sm w-full rounded-3xl border border-white/[0.05] p-6 text-center transform scale-95 transition-all duration-300 shadow-2xl">
+      <div class="w-14 h-14 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-5">
+        <i class="ph-fill ph-download-simple text-3xl text-blue-500"></i>
+      </div>
+      <h2 class="text-xl font-black text-white mb-2">Backup Detectado</h2>
+      <p class="text-zinc-400 text-sm mb-8 leading-relaxed">Como deseja inserir os dados restaurados do backup?</p>
+      <div class="flex flex-col gap-3">
+        <button onclick="App.processImport('merge')" class="w-full py-3.5 rounded-xl font-bold border border-blue-500 text-blue-400 hover:bg-blue-500/10 transition-colors">Mesclar (Recomendado)</button>
+        <button onclick="App.processImport('replace')" class="w-full py-3.5 rounded-xl font-bold bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors">Substituir Tudo</button>
+        <button onclick="App.closeModals()" class="w-full py-2 text-sm font-bold text-zinc-500 hover:text-zinc-300 mt-2">Cancelar Operação</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toasts -->
+  <div id="toast-container" class="fixed top-6 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-3 pointer-events-none"></div>
+
+  <!-- ================= SCRIPT LOGIC ================= -->
   <script>
-    // --- 1. Toasts (Notificações) ---
-    function showToast(message, type = 'info') {
-      const container = document.getElementById('toast-container');
-      const toast = document.createElement('div');
+    const STORAGE_KEY = 'sys_kids_data_v4';
+    let pendingImportData = null;
+
+    const Utils = {
+      generateId: () => crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15),
+      getMonthKey: (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+      getMonthName: (d) => ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'][d.getMonth()] + ' ' + d.getFullYear(),
+      isCurrentMonth: (d) => { const t = new Date(); return d.getMonth() === t.getMonth() && d.getFullYear() === t.getFullYear(); },
       
-      let icon = 'ph-info';
-      let colorClass = 'text-blue-400 bg-blue-400/10 border-blue-400/20';
-      
-      if(type === 'success') {
-        icon = 'ph-check-circle';
-        colorClass = 'text-green-400 bg-green-400/10 border-green-400/20';
-      } else if (type === 'warning') {
-        icon = 'ph-warning';
-        colorClass = 'text-orange-400 bg-orange-400/10 border-orange-400/20';
-      }
-      
-      toast.className = `transform transition-all duration-500 translate-y-10 opacity-0 flex items-center gap-3 px-4 py-3.5 rounded-2xl shadow-xl border border-white/[0.05] bg-[#18181b] text-white text-sm font-medium pointer-events-auto`;
-      toast.innerHTML = `
-        <div class="p-1.5 rounded-xl border ${colorClass}">
-            <i class="ph-fill ${icon} text-lg"></i>
-        </div>
-        ${message}
-      `;
-      
-      container.appendChild(toast);
-      
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-            toast.classList.remove('translate-y-10', 'opacity-0');
-            toast.classList.add('translate-y-0', 'opacity-100');
-        });
-      });
-      
-      setTimeout(() => {
-        toast.classList.remove('translate-y-0', 'opacity-100');
-        toast.classList.add('translate-y-10', 'opacity-0');
-        setTimeout(() => toast.remove(), 500);
-      }, 3000);
-    }
+      maskDate: (input) => {
+        let v = input.value.replace(/\D/g, '');
+        if (v.length > 8) v = v.slice(0, 8);
+        if (v.length >= 5) input.value = `${v.slice(0,2)}/${v.slice(2,4)}/${v.slice(4)}`;
+        else if (v.length >= 3) input.value = `${v.slice(0,2)}/${v.slice(2)}`;
+        else input.value = v;
+      },
 
-    // --- 2. Lógica do Modal ---
-    const modal = document.getElementById('modal-novo-membro');
-    const backdrop = document.getElementById('modal-backdrop');
-    const panel = document.getElementById('modal-panel');
-
-    function openModal() {
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-      void modal.offsetWidth; 
-      backdrop.classList.add('opacity-100');
-      backdrop.classList.remove('opacity-0');
-      panel.classList.add('scale-100', 'opacity-100');
-      panel.classList.remove('scale-95', 'opacity-0');
-    }
-
-    function closeModal() {
-      backdrop.classList.remove('opacity-100');
-      backdrop.classList.add('opacity-0');
-      panel.classList.remove('scale-100', 'opacity-100');
-      panel.classList.add('scale-95', 'opacity-0');
-      setTimeout(() => {
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-      }, 300);
-    }
-
-    // --- 3. Lógica para Adicionar Membro (Manipulação de DOM) ---
-    function salvarMembro() {
-      const inputNome = document.getElementById('novo-nome');
-      const inputCargo = document.getElementById('novo-cargo');
-      
-      const nome = inputNome.value.trim();
-      const cargo = inputCargo.value.trim();
-
-      if (!nome || !cargo) {
-        showToast('Por favor, preencha todos os campos.', 'warning');
-        return;
-      }
-
-      // Gerar e-mail e avatar
-      const email = nome.toLowerCase().replace(/\s+/g, '.') + '@nexus.pt';
-      const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(nome)}&background=27272a&color=fafafa&bold=true`;
-
-      // Criar a nova linha (tr) da tabela baseada na tua estrutura original
-      const novaLinha = document.createElement('tr');
-      novaLinha.className = 'hover:bg-white/[0.02] transition-colors group slide-up';
-      novaLinha.innerHTML = `
-        <td class="px-6 py-4">
-          <div class="flex items-center gap-3">
-            <img src="${avatarUrl}" alt="Avatar" class="w-10 h-10 rounded-full border border-white/10 group-hover:border-white/30 transition-colors">
-            <div>
-              <p class="font-semibold text-white">${nome}</p>
-              <p class="text-xs text-matte-muted font-medium mt-0.5">${email}</p>
-            </div>
-          </div>
-        </td>
-        <td class="px-6 py-4 text-matte-muted font-medium">${cargo}</td>
-        <td class="px-6 py-4">
-          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-green-500/10 text-green-400 border border-green-500/20 uppercase tracking-wide">
-            <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span> Ativo
-          </span>
-        </td>
-        <td class="px-6 py-4 text-matte-muted font-medium">Agora mesmo</td>
-        <td class="px-6 py-4 text-right">
-          <button onclick="showToast('A abrir opções do membro...')" class="text-matte-muted hover:text-white hover:bg-white/5 p-2 rounded-lg transition-colors"><i class="ph ph-dots-three text-xl"></i></button>
-        </td>
-      `;
-
-      // Adicionar ao topo do corpo da tabela
-      const tbody = document.getElementById('tabela-membros');
-      tbody.insertBefore(novaLinha, tbody.firstChild);
-
-      // Atualizar número do KPI "Membros Ativos"
-      const kpi = document.getElementById('membros-ativos-kpi');
-      kpi.innerText = parseInt(kpi.innerText) + 1;
-
-      // Limpar os inputs e fechar o modal
-      inputNome.value = '';
-      inputCargo.value = '';
-      closeModal();
-      
-      atualizarContadorRodape();
-      showToast('Membro adicionado com sucesso!', 'success');
-    }
-
-    // --- 4. Lógica de Pesquisa/Filtro ---
-    document.getElementById('input-pesquisa').addEventListener('input', function(e) {
-      const termo = e.target.value.toLowerCase();
-      const linhas = document.querySelectorAll('#tabela-membros tr');
-
-      linhas.forEach(linha => {
-        // Obter o texto da linha (Nome, Email, Cargo, etc.)
-        const textoLinha = linha.textContent.toLowerCase();
+      calculateAgeStr: (birthDateStr) => {
+        if (!birthDateStr || birthDateStr.length !== 10) return 'Atualizar Data';
+        const parts = birthDateStr.split('/');
+        if(parts.length !== 3) return 'Erro Data';
         
-        // Se a linha conter o texto digitado, mostrar; caso contrário, ocultar
-        if (textoLinha.includes(termo)) {
-          linha.style.display = '';
-        } else {
-          linha.style.display = 'none';
-        }
-      });
-      
-      atualizarContadorRodape();
-    });
+        const day = parseInt(parts[0], 10), month = parseInt(parts[1], 10) - 1, year = parseInt(parts[2], 10);
+        const dob = new Date(year, month, day); const today = new Date();
+        
+        let years = today.getFullYear() - dob.getFullYear();
+        let months = today.getMonth() - dob.getMonth();
+        
+        if (months < 0 || (months === 0 && today.getDate() < dob.getDate())) { years--; months += 12; }
+        if (today.getDate() < dob.getDate()) { months--; if(months < 0) months += 12; }
 
-    // --- 5. Atualizar Contadores da Tabela (Rodapé) ---
-    function atualizarContadorRodape() {
-      const linhasVisiveis = document.querySelectorAll('#tabela-membros tr:not([style*="display: none"])').length;
-      const totalLinhas = document.querySelectorAll('#tabela-membros tr').length;
+        if (years > 0) return `${years} ano${years > 1 ? 's' : ''}`;
+        if (months > 0) return `${months} mês${months > 1 ? 'es' : ''}`;
+        return 'Recém-nascido';
+      },
+
+      maskPhone: (i) => { let v=i.value.replace(/\D/g,''); if(v.length>11)v=v.slice(0,11); if(v.length>2)v=`(${v.slice(0,2)}) ${v.slice(2)}`; if(v.length>10)v=`${v.slice(0,10)}-${v.slice(10)}`; i.value=v; },
+      maskCpf: (i) => { let v=i.value.replace(/\D/g,''); if(v.length>11)v=v.slice(0,11); if(v.length>3)v=`${v.slice(0,3)}.${v.slice(3)}`; if(v.length>7)v=`${v.slice(0,7)}.${v.slice(7)}`; if(v.length>11)v=`${v.slice(0,11)}-${v.slice(11)}`; i.value=v; },
       
-      const texto = document.getElementById('texto-paginacao');
-      if (linhasVisiveis === 0) {
-        texto.innerHTML = `Mostrando <span class="text-white font-bold">0</span> de <span class="text-white font-bold">${totalLinhas}</span> membros`;
-      } else {
-        texto.innerHTML = `Mostrando <span class="text-white font-bold">1</span> a <span class="text-white font-bold">${linhasVisiveis}</span> de <span class="text-white font-bold">${totalLinhas}</span> membros`;
+      showToast: (msg, type = 'success') => {
+        const cont = document.getElementById('toast-container');
+        const el = document.createElement('div');
+        const icon = type === 'error' ? '<i class="ph-fill ph-warning-circle text-red-500"></i>' : '<i class="ph-fill ph-check-circle text-blue-400"></i>';
+        
+        el.className = 'toast-animate flex items-center gap-3 bg-zinc-800 border border-white/[0.05] px-4 py-3 rounded-xl shadow-2xl pointer-events-auto';
+        el.innerHTML = `${icon}<span class="text-sm font-bold text-zinc-200 whitespace-nowrap">${msg}</span>`;
+        cont.appendChild(el);
+        
+        setTimeout(() => { 
+            el.style.opacity = '0'; 
+            el.style.transform = 'translateY(-15px) translateX(-50%)'; 
+            el.style.transition = 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'; 
+            setTimeout(() => el.remove(), 300); 
+        }, 3000);
       }
-    }
+    };
+
+    const State = { viewDate: new Date(), locFilter: 'Todas', visitFilter: 'Todos', search: '', items: [], currentPhotoBase64: null };
+
+    const Storage = {
+      load: () => {
+        const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('sys_kids_data_v3') || localStorage.getItem('sys_kids_data_v2') || localStorage.getItem('sys_kids_data');
+        if (saved) { State.items = JSON.parse(saved); Storage.save(); }
+        State.viewDate.setDate(1); 
+      },
+      save: () => {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(State.items)); } 
+        catch (e) { Utils.showToast('Memória cheia! Apague registos antigos.', 'error'); }
+      },
+      addItem: (item) => {
+        const idx = State.items.findIndex(i => i.id === item.id);
+        if (idx >= 0) { item.visits = State.items[idx].visits || {}; State.items[idx] = item; } 
+        else { item.visits = {}; State.items.push(item); }
+        Storage.save();
+      },
+      deleteItem: (id) => { State.items = State.items.filter(i => i.id !== id); Storage.save(); },
+      getFiltered: () => {
+        const mk = Utils.getMonthKey(State.viewDate);
+        return State.items.filter(i => {
+          const ml = State.locFilter === 'Todas' || i.locality === State.locFilter;
+          const ms = (i.name||'').toLowerCase().includes(State.search.toLowerCase()) || (i.responsible||'').toLowerCase().includes(State.search.toLowerCase());
+          const vc = (i.visits && i.visits[mk]) ? i.visits[mk] : 0;
+          let mv = true;
+          if (State.visitFilter === 'Pendentes') mv = vc === 0;
+          if (State.visitFilter === 'Parciais') mv = vc === 1;
+          if (State.visitFilter === 'Concluidos') mv = vc >= 2;
+          return ml && ms && mv;
+        }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      }
+    };
+
+    const UI = {
+      renderHeader: () => {
+        document.getElementById('monthDisplayLabel').innerText = Utils.getMonthName(State.viewDate);
+        const isCurrent = Utils.isCurrentMonth(State.viewDate);
+        const btn = document.getElementById('btnCurrentMonth');
+        if(!isCurrent) { 
+            btn.classList.remove('opacity-0'); 
+        } else { 
+            btn.classList.add('opacity-0'); 
+        }
+      },
+      renderStats: () => {
+        const mk = Utils.getMonthKey(State.viewDate);
+        let p=0, pr=0, c=0;
+        State.items.forEach(i => {
+           const v = (i.visits && i.visits[mk]) ? i.visits[mk] : 0;
+           if(v===0) p++; else if(v===1) pr++; else c++;
+        });
+
+        // Calculo da Barra de Progresso do Mês
+        const totalVisitasNecessarias = State.items.length * 2;
+        const visitasRealizadas = (pr * 1) + (c * 2);
+        const percentagem = totalVisitasNecessarias > 0 ? Math.round((visitasRealizadas / totalVisitasNecessarias) * 100) : 0;
+
+        document.getElementById('monthProgressText').innerText = `${percentagem}%`;
+        document.getElementById('monthProgressBar').style.width = `${percentagem}%`;
+        document.getElementById('monthProgressSubtext').innerText = `${visitasRealizadas} de ${totalVisitasNecessarias} visitas realizadas`;
+
+        // Renderização dos Cards Menores
+        document.getElementById('statsContainer').innerHTML = `
+          <div class="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-4 flex flex-col justify-between relative overflow-hidden">
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Crianças</span>
+                <i class="ph-fill ph-users text-blue-400 text-lg"></i>
+            </div>
+            <div class="text-2xl font-black text-white leading-none">${State.items.length}</div>
+          </div>
+          <div class="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-4 flex flex-col justify-between relative overflow-hidden">
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">0 Visitas</span>
+                <i class="ph-fill ph-x-circle text-red-400 text-lg"></i>
+            </div>
+            <div class="text-2xl font-black text-red-400 leading-none">${p}</div>
+          </div>
+          <div class="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-4 flex flex-col justify-between relative overflow-hidden">
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">1 Visita</span>
+                <i class="ph-fill ph-warning-circle text-amber-400 text-lg"></i>
+            </div>
+            <div class="text-2xl font-black text-amber-400 leading-none">${pr}</div>
+          </div>
+          <div class="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-4 flex flex-col justify-between relative overflow-hidden">
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">2 Visitas</span>
+                <i class="ph-fill ph-check-circle text-emerald-400 text-lg"></i>
+            </div>
+            <div class="text-2xl font-black text-emerald-400 leading-none">${c}</div>
+          </div>
+        `;
+      },
+      renderList: () => {
+        const cont = document.getElementById('listContainer'), emp = document.getElementById('emptyState');
+        const items = Storage.getFiltered();
+        const mk = Utils.getMonthKey(State.viewDate);
+
+        if (items.length === 0) { cont.innerHTML = ''; emp.classList.remove('hidden'); return; }
+        emp.classList.add('hidden');
+        
+        let html = '';
+        items.forEach((kid) => {
+          const isPregnancy = kid.isPregnancy;
+          const isLegacy = !isPregnancy && (!kid.birthDate || kid.birthDate.length !== 10 || !kid.birthDate.includes('/'));
+          
+          let ageDisplay = '';
+          if (isPregnancy) ageDisplay = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-pink-500/10 text-pink-400 uppercase tracking-wider">Gestação</span>`;
+          else if (isLegacy && kid.age !== undefined) ageDisplay = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-400 uppercase tracking-wider">${kid.age} ANOS</span>`;
+          else ageDisplay = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-400 uppercase tracking-wider">${Utils.calculateAgeStr(kid.birthDate)}</span>`;
+
+          const vc = (kid.visits && kid.visits[mk]) ? kid.visits[mk] : 0;
+          const photoHtml = kid.photoBase64 
+            ? `<div class="w-12 h-12 rounded-full bg-zinc-800 bg-cover bg-center border border-white/10 shrink-0" style="background-image: url(${kid.photoBase64})"></div>` 
+            : `<div class="w-12 h-12 rounded-full bg-white/[0.03] border border-white/[0.05] shrink-0 flex items-center justify-center text-zinc-500"><i class="ph-fill ph-user text-xl"></i></div>`;
+
+          html += `
+            <div class="card bg-white/[0.02] border border-white/[0.05] rounded-2xl overflow-hidden animate-slide-up" id="card-${kid.id}">
+              
+              <!-- Header do Card -->
+              <div class="p-4 flex justify-between items-start cursor-pointer hover:bg-white/[0.02] transition-colors" onclick="App.toggleCard('${kid.id}')">
+                <div class="flex gap-3 flex-1 min-w-0">
+                  ${photoHtml}
+                  <div class="min-w-0">
+                    <h3 class="font-bold text-white truncate text-base">${kid.name}</h3>
+                    <div class="flex flex-wrap gap-2 mt-1 mb-1.5">
+                        ${ageDisplay}
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-white/[0.05] border border-white/[0.05] text-zinc-400 uppercase tracking-wider">${kid.locality}</span>
+                    </div>
+                    <div class="text-xs text-zinc-500 font-medium truncate">Resp: <span class="text-zinc-400">${kid.responsible}</span></div>
+                  </div>
+                </div>
+                <div class="chevron text-zinc-500 p-2 rounded-full hover:bg-white/[0.05]"><i class="ph-bold ph-caret-down"></i></div>
+              </div>
+              
+              ${isLegacy ? `<div class="mx-4 mt-1 mb-2 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-xl text-xs font-semibold text-red-400 flex items-center gap-2"><i class="ph-bold ph-warning"></i> Atualize a Data p/ DD/MM/AAAA</div>` : ''}
+
+              <!-- Controles de Visita (Sempre Visíveis) -->
+              <div class="px-4 pb-4 pt-1" onclick="event.stopPropagation()">
+                <div class="flex gap-2 bg-black/20 p-1.5 rounded-xl border border-white/[0.02]">
+                    <button class="flex-1 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${vc>=1 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.1)]' : 'bg-transparent border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.02]'}" onclick="App.setVisit('${kid.id}', 1)">
+                        <i class="ph-bold ${vc>=1 ? 'ph-check' : 'ph-circle'} text-sm"></i> 1ª Visita
+                    </button>
+                    
+                    <div class="w-px bg-white/[0.05] my-2"></div>
+                    
+                    <button class="flex-1 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${vc>=2 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.1)]' : 'bg-transparent border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.02]'}" onclick="App.setVisit('${kid.id}', 2)">
+                        <i class="ph-bold ${vc>=2 ? 'ph-check' : 'ph-circle'} text-sm"></i> 2ª Visita
+                    </button>
+                </div>
+              </div>
+
+              <!-- Detalhes Expandíveis -->
+              <div class="card-details bg-matte-bg/50 border-t border-white/[0.02]">
+                <div class="card-details-inner px-4 pt-4 pb-4">
+                  <div class="grid grid-cols-2 gap-3 p-3 bg-white/[0.02] border border-white/[0.05] rounded-xl mb-4">
+                    <div>
+                      <div class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Telefone</div>
+                      <div class="text-sm font-medium text-white mt-0.5">${kid.phone || '---'}</div>
+                    </div>
+                    <div>
+                      <div class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">CPF Resp.</div>
+                      <div class="text-sm font-medium text-white mt-0.5">${kid.cpf || '---'}</div>
+                    </div>
+                    <div class="col-span-2">
+                      <div class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Ponto de Referência</div>
+                      <div class="text-sm font-medium text-white mt-0.5 leading-snug">${kid.reference || '---'}</div>
+                    </div>
+                  </div>
+                  
+                  ${kid.notes ? `
+                    <div class="mb-4">
+                      <div class="text-[10px] font-bold text-blue-400/80 uppercase tracking-wider mb-1">Observações</div>
+                      <div class="text-sm text-zinc-300 leading-relaxed bg-blue-500/5 p-3 rounded-xl border border-blue-500/10">${kid.notes}</div>
+                    </div>
+                  ` : ''}
+                  
+                  <div class="flex gap-2">
+                    <button class="flex-1 py-3 rounded-xl text-sm font-bold bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 transition-colors flex items-center justify-center gap-2" onclick="App.editKid('${kid.id}', event)">
+                        <i class="ph-bold ph-pencil-simple"></i> Editar
+                    </button>
+                    <button class="flex-1 py-3 rounded-xl text-sm font-bold bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors flex items-center justify-center gap-2" onclick="App.confirmDelete('${kid.id}', event)">
+                        <i class="ph-bold ph-trash"></i> Excluir
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>`;
+        });
+        cont.innerHTML = html;
+      },
+      updatePills: () => {
+        document.querySelectorAll('#visitFilterContainer .pill').forEach(b => {
+          const isActive = b.innerText.includes(State.visitFilter) || (State.visitFilter==='Parciais'&&b.innerText.includes('1')) || (State.visitFilter==='Concluidos'&&b.innerText.includes('Concluídos'));
+          if(isActive) b.className = "pill active px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border border-blue-500/30 bg-blue-500/10 text-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.1)] flex items-center gap-1.5";
+          else b.className = "pill px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border border-white/[0.05] bg-white/[0.02] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05] flex items-center gap-1.5";
+        });
+        document.querySelectorAll('#locFilterContainer .pill').forEach(b => {
+          const isActive = b.innerText.includes(State.locFilter === 'Todas' ? 'Todas Áreas' : State.locFilter);
+          if(isActive) b.className = "pill active px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border border-blue-500/30 bg-blue-500/10 text-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.1)]";
+          else b.className = "pill px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border border-white/[0.05] bg-white/[0.02] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]";
+        });
+      },
+      animateList: (cb) => {
+        const c = document.getElementById('listContainer');
+        c.style.opacity = '0'; setTimeout(() => { cb(); c.style.opacity = '1'; }, 200);
+      }
+    };
+
+    const App = {
+      init: () => { 
+        Storage.load(); 
+        UI.renderHeader(); 
+        UI.renderStats(); 
+        UI.updatePills();
+        UI.renderList(); 
+        document.getElementById('fileInput').addEventListener('change', App.handleFileImport); 
+      },
+      changeMonth: (o) => UI.animateList(() => { State.viewDate.setMonth(State.viewDate.getMonth() + o); UI.renderHeader(); UI.renderStats(); UI.renderList(); }),
+      goToCurrentMonth: () => UI.animateList(() => { State.viewDate = new Date(); State.viewDate.setDate(1); UI.renderHeader(); UI.renderStats(); UI.renderList(); }),
+      setLocFilter: (l) => { State.locFilter = l; UI.updatePills(); UI.animateList(UI.renderList); },
+      setVisitFilter: (s) => { State.visitFilter = s; UI.updatePills(); UI.animateList(UI.renderList); },
+      handleSearch: (e) => { State.search = e.target.value; UI.renderList(); },
+      
+      toggleCard: (id) => { 
+        const c = document.getElementById(`card-${id}`); 
+        document.querySelectorAll('.card.expanded').forEach(x => { if(x.id !== c.id) x.classList.remove('expanded'); }); 
+        c.classList.toggle('expanded'); 
+      },
+      
+      setVisit: (id, target) => {
+        const k = State.items.find(i => i.id === id); if(!k) return;
+        const mk = Utils.getMonthKey(State.viewDate); k.visits = k.visits || {}; let c = k.visits[mk] || 0;
+        if(target===1) k.visits[mk] = c>=1 ? 0 : 1; else if(target===2) k.visits[mk] = c>=2 ? 1 : 2;
+        Storage.save(); UI.renderStats(); UI.renderList();
+      },
+      
+      handlePhotoUpload: (e) => {
+        const file = e.target.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const MAX_WIDTH = 300;
+                const scale = Math.min(MAX_WIDTH / img.width, MAX_WIDTH / img.height);
+                canvas.width = img.width * scale; canvas.height = img.height * scale;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                State.currentPhotoBase64 = canvas.toDataURL('image/jpeg', 0.6);
+                document.getElementById('photoPreview').style.backgroundImage = `url(${State.currentPhotoBase64})`;
+                document.getElementById('photoPreview').innerHTML = '';
+            }
+            img.src = ev.target.result;
+        }
+        reader.readAsDataURL(file);
+      },
+
+      handlePregnancyChange: (cb) => {
+        const bdGroup = document.getElementById('birthDateGroup');
+        const nameLbl = document.getElementById('nameLabelText');
+        if(cb.checked) {
+          bdGroup.classList.add('hidden'); document.getElementById('formBirthDate').value = ''; document.getElementById('formBirthDate').required = false;
+          nameLbl.innerHTML = 'Nome do Bebé (Opcional)';
+        } else {
+          bdGroup.classList.remove('hidden'); nameLbl.innerHTML = 'Nome da Criança <span class="text-red-500">*</span>';
+        }
+      },
+      
+      handleLocalityChange: (sel) => {
+        const rg = document.getElementById('refGroup');
+        if(sel.value) { rg.classList.remove('hidden'); document.getElementById('formRef').required = true; }
+        else { rg.classList.add('hidden'); document.getElementById('formRef').required = false; }
+      },
+
+      showModalEl: (id) => {
+        const m = document.getElementById(id);
+        const c = m.querySelector('.modal-content');
+        m.classList.remove('opacity-0', 'pointer-events-none');
+        setTimeout(() => {
+          if(c.classList.contains('translate-y-full')) c.classList.remove('translate-y-full');
+          if(c.classList.contains('scale-95')) c.classList.remove('scale-95');
+        }, 10);
+      },
+
+      hideModalEl: (id) => {
+        const m = document.getElementById(id);
+        const c = m.querySelector('.modal-content');
+        if(c.classList.contains('translate-y-full') === false) c.classList.add('translate-y-full'); // Para bottom sheet
+        if(c.classList.contains('scale-95') === false) c.classList.add('scale-95'); // Para alerts
+        m.classList.add('opacity-0');
+        setTimeout(() => { m.classList.add('pointer-events-none'); }, 300);
+      },
+
+      openFormModal: (kidId = null) => {
+        App.showModalEl('formModal');
+        document.getElementById('formModalTitle').innerText = kidId ? 'Editar Registo' : 'Nova Criança';
+        document.getElementById('kidForm').reset();
+        document.getElementById('formId').value = '';
+        document.getElementById('refGroup').classList.add('hidden');
+        
+        State.currentPhotoBase64 = null;
+        document.getElementById('photoPreview').style.backgroundImage = 'none';
+        document.getElementById('photoPreview').innerHTML = `<i class="ph-fill ph-camera text-3xl text-zinc-600 group-hover:opacity-0 transition-opacity"></i><div class="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm"><i class="ph-bold ph-upload-simple text-white text-xl"></i></div>`;
+        
+        App.handlePregnancyChange({checked: false});
+
+        if (kidId) {
+          const k = State.items.find(i => i.id === kidId);
+          document.getElementById('formId').value = k.id;
+          
+          if(k.photoBase64) {
+             State.currentPhotoBase64 = k.photoBase64;
+             document.getElementById('photoPreview').style.backgroundImage = `url(${k.photoBase64})`;
+             document.getElementById('photoPreview').innerHTML = '';
+          }
+
+          document.getElementById('formPregnancy').checked = !!k.isPregnancy;
+          App.handlePregnancyChange(document.getElementById('formPregnancy'));
+          
+          document.getElementById('formName').value = k.name==='Bebé (Gestação)' ? '' : k.name;
+          if(!k.isPregnancy && k.birthDate) {
+             if (k.birthDate.includes('-')) {
+                 const [y,m,d] = k.birthDate.split('-');
+                 document.getElementById('formBirthDate').value = `${d}/${m}/${y}`;
+             } else {
+                 document.getElementById('formBirthDate').value = k.birthDate;
+             }
+          }
+          
+          document.getElementById('formResp').value = k.responsible||'';
+          document.getElementById('formLocality').value = k.locality||'';
+          document.getElementById('formRef').value = k.reference||'';
+          document.getElementById('formPhone').value = k.phone||'';
+          document.getElementById('formCpf').value = k.cpf||'';
+          document.getElementById('formNotes').value = k.notes||'';
+          App.handleLocalityChange(document.getElementById('formLocality'));
+        }
+      },
+      closeModals: () => {
+        App.hideModalEl('formModal');
+        App.hideModalEl('deleteModal');
+        App.hideModalEl('importModal');
+      },
+      
+      handleFormSubmit: () => {
+        const isPreg = document.getElementById('formPregnancy').checked;
+        let name = document.getElementById('formName').value.trim();
+        if(!name) { if(isPreg) name = 'Bebé (Gestação)'; else return Utils.showToast('Nome é obrigatório.', 'error'); }
+        
+        let birthDate = null;
+        if(!isPreg) {
+           birthDate = document.getElementById('formBirthDate').value;
+           if(!birthDate || birthDate.length !== 10) return Utils.showToast('Data incompleta (DD/MM/AAAA).', 'error');
+        }
+
+        const loc = document.getElementById('formLocality').value;
+        if(!loc) return Utils.showToast('Localidade é obrigatória.', 'error');
+
+        const k = {
+          id: document.getElementById('formId').value || Utils.generateId(),
+          isPregnancy: isPreg,
+          name, birthDate,
+          responsible: document.getElementById('formResp').value.trim(),
+          locality: loc,
+          reference: document.getElementById('formRef').value.trim(),
+          phone: document.getElementById('formPhone').value.trim(),
+          cpf: document.getElementById('formCpf').value.trim(),
+          notes: document.getElementById('formNotes').value.trim(),
+          photoBase64: State.currentPhotoBase64
+        };
+
+        Storage.addItem(k); App.closeModals(); UI.renderStats(); UI.renderList(); Utils.showToast('Salvo com sucesso!');
+      },
+
+      editKid: (id, e) => { e.stopPropagation(); App.openFormModal(id); },
+      confirmDelete: (id, e) => { 
+        e.stopPropagation(); 
+        App.showModalEl('deleteModal'); 
+        document.getElementById('confirmDeleteBtn').onclick = () => { 
+            Storage.deleteItem(id); 
+            App.closeModals(); 
+            UI.renderStats(); 
+            UI.renderList(); 
+            Utils.showToast('Registo Excluído.'); 
+        }; 
+      },
+      
+      printData: () => {
+        const items = Storage.getFiltered();
+        if (items.length === 0) return Utils.showToast('Sem registos para imprimir no filtro atual.', 'error');
+
+        let html = `
+          <div class="print-header">
+            <h1>Relatório de Visitas - ${State.locFilter === 'Todas' ? 'Todas Áreas' : State.locFilter}</h1>
+            <p>Referência: ${Utils.getMonthName(State.viewDate)} | Total listado: ${items.length}</p>
+          </div>
+          <div class="print-grid">
+        `;
+
+        items.forEach(kid => {
+          html += `
+            <div class="print-card">
+              <strong>${kid.name} ${kid.isPregnancy ? ' (Gestação)' : ` - Nasc: ${kid.birthDate || 'N/D'}`}</strong>
+              <p><span class="label">Resp:</span> ${kid.responsible}</p>
+              <p><span class="label">Tel:</span> ${kid.phone || '---'} &nbsp;|&nbsp; <span class="label">CPF:</span> ${kid.cpf || '---'}</p>
+              <p><span class="label">Local:</span> ${kid.locality}</p>
+              <p><span class="label">Ref:</span> ${kid.reference || '---'}</p>
+              ${kid.notes ? `<p style="margin-top:4px;"><span class="label">Obs:</span> ${kid.notes}</p>` : ''}
+            </div>
+          `;
+        });
+
+        html += `</div>`;
+        document.getElementById('printContainer').innerHTML = html;
+        window.print();
+      },
+
+      exportData: () => {
+        if(!State.items.length) return Utils.showToast('Sem dados para exportar.', 'error');
+        const l = document.createElement('a'); l.href = URL.createObjectURL(new Blob([JSON.stringify(State.items)], {type: 'application/json'}));
+        l.download = `backup_visitas_${new Date().toISOString().split('T')[0]}.json`; l.click(); Utils.showToast('Backup transferido!');
+      },
+      handleFileImport: (e) => {
+        const f = e.target.files[0]; if(!f) return; const r = new FileReader();
+        r.onload = (ev) => { 
+            try { 
+                const p = JSON.parse(ev.target.result); 
+                if(Array.isArray(p)) { 
+                    pendingImportData = p; 
+                    App.showModalEl('importModal'); 
+                } 
+            } catch(err) { Utils.showToast('Erro ao ler arquivo.', 'error'); } 
+        };
+        r.readAsText(f); e.target.value = '';
+      },
+      processImport: (t) => {
+        if(!pendingImportData) return;
+        if(t==='replace') State.items = pendingImportData;
+        else {
+          const ex = new Set(State.items.map(i=>i.id)); const n = pendingImportData.filter(i=>!ex.has(i.id));
+          pendingImportData.forEach(imp => { const idx = State.items.findIndex(i=>i.id===imp.id); if(idx!==-1) { imp.visits = imp.visits || State.items[idx].visits || {}; State.items[idx] = imp; } });
+          State.items = [...State.items, ...n];
+        }
+        Storage.save(); App.closeModals(); UI.renderStats(); UI.renderList(); pendingImportData = null; Utils.showToast('Dados restaurados!');
+      }
+    };
+
+    window.onload = App.init;
   </script>
 </body>
 </html>
