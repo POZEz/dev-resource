@@ -7,7 +7,7 @@
  */
 
 // ⚠️ IMPORTANTE: Substitua pela URL real do seu projeto Supabase
-const SUPABASE_URL = 'https://SEU_PROJETO_AQUI.supabase.co';
+const SUPABASE_URL = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
 const SUPABASE_KEY = 'sb_publishable_JnDv-fxHXPTzNaFX9n3Z0w_4mqt47Js';
 
 // Inicializa a instância Global do Supabase
