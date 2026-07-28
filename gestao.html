@@ -5,95 +5,51 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Gestão de Visitas</title>
   
-  <!-- Tailwind CSS -->
+  <!-- Tailwind CSS & Phosphor Icons -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Phosphor Icons -->
   <script src="https://unpkg.com/@phosphor-icons/web"></script>
   <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
   <script>
-    tailwind.config = {
-        darkMode: 'class',
-        theme: {
-            extend: {
-                fontFamily: { sans: ['Inter', 'sans-serif'] },
-                colors: { 
-                    matte: {
-                        bg: '#09090b',
-                        card: '#18181b',
-                        border: '#27272a',
-                        text: '#fafafa',
-                        muted: '#a1a1aa'
-                    }
-                }
-            }
-        }
-    }
+    tailwind.config = { darkMode: 'class', theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'] }, colors: { matte: { bg: '#09090b', card: '#18181b', border: '#27272a', text: '#fafafa', muted: '#a1a1aa' } } } } }
   </script>
 
   <style>
-    body { 
-        background-color: #09090b; 
-        color: #fafafa; 
-        -webkit-tap-highlight-color: transparent; 
-        padding-bottom: 100px;
-        overflow-x: hidden;
-    }
-    
-    /* Scrollbar elegante */
+    body { background-color: #09090b; color: #fafafa; -webkit-tap-highlight-color: transparent; padding-bottom: 100px; }
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 10px; }
     ::-webkit-scrollbar-thumb:hover { background: #52525b; }
-
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-    /* Acordeão de detalhes do Card */
-    .card-details {
-        display: grid;
-        grid-template-rows: 0fr;
-        transition: grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
+    .card-details { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
     .card-details-inner { overflow: hidden; opacity: 0; transition: opacity 0.3s ease; }
     .card.expanded .card-details { grid-template-rows: 1fr; }
     .card.expanded .card-details-inner { opacity: 1; padding-bottom: 16px; }
-    
     .chevron { transition: transform 0.3s ease; }
     .card.expanded .chevron { transform: rotate(180deg); }
 
-    /* Inputs Modernos Customizados */
-    input[type="text"], input[type="tel"], input[type="url"], select, textarea {
-        color-scheme: dark;
-    }
-    
+    input[type="text"], input[type="tel"], input[type="url"], select, textarea { color-scheme: dark; }
     .avatar-preview { background-size: cover; background-position: center; }
 
-    /* Animações e Transições */
     @keyframes slideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
-    .animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-
-    @keyframes slideIn { from { transform: translateY(-15px) translateX(-50%); opacity: 0; } to { transform: translateY(0) translateX(-50%); opacity: 1; } }
+    .animate-slide-up { animation: slideUp 0.3s ease forwards; }
+    @keyframes slideIn { from { transform: translateY(15px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     .toast-animate { animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
-    /* FAB */
     .fab { box-shadow: 0 8px 30px rgba(59, 130, 246, 0.3); }
 
-    /* Progresso Suave */
-    .progress-bar-fill { transition: width 1s cubic-bezier(0.4, 0, 0.2, 1); }
-
-    /* ================= IMPRESSÃO ================= */
+    /* Impressão */
     #printContainer { display: none; }
     @media print {
       body { background: #fff !important; color: #000 !important; padding: 0 !important; overflow: auto !important; }
       header, main, .fab, .modal-overlay, #toast-container { display: none !important; }
       #printContainer { display: block !important; padding: 10px; }
-      
       .print-header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
       .print-header h1 { font-size: 20px; margin: 0 0 5px 0; text-transform: uppercase; font-weight: bold; }
       .print-header p { font-size: 14px; margin: 0; color: #555; }
-      
       .print-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
       .print-card { border: 1px solid #aaa; padding: 10px; border-radius: 6px; page-break-inside: avoid; font-size: 12px; line-height: 1.4; }
       .print-card strong { font-size: 14px; display: block; margin-bottom: 6px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
@@ -104,7 +60,7 @@
 </head>
 <body class="antialiased flex flex-col relative min-h-screen">
 
-  <!-- ================= HEADER (STICKY BLUR) ================= -->
+  <!-- HEADER -->
   <header class="sticky top-0 z-40 bg-matte-bg/90 backdrop-blur-md border-b border-white/[0.04]">
     <div class="max-w-3xl mx-auto px-4 py-3 flex justify-between items-center gap-4">
       <div class="flex items-center gap-3">
@@ -113,21 +69,13 @@
         </div>
         <div>
           <h1 class="text-base font-bold text-white leading-tight">Gestão de Visitas</h1>
-          <p class="text-[10px] text-zinc-500 font-medium tracking-wide">Controle mensal</p>
+          <p class="text-[10px] text-zinc-500 font-medium tracking-wide">Sincronizado na Nuvem</p>
         </div>
       </div>
       
       <div class="flex items-center gap-2">
-        <input type="file" id="fileInput" accept=".json" class="hidden">
-        
         <button onclick="App.printData()" class="p-2 bg-white/[0.03] hover:bg-white/10 rounded-lg text-blue-400 transition-colors" title="Imprimir Relatório">
           <i class="ph-bold ph-printer text-lg"></i>
-        </button>
-        <button onclick="document.getElementById('fileInput').click()" class="p-2 bg-white/[0.03] hover:bg-white/10 rounded-lg text-zinc-400 hover:text-white transition-colors" title="Restaurar Backup">
-          <i class="ph-bold ph-upload-simple text-lg"></i>
-        </button>
-        <button onclick="App.exportData()" class="p-2 bg-white/[0.03] hover:bg-white/10 rounded-lg text-zinc-400 hover:text-white transition-colors" title="Criar Backup">
-          <i class="ph-bold ph-download-simple text-lg"></i>
         </button>
       </div>
     </div>
@@ -135,160 +83,130 @@
 
   <main class="flex-1 w-full max-w-3xl mx-auto p-4 sm:p-6">
     
-    <!-- ================= PAINEL SUPERIOR (MÊS E PROGRESSO GERAL) ================= -->
-    <div class="bg-white/[0.02] rounded-2xl shadow-sm p-5 border border-white/[0.05] relative overflow-hidden mb-6">
-        <div class="absolute top-0 right-0 w-40 h-40 bg-blue-500/5 rounded-full blur-3xl -mr-10 -mt-10"></div>
-        
-        <!-- Navegador de Meses -->
-        <div class="flex items-center justify-between relative z-10 mb-5">
-            <button class="p-2 bg-white/[0.03] hover:bg-white/[0.08] rounded-xl text-zinc-400 hover:text-white transition-colors" onclick="App.changeMonth(-1)">
-                <i class="ph-bold ph-caret-left text-lg"></i>
-            </button>
-            
-            <div class="flex flex-col items-center cursor-pointer group" onclick="App.goToCurrentMonth()" title="Voltar ao mês atual">
-                <h2 id="monthDisplayLabel" class="text-lg font-black text-white capitalize group-hover:text-blue-400 transition-colors">Carregando...</h2>
-                <span id="btnCurrentMonth" class="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mt-0.5 transition-opacity opacity-0 group-hover:text-blue-500">Ir para Hoje</span>
-            </div>
+    <!-- MÊS E NAVEGAÇÃO -->
+    <div class="flex items-center justify-between bg-white/[0.02] border border-white/[0.05] rounded-xl p-3 mb-6">
+      <button class="p-2 rounded-lg hover:bg-white/5 text-zinc-400 hover:text-white transition-colors" onclick="App.changeMonth(-1)">
+        <i class="ph-bold ph-caret-left text-lg"></i>
+      </button>
+      
+      <div class="flex flex-col items-center">
+        <h2 id="monthDisplayLabel" class="text-base font-bold text-white capitalize">Carregando...</h2>
+        <button id="btnCurrentMonth" class="text-[10px] font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded mt-1 uppercase opacity-0 pointer-events-none transition-opacity" onclick="App.goToCurrentMonth()">Hoje</button>
+      </div>
 
-            <button class="p-2 bg-white/[0.03] hover:bg-white/[0.08] rounded-xl text-zinc-400 hover:text-white transition-colors" onclick="App.changeMonth(1)">
-                <i class="ph-bold ph-caret-right text-lg"></i>
-            </button>
-        </div>
-
-        <!-- Barra de Progresso Global do Mês -->
-        <div class="relative z-10">
-            <div class="flex justify-between items-end mb-2">
-                <span class="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <i class="ph-fill ph-flag-checkered text-blue-400"></i> Progresso do Mês
-                </span>
-                <span id="monthProgressText" class="text-sm font-black text-white">0%</span>
-            </div>
-            <div class="h-2 w-full bg-black/40 rounded-full overflow-hidden border border-white/[0.02]">
-                <div id="monthProgressBar" class="h-full bg-gradient-to-r from-blue-600 to-blue-400 rounded-full progress-bar-fill" style="width: 0%"></div>
-            </div>
-            <p id="monthProgressSubtext" class="text-[10px] text-zinc-500 font-medium text-right mt-1.5">0 de 0 visitas realizadas</p>
-        </div>
+      <button class="p-2 rounded-lg hover:bg-white/5 text-zinc-400 hover:text-white transition-colors" onclick="App.changeMonth(1)">
+        <i class="ph-bold ph-caret-right text-lg"></i>
+      </button>
     </div>
 
-    <!-- ================= PAINEL DE ESTATÍSTICAS (CARDS) ================= -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8" id="statsContainer">
-      <!-- Renderizado via JS -->
-    </div>
+    <!-- PAINEL (STATS) -->
+    <div class="grid grid-cols-2 gap-3 mb-8" id="statsContainer"></div>
 
-    <!-- ================= FILTROS E BUSCA ================= -->
+    <!-- FILTROS E BUSCA -->
     <div class="space-y-5 mb-6">
-      <!-- Busca -->
-      <div class="relative group">
-        <i class="ph-bold ph-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 text-lg group-focus-within:text-blue-400 transition-colors"></i>
-        <input type="text" id="searchInput" placeholder="Buscar criança ou responsável..." oninput="App.handleSearch(event)" 
-          class="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl py-3.5 pl-12 pr-4 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-blue-500/50 focus:bg-white/[0.04] transition-all shadow-sm">
+      <div class="relative">
+        <i class="ph ph-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 text-lg"></i>
+        <input type="text" id="searchInput" placeholder="Buscar por nome da criança ou responsável..." oninput="App.handleSearch(event)" 
+          class="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl py-3 pl-10 pr-4 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-blue-500/50 transition-colors">
       </div>
 
-      <!-- Filtro de Status -->
       <div>
-        <span class="block text-[10px] uppercase font-bold text-zinc-500 tracking-wider mb-2 flex items-center gap-1.5">
-            <i class="ph-fill ph-funnel"></i> Filtrar por Estado
-        </span>
+        <span class="block text-[10px] uppercase font-bold text-zinc-500 tracking-wider mb-2">Progresso do Mês</span>
         <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1" id="visitFilterContainer">
-          <button class="pill active px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border border-transparent" onclick="App.setVisitFilter('Todos')">Todos</button>
-          <button class="pill px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border border-transparent flex items-center gap-1.5" onclick="App.setVisitFilter('Pendentes')"><i class="ph-fill ph-x-circle text-red-400"></i> Pendentes (0)</button>
-          <button class="pill px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border border-transparent flex items-center gap-1.5" onclick="App.setVisitFilter('Parciais')"><i class="ph-fill ph-warning-circle text-amber-400"></i> Parciais (1)</button>
-          <button class="pill px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border border-transparent flex items-center gap-1.5" onclick="App.setVisitFilter('Concluidos')"><i class="ph-fill ph-check-circle text-emerald-400"></i> Concluídos (2)</button>
+          <button class="pill active px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent bg-white/10 text-white" onclick="App.setVisitFilter('Todos')">Todos</button>
+          <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent bg-white/[0.02] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]" onclick="App.setVisitFilter('Pendentes')">Pendentes</button>
+          <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent bg-white/[0.02] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]" onclick="App.setVisitFilter('Parciais')">Parciais (1)</button>
+          <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent bg-white/[0.02] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]" onclick="App.setVisitFilter('Concluidos')">Concluídos (2)</button>
         </div>
       </div>
 
-      <!-- Filtro de Localidade -->
       <div>
-        <span class="block text-[10px] uppercase font-bold text-zinc-500 tracking-wider mb-2 flex items-center gap-1.5">
-            <i class="ph-fill ph-map-pin"></i> Localidade
-        </span>
+        <span class="block text-[10px] uppercase font-bold text-zinc-500 tracking-wider mb-2">Localidade</span>
         <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1" id="locFilterContainer">
-          <button class="pill active px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent" onclick="App.setLocFilter('Todas')">Todas Áreas</button>
-          <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent" onclick="App.setLocFilter('Rive')">Rive</button>
-          <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent" onclick="App.setLocFilter('Vila Alta')">Vila Alta</button>
-          <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent" onclick="App.setLocFilter('Vila do Sul')">Vila do Sul</button>
-          <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent" onclick="App.setLocFilter('Querosene')">Querosene</button>
-          <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent" onclick="App.setLocFilter('Café')">Café</button>
-          <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent" onclick="App.setLocFilter('Celina')">Celina</button>
-          <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent" onclick="App.setLocFilter('Centro')">Centro</button>
-          <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent" onclick="App.setLocFilter('Pendente')">Pendente</button>
+          <button class="pill active px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent bg-white/10 text-white" onclick="App.setLocFilter('Todas')">Todas Áreas</button>
+          <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent bg-white/[0.02] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]" onclick="App.setLocFilter('Rive')">Rive</button>
+          <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent bg-white/[0.02] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]" onclick="App.setLocFilter('Vila Alta')">Vila Alta</button>
+          <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent bg-white/[0.02] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]" onclick="App.setLocFilter('Vila do Sul')">Vila do Sul</button>
+          <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent bg-white/[0.02] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]" onclick="App.setLocFilter('Querosene')">Querosene</button>
+          <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent bg-white/[0.02] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]" onclick="App.setLocFilter('Café')">Café</button>
+          <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent bg-white/[0.02] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]" onclick="App.setLocFilter('Celina')">Celina</button>
+          <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent bg-white/[0.02] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]" onclick="App.setLocFilter('Centro')">Centro</button>
+          <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent bg-white/[0.02] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]" onclick="App.setLocFilter('Pendente')">Pendente</button>
         </div>
       </div>
     </div>
 
-    <!-- ================= LISTA DE CARDS ================= -->
-    <div id="listContainer" class="space-y-4 transition-opacity duration-200"></div>
+    <!-- LISTA DE CARDS -->
+    <div id="listContainer" class="space-y-3 transition-opacity duration-200">
+      <div class="text-center py-10 text-zinc-500 font-medium animate-pulse">Obtendo dados da nuvem...</div>
+    </div>
     
     <!-- Estado Vazio -->
-    <div id="emptyState" class="hidden text-center py-16 px-4 bg-white/[0.01] border border-white/[0.03] border-dashed rounded-2xl mt-4">
-      <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/[0.02] text-zinc-600 mb-4 shadow-inner">
-        <i class="ph-fill ph-users text-3xl"></i>
+    <div id="emptyState" class="hidden text-center py-16 px-4 bg-white/[0.01] border border-white/[0.05] rounded-xl mt-4">
+      <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/[0.03] text-zinc-600 mb-4">
+        <i class="ph ph-folder-open text-3xl"></i>
       </div>
       <h3 class="text-base font-bold text-zinc-300">Nenhum registo encontrado</h3>
-      <p class="text-sm text-zinc-500 mt-1 max-w-xs mx-auto">Ajuste os filtros ou adicione uma nova criança para começar.</p>
+      <p class="text-sm text-zinc-500 mt-1 max-w-xs mx-auto">Ajuste os filtros ou adicione um novo acompanhamento.</p>
     </div>
   </main>
 
-  <!-- ================= FAB (Novo) ================= -->
-  <button class="fab fixed bottom-6 right-6 w-14 h-14 bg-blue-600 hover:bg-blue-500 text-white rounded-full flex items-center justify-center z-30 transition-transform active:scale-90" onclick="App.openFormModal()">
+  <!-- FAB -->
+  <button class="fab fixed bottom-6 right-6 w-14 h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-full flex items-center justify-center z-30 transition-transform active:scale-90" onclick="App.openFormModal()">
     <i class="ph-bold ph-plus text-2xl"></i>
   </button>
 
-  <!-- ================= DIV OCULTA PARA IMPRESSÃO ================= -->
   <div id="printContainer"></div>
 
-  <!-- ================= MODAL: FORMULÁRIO ================= -->
+  <!-- MODAL: FORMULÁRIO -->
   <div class="modal-overlay fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300" id="formModal">
-    <div class="modal-content bg-matte-card w-full sm:max-w-md h-[90vh] sm:h-auto sm:max-h-[90vh] rounded-t-3xl sm:rounded-3xl border border-white/[0.05] shadow-2xl flex flex-col transform translate-y-full sm:scale-95 transition-all duration-300">
+    <div class="modal-content bg-matte-card w-full sm:max-w-md h-[90vh] sm:h-auto sm:max-h-[90vh] rounded-t-2xl sm:rounded-2xl border border-white/[0.05] shadow-2xl flex flex-col transform translate-y-full sm:scale-95 transition-all duration-300">
       
-      <div class="flex justify-between items-center p-6 border-b border-white/[0.05]">
-        <h2 class="text-lg font-black text-white" id="formModalTitle">Nova Criança</h2>
+      <div class="flex justify-between items-center p-5 border-b border-white/[0.05]">
+        <h2 class="text-lg font-bold text-white" id="formModalTitle">Nova Criança</h2>
         <button class="p-2 bg-white/[0.03] hover:bg-white/10 rounded-full text-zinc-400 transition-colors" onclick="App.closeModals()">
           <i class="ph-bold ph-x text-lg"></i>
         </button>
       </div>
       
-      <div class="flex-1 overflow-y-auto p-6 no-scrollbar">
+      <div class="flex-1 overflow-y-auto p-5 no-scrollbar">
         <form id="kidForm" class="space-y-5">
           <input type="hidden" id="formId">
           
-          <!-- Avatar Upload -->
-          <div class="flex flex-col items-center mb-4">
+          <div class="flex flex-col items-center mb-2">
             <input type="file" id="formPhoto" accept="image/*" capture="environment" class="hidden" onchange="App.handlePhotoUpload(event)">
-            <div class="avatar-preview w-24 h-24 rounded-full bg-white/[0.02] border border-dashed border-white/10 flex items-center justify-center cursor-pointer relative overflow-hidden group shadow-inner" id="photoPreview" onclick="document.getElementById('formPhoto').click()">
-              <i class="ph-fill ph-camera text-3xl text-zinc-600 group-hover:opacity-0 transition-opacity"></i>
-              <div class="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
+            <div class="avatar-preview w-24 h-24 rounded-full bg-white/[0.03] border-2 border-dashed border-white/10 flex items-center justify-center cursor-pointer relative overflow-hidden group" id="photoPreview" onclick="document.getElementById('formPhoto').click()">
+              <i class="ph ph-camera text-3xl text-zinc-500 group-hover:opacity-0 transition-opacity"></i>
+              <div class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                 <i class="ph-bold ph-upload-simple text-white text-xl"></i>
               </div>
             </div>
-            <span class="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mt-3">Toque para Foto</span>
+            <span class="text-xs text-zinc-500 font-medium mt-2">Tocar para Foto</span>
           </div>
           
-          <!-- Checkbox de Gravidez -->
-          <label class="flex items-center gap-3 p-4 bg-pink-500/5 hover:bg-pink-500/10 border border-pink-500/20 rounded-xl cursor-pointer transition-colors group">
-            <input type="checkbox" id="formPregnancy" onchange="App.handlePregnancyChange(this)" class="w-5 h-5 accent-pink-500 rounded border-white/20 bg-matte-bg cursor-pointer">
-            <span class="text-sm font-bold text-pink-400 group-hover:text-pink-300 transition-colors">Registar como Gestação</span>
+          <label class="flex items-center gap-3 p-4 bg-pink-500/5 border border-pink-500/20 rounded-xl cursor-pointer">
+            <input type="checkbox" id="formPregnancy" onchange="App.handlePregnancyChange(this)" class="w-5 h-5 accent-pink-500 rounded border-white/20 bg-matte-bg">
+            <span class="text-sm font-bold text-pink-400">Registar como Gestação</span>
           </label>
 
           <div>
-            <label class="block text-xs font-bold text-zinc-500 mb-1.5 uppercase tracking-wide" id="nameLabelText">Nome da Criança <span class="text-red-500">*</span></label>
-            <input type="text" id="formName" placeholder="Ex: João da Silva" class="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl p-3.5 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 focus:bg-white/[0.04] transition-all">
+            <label class="block text-xs font-semibold text-zinc-500 mb-1.5 uppercase" id="nameLabelText">Nome da Criança <span class="text-red-500">*</span></label>
+            <input type="text" id="formName" placeholder="Ex: João da Silva" class="w-full bg-white/[0.02] border border-white/[0.05] rounded-lg p-3 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 transition-colors">
           </div>
           
-          <!-- Data de Nascimento -->
           <div id="birthDateGroup">
-            <label class="block text-xs font-bold text-zinc-500 mb-1.5 uppercase tracking-wide">Data de Nascimento <span class="text-red-500">*</span></label>
-            <input type="tel" id="formBirthDate" placeholder="DD/MM/AAAA" maxlength="10" oninput="Utils.maskDate(this)" class="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl p-3.5 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 focus:bg-white/[0.04] transition-all">
+            <label class="block text-xs font-semibold text-zinc-500 mb-1.5 uppercase">Data de Nascimento <span class="text-red-500">*</span></label>
+            <input type="tel" id="formBirthDate" placeholder="DD/MM/AAAA" maxlength="10" oninput="Utils.maskDate(this)" class="w-full bg-white/[0.02] border border-white/[0.05] rounded-lg p-3 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 transition-colors">
           </div>
 
           <div>
-            <label class="block text-xs font-bold text-zinc-500 mb-1.5 uppercase tracking-wide">Nome do Responsável <span class="text-red-500">*</span></label>
-            <input type="text" id="formResp" required placeholder="Nome da mãe ou pai" class="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl p-3.5 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 focus:bg-white/[0.04] transition-all">
+            <label class="block text-xs font-semibold text-zinc-500 mb-1.5 uppercase">Nome do Responsável <span class="text-red-500">*</span></label>
+            <input type="text" id="formResp" required placeholder="Nome da mãe ou pai" class="w-full bg-white/[0.02] border border-white/[0.05] rounded-lg p-3 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 transition-colors">
           </div>
 
           <div>
-            <label class="block text-xs font-bold text-zinc-500 mb-1.5 uppercase tracking-wide">Localidade <span class="text-red-500">*</span></label>
-            <select id="formLocality" required onchange="App.handleLocalityChange(this)" class="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl p-3.5 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 focus:bg-white/[0.04] transition-all cursor-pointer appearance-none">
+            <label class="block text-xs font-semibold text-zinc-500 mb-1.5 uppercase">Localidade <span class="text-red-500">*</span></label>
+            <select id="formLocality" required onchange="App.handleLocalityChange(this)" class="w-full bg-white/[0.02] border border-white/[0.05] rounded-lg p-3 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 transition-colors cursor-pointer appearance-none">
               <option value="" disabled selected class="text-zinc-500">Selecione a área...</option>
               <option value="Rive" class="bg-matte-card">Rive</option>
               <option value="Vila Alta" class="bg-matte-card">Vila Alta</option>
@@ -302,74 +220,54 @@
           </div>
 
           <div class="hidden" id="refGroup">
-            <label class="block text-xs font-bold text-zinc-500 mb-1.5 uppercase tracking-wide">Ponto de Referência <span class="text-red-500">*</span></label>
-            <input type="text" id="formRef" placeholder="Ex: Perto da padaria X..." class="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl p-3.5 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 focus:bg-white/[0.04] transition-all">
+            <label class="block text-xs font-semibold text-zinc-500 mb-1.5 uppercase">Ponto de Referência <span class="text-red-500">*</span></label>
+            <input type="text" id="formRef" placeholder="Ex: Perto da padaria X..." class="w-full bg-white/[0.02] border border-white/[0.05] rounded-lg p-3 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 transition-colors">
           </div>
 
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="block text-xs font-bold text-zinc-500 mb-1.5 uppercase tracking-wide">Telefone</label>
-              <input type="tel" id="formPhone" placeholder="(00) 00000-0000" oninput="Utils.maskPhone(this)" class="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl p-3.5 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 focus:bg-white/[0.04] transition-all">
+              <label class="block text-xs font-semibold text-zinc-500 mb-1.5 uppercase">Telefone</label>
+              <input type="tel" id="formPhone" placeholder="(00) 00000-0000" oninput="Utils.maskPhone(this)" class="w-full bg-white/[0.02] border border-white/[0.05] rounded-lg p-3 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 transition-colors">
             </div>
             <div>
-              <label class="block text-xs font-bold text-zinc-500 mb-1.5 uppercase tracking-wide">CPF Resp.</label>
-              <input type="tel" id="formCpf" placeholder="000.000.000-00" oninput="Utils.maskCpf(this)" class="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl p-3.5 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 focus:bg-white/[0.04] transition-all">
+              <label class="block text-xs font-semibold text-zinc-500 mb-1.5 uppercase">CPF Resp.</label>
+              <input type="tel" id="formCpf" placeholder="000.000.000-00" oninput="Utils.maskCpf(this)" class="w-full bg-white/[0.02] border border-white/[0.05] rounded-lg p-3 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 transition-colors">
             </div>
           </div>
 
           <div>
-            <label class="block text-xs font-bold text-zinc-500 mb-1.5 uppercase tracking-wide">Observações</label>
-            <textarea id="formNotes" rows="3" placeholder="Alergias, necessidades especiais..." class="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl p-3.5 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 focus:bg-white/[0.04] transition-all resize-none"></textarea>
+            <label class="block text-xs font-semibold text-zinc-500 mb-1.5 uppercase">Observações</label>
+            <textarea id="formNotes" rows="3" placeholder="Alergias, necessidades especiais..." class="w-full bg-white/[0.02] border border-white/[0.05] rounded-lg p-3 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 transition-colors resize-none"></textarea>
           </div>
         </form>
       </div>
       
-      <div class="p-5 border-t border-white/[0.05] bg-matte-card/80 backdrop-blur-md">
-        <button type="button" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-4 rounded-xl transition-colors active:scale-95 shadow-lg shadow-blue-900/20" onclick="App.handleFormSubmit()">Salvar Registo</button>
+      <div class="p-5 border-t border-white/[0.05] bg-matte-card/50">
+        <button id="btnSubmitForm" type="button" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3.5 px-4 rounded-xl transition-colors active:scale-95 shadow-lg shadow-blue-500/20" onclick="App.handleFormSubmit()">Salvar na Nuvem</button>
       </div>
     </div>
   </div>
 
-  <!-- ================= MODAIS DE ALERTA ================= -->
+  <!-- MODAL: EXCLUSÃO -->
   <div class="modal-overlay modal-alert fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300 p-4" id="deleteModal">
-    <div class="modal-content bg-matte-card max-w-sm w-full rounded-3xl border border-white/[0.05] p-6 text-center transform scale-95 transition-all duration-300 shadow-2xl">
-      <div class="w-14 h-14 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-5">
-        <i class="ph-fill ph-warning-circle text-3xl text-red-500"></i>
+    <div class="modal-content bg-matte-card max-w-sm w-full rounded-2xl border border-white/[0.05] p-6 text-center transform scale-95 transition-all duration-300 shadow-2xl">
+      <div class="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+        <i class="ph-fill ph-warning-circle text-2xl text-red-500"></i>
       </div>
-      <h2 class="text-xl font-black text-white mb-2">Excluir Registo?</h2>
-      <p class="text-zinc-400 text-sm mb-8 leading-relaxed">Esta ação apagará todo o histórico de visitas desta criança permanentemente. Não é possível desfazer.</p>
+      <h2 class="text-lg font-bold text-white mb-2">Excluir Registo?</h2>
+      <p class="text-zinc-400 text-sm mb-6">Esta ação apagará os dados na nuvem permanentemente.</p>
       <div class="flex gap-3">
-        <button onclick="App.closeModals()" class="flex-1 py-3.5 rounded-xl font-bold bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 transition-colors">Cancelar</button>
-        <button id="confirmDeleteBtn" class="flex-1 py-3.5 rounded-xl font-bold bg-red-600 hover:bg-red-500 text-white transition-colors shadow-lg shadow-red-900/20">Sim, Excluir</button>
+        <button onclick="App.closeModals()" class="flex-1 py-3 rounded-xl font-bold bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 transition-colors">Cancelar</button>
+        <button id="confirmDeleteBtn" class="flex-1 py-3 rounded-xl font-bold bg-red-500 hover:bg-red-600 text-white transition-colors">Sim, Excluir</button>
       </div>
     </div>
   </div>
 
-  <div class="modal-overlay modal-alert fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300 p-4" id="importModal">
-    <div class="modal-content bg-matte-card max-w-sm w-full rounded-3xl border border-white/[0.05] p-6 text-center transform scale-95 transition-all duration-300 shadow-2xl">
-      <div class="w-14 h-14 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-5">
-        <i class="ph-fill ph-download-simple text-3xl text-blue-500"></i>
-      </div>
-      <h2 class="text-xl font-black text-white mb-2">Backup Detectado</h2>
-      <p class="text-zinc-400 text-sm mb-8 leading-relaxed">Como deseja inserir os dados restaurados do backup?</p>
-      <div class="flex flex-col gap-3">
-        <button onclick="App.processImport('merge')" class="w-full py-3.5 rounded-xl font-bold border border-blue-500 text-blue-400 hover:bg-blue-500/10 transition-colors">Mesclar (Recomendado)</button>
-        <button onclick="App.processImport('replace')" class="w-full py-3.5 rounded-xl font-bold bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors">Substituir Tudo</button>
-        <button onclick="App.closeModals()" class="w-full py-2 text-sm font-bold text-zinc-500 hover:text-zinc-300 mt-2">Cancelar Operação</button>
-      </div>
-    </div>
-  </div>
+  <div id="toast-container" class="fixed bottom-6 right-6 z-[60] flex flex-col gap-3 pointer-events-none"></div>
 
-  <!-- Toasts -->
-  <div id="toast-container" class="fixed top-6 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-3 pointer-events-none"></div>
-
-  <!-- ================= SCRIPT LOGIC ================= -->
+  <!-- ================= SCRIPT ================= -->
   <script>
-    const STORAGE_KEY = 'sys_kids_data_v4';
-    let pendingImportData = null;
-
     const Utils = {
-      generateId: () => crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15),
       getMonthKey: (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
       getMonthName: (d) => ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'][d.getMonth()] + ' ' + d.getFullYear(),
       isCurrentMonth: (d) => { const t = new Date(); return d.getMonth() === t.getMonth() && d.getFullYear() === t.getFullYear(); },
@@ -407,16 +305,14 @@
       showToast: (msg, type = 'success') => {
         const cont = document.getElementById('toast-container');
         const el = document.createElement('div');
-        const icon = type === 'error' ? '<i class="ph-fill ph-warning-circle text-red-500"></i>' : '<i class="ph-fill ph-check-circle text-blue-400"></i>';
+        const icon = type === 'error' ? '<i class="ph-fill ph-warning-circle text-red-500 text-lg"></i>' : '<i class="ph-fill ph-check-circle text-blue-400 text-lg"></i>';
         
-        el.className = 'toast-animate flex items-center gap-3 bg-zinc-800 border border-white/[0.05] px-4 py-3 rounded-xl shadow-2xl pointer-events-auto';
-        el.innerHTML = `${icon}<span class="text-sm font-bold text-zinc-200 whitespace-nowrap">${msg}</span>`;
+        el.className = 'toast-animate flex items-center gap-3 bg-zinc-800 border border-white/[0.05] px-4 py-3 rounded-xl shadow-xl pointer-events-auto';
+        el.innerHTML = `${icon}<span class="text-sm font-medium text-zinc-200">${msg}</span>`;
         cont.appendChild(el);
         
         setTimeout(() => { 
-            el.style.opacity = '0'; 
-            el.style.transform = 'translateY(-15px) translateX(-50%)'; 
-            el.style.transition = 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'; 
+            el.style.opacity = '0'; el.style.transform = 'translateY(10px)'; el.style.transition = 'all 0.3s ease'; 
             setTimeout(() => el.remove(), 300); 
         }, 3000);
       }
@@ -424,23 +320,105 @@
 
     const State = { viewDate: new Date(), locFilter: 'Todas', visitFilter: 'Todos', search: '', items: [], currentPhotoBase64: null };
 
+    // ==========================================
+    // CLOUD STORAGE (Supabase Integration)
+    // ==========================================
     const Storage = {
-      load: () => {
-        const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('sys_kids_data_v3') || localStorage.getItem('sys_kids_data_v2') || localStorage.getItem('sys_kids_data');
-        if (saved) { State.items = JSON.parse(saved); Storage.save(); }
-        State.viewDate.setDate(1); 
+      getDB: () => {
+        if (!window.parent || !window.parent.PortalDB) {
+          Utils.showToast('Nuvem não detetada! Abra pelo Início (Hub).', 'error');
+          return null;
+        }
+        return window.parent.PortalDB.supabase;
       },
-      save: () => {
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(State.items)); } 
-        catch (e) { Utils.showToast('Memória cheia! Apague registos antigos.', 'error'); }
+      load: async () => {
+        const db = Storage.getDB();
+        if (!db) {
+            document.getElementById('listContainer').innerHTML = '<div class="text-center py-10 text-red-400 font-medium">Conecte a Nuvem na página inicial primeiro.</div>';
+            return;
+        }
+
+        try {
+          const { data, error } = await db.from('gestao_visitas').select('*');
+          if (error) throw error;
+          
+          State.items = data.map(row => ({
+            id: row.id,
+            name: row.nome_crianca,
+            birthDate: row.data_nascimento,
+            responsible: row.responsavel,
+            locality: row.localidade,
+            reference: row.referencia,
+            phone: row.telefone,
+            cpf: row.cpf,
+            notes: row.notas,
+            isPregnancy: row.is_gestacao,
+            visits: row.visitas || {},
+            photoBase64: row.photo_base64
+          }));
+          
+          State.viewDate.setDate(1); 
+        } catch (e) {
+          Utils.showToast('Erro ao carregar dados da nuvem.', 'error');
+          console.error(e);
+        }
       },
-      addItem: (item) => {
-        const idx = State.items.findIndex(i => i.id === item.id);
-        if (idx >= 0) { item.visits = State.items[idx].visits || {}; State.items[idx] = item; } 
-        else { item.visits = {}; State.items.push(item); }
-        Storage.save();
+      addItem: async (item) => {
+        const db = Storage.getDB();
+        if(!db) return false;
+        
+        const payload = {
+            nome_crianca: item.name,
+            data_nascimento: item.birthDate,
+            responsavel: item.responsible,
+            localidade: item.locality,
+            referencia: item.reference,
+            telefone: item.phone,
+            cpf: item.cpf,
+            notas: item.notes,
+            is_gestacao: item.isPregnancy,
+            photo_base64: item.photoBase64
+        };
+
+        try {
+            if (item.id) {
+                const { error } = await db.from('gestao_visitas').update(payload).eq('id', item.id);
+                if(error) throw error;
+            } else {
+                const { error } = await db.from('gestao_visitas').insert([payload]);
+                if(error) throw error;
+            }
+            return true;
+        } catch(e) {
+            Utils.showToast('Erro ao salvar na nuvem.', 'error');
+            console.error(e);
+            return false;
+        }
       },
-      deleteItem: (id) => { State.items = State.items.filter(i => i.id !== id); Storage.save(); },
+      deleteItem: async (id) => {
+        const db = Storage.getDB();
+        if(!db) return false;
+        try {
+            const { error } = await db.from('gestao_visitas').delete().eq('id', id);
+            if(error) throw error;
+            return true;
+        } catch(e) {
+            Utils.showToast('Erro ao excluir na nuvem.', 'error');
+            return false;
+        }
+      },
+      updateVisits: async (id, visitsObj) => {
+          const db = Storage.getDB();
+          if(!db) return false;
+          try {
+              const { error } = await db.from('gestao_visitas').update({ visitas: visitsObj }).eq('id', id);
+              if(error) throw error;
+              return true;
+          } catch(e) {
+              Utils.showToast('Erro de sincronização.', 'error');
+              return false;
+          }
+      },
       getFiltered: () => {
         const mk = Utils.getMonthKey(State.viewDate);
         return State.items.filter(i => {
@@ -461,11 +439,8 @@
         document.getElementById('monthDisplayLabel').innerText = Utils.getMonthName(State.viewDate);
         const isCurrent = Utils.isCurrentMonth(State.viewDate);
         const btn = document.getElementById('btnCurrentMonth');
-        if(!isCurrent) { 
-            btn.classList.remove('opacity-0'); 
-        } else { 
-            btn.classList.add('opacity-0'); 
-        }
+        if(!isCurrent) { btn.classList.remove('opacity-0', 'pointer-events-none'); } 
+        else { btn.classList.add('opacity-0', 'pointer-events-none'); }
       },
       renderStats: () => {
         const mk = Utils.getMonthKey(State.viewDate);
@@ -474,45 +449,26 @@
            const v = (i.visits && i.visits[mk]) ? i.visits[mk] : 0;
            if(v===0) p++; else if(v===1) pr++; else c++;
         });
-
-        // Calculo da Barra de Progresso do Mês
-        const totalVisitasNecessarias = State.items.length * 2;
-        const visitasRealizadas = (pr * 1) + (c * 2);
-        const percentagem = totalVisitasNecessarias > 0 ? Math.round((visitasRealizadas / totalVisitasNecessarias) * 100) : 0;
-
-        document.getElementById('monthProgressText').innerText = `${percentagem}%`;
-        document.getElementById('monthProgressBar').style.width = `${percentagem}%`;
-        document.getElementById('monthProgressSubtext').innerText = `${visitasRealizadas} de ${totalVisitasNecessarias} visitas realizadas`;
-
-        // Renderização dos Cards Menores
         document.getElementById('statsContainer').innerHTML = `
-          <div class="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-4 flex flex-col justify-between relative overflow-hidden">
-            <div class="flex justify-between items-center mb-2">
-                <span class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Crianças</span>
-                <i class="ph-fill ph-users text-blue-400 text-lg"></i>
-            </div>
-            <div class="text-2xl font-black text-white leading-none">${State.items.length}</div>
+          <div class="bg-white/[0.02] border border-white/[0.05] rounded-xl p-4 flex flex-col justify-between relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
+            <span class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Total Geral</span>
+            <div class="text-2xl font-bold text-white leading-none">${State.items.length}</div>
           </div>
-          <div class="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-4 flex flex-col justify-between relative overflow-hidden">
-            <div class="flex justify-between items-center mb-2">
-                <span class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">0 Visitas</span>
-                <i class="ph-fill ph-x-circle text-red-400 text-lg"></i>
-            </div>
-            <div class="text-2xl font-black text-red-400 leading-none">${p}</div>
+          <div class="bg-white/[0.02] border border-white/[0.05] rounded-xl p-4 flex flex-col justify-between relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-1 h-full bg-red-500"></div>
+            <span class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Pendentes (0)</span>
+            <div class="text-2xl font-bold text-red-400 leading-none">${p}</div>
           </div>
-          <div class="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-4 flex flex-col justify-between relative overflow-hidden">
-            <div class="flex justify-between items-center mb-2">
-                <span class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">1 Visita</span>
-                <i class="ph-fill ph-warning-circle text-amber-400 text-lg"></i>
-            </div>
-            <div class="text-2xl font-black text-amber-400 leading-none">${pr}</div>
+          <div class="bg-white/[0.02] border border-white/[0.05] rounded-xl p-4 flex flex-col justify-between relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-1 h-full bg-yellow-500"></div>
+            <span class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Parciais (1)</span>
+            <div class="text-2xl font-bold text-yellow-400 leading-none">${pr}</div>
           </div>
-          <div class="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-4 flex flex-col justify-between relative overflow-hidden">
-            <div class="flex justify-between items-center mb-2">
-                <span class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">2 Visitas</span>
-                <i class="ph-fill ph-check-circle text-emerald-400 text-lg"></i>
-            </div>
-            <div class="text-2xl font-black text-emerald-400 leading-none">${c}</div>
+          <div class="bg-white/[0.02] border border-white/[0.05] rounded-xl p-4 flex flex-col justify-between relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
+            <span class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Concluídos (2)</span>
+            <div class="text-2xl font-bold text-emerald-400 leading-none">${c}</div>
           </div>
         `;
       },
@@ -540,9 +496,7 @@
             : `<div class="w-12 h-12 rounded-full bg-white/[0.03] border border-white/[0.05] shrink-0 flex items-center justify-center text-zinc-500"><i class="ph-fill ph-user text-xl"></i></div>`;
 
           html += `
-            <div class="card bg-white/[0.02] border border-white/[0.05] rounded-2xl overflow-hidden animate-slide-up" id="card-${kid.id}">
-              
-              <!-- Header do Card -->
+            <div class="card bg-white/[0.02] border border-white/[0.05] rounded-xl overflow-hidden animate-slide-up" id="card-${kid.id}">
               <div class="p-4 flex justify-between items-start cursor-pointer hover:bg-white/[0.02] transition-colors" onclick="App.toggleCard('${kid.id}')">
                 <div class="flex gap-3 flex-1 min-w-0">
                   ${photoHtml}
@@ -550,63 +504,38 @@
                     <h3 class="font-bold text-white truncate text-base">${kid.name}</h3>
                     <div class="flex flex-wrap gap-2 mt-1 mb-1.5">
                         ${ageDisplay}
-                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-white/[0.05] border border-white/[0.05] text-zinc-400 uppercase tracking-wider">${kid.locality}</span>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-white/[0.05] text-zinc-400 uppercase tracking-wider">${kid.locality}</span>
                     </div>
                     <div class="text-xs text-zinc-500 font-medium truncate">Resp: <span class="text-zinc-400">${kid.responsible}</span></div>
                   </div>
                 </div>
-                <div class="chevron text-zinc-500 p-2 rounded-full hover:bg-white/[0.05]"><i class="ph-bold ph-caret-down"></i></div>
+                <div class="chevron text-zinc-500 p-1"><i class="ph-bold ph-caret-down"></i></div>
               </div>
               
-              ${isLegacy ? `<div class="mx-4 mt-1 mb-2 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-xl text-xs font-semibold text-red-400 flex items-center gap-2"><i class="ph-bold ph-warning"></i> Atualize a Data p/ DD/MM/AAAA</div>` : ''}
+              ${isLegacy ? `<div class="mx-4 mt-1 mb-2 px-3 py-2 bg-red-500/10 border-l-2 border-red-500 rounded-r-lg text-xs font-semibold text-red-400 flex items-center gap-2"><i class="ph-bold ph-warning"></i> Atualize a Data p/ DD/MM/AAAA</div>` : ''}
 
-              <!-- Controles de Visita (Sempre Visíveis) -->
-              <div class="px-4 pb-4 pt-1" onclick="event.stopPropagation()">
-                <div class="flex gap-2 bg-black/20 p-1.5 rounded-xl border border-white/[0.02]">
-                    <button class="flex-1 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${vc>=1 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.1)]' : 'bg-transparent border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.02]'}" onclick="App.setVisit('${kid.id}', 1)">
-                        <i class="ph-bold ${vc>=1 ? 'ph-check' : 'ph-circle'} text-sm"></i> 1ª Visita
-                    </button>
-                    
-                    <div class="w-px bg-white/[0.05] my-2"></div>
-                    
-                    <button class="flex-1 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${vc>=2 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.1)]' : 'bg-transparent border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.02]'}" onclick="App.setVisit('${kid.id}', 2)">
-                        <i class="ph-bold ${vc>=2 ? 'ph-check' : 'ph-circle'} text-sm"></i> 2ª Visita
-                    </button>
-                </div>
+              <div class="flex items-center gap-2 px-4 py-3 bg-black/20 border-t border-white/[0.02]" onclick="event.stopPropagation()">
+                <span class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider w-12 leading-tight">Visitas Mês</span>
+                <button class="flex-1 py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1.5 border ${vc>=1 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-white/[0.02] border-white/[0.05] text-zinc-400 hover:text-white'}" onclick="App.setVisit('${kid.id}', 1)">
+                  <i class="ph-bold ${vc>=1 ? 'ph-check' : 'ph-circle'} text-sm"></i> 1ª Visita
+                </button>
+                <button class="flex-1 py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1.5 border ${vc>=2 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-white/[0.02] border-white/[0.05] text-zinc-400 hover:text-white'}" onclick="App.setVisit('${kid.id}', 2)">
+                  <i class="ph-bold ${vc>=2 ? 'ph-check' : 'ph-circle'} text-sm"></i> 2ª Visita
+                </button>
               </div>
 
-              <!-- Detalhes Expandíveis -->
-              <div class="card-details bg-matte-bg/50 border-t border-white/[0.02]">
-                <div class="card-details-inner px-4 pt-4 pb-4">
-                  <div class="grid grid-cols-2 gap-3 p-3 bg-white/[0.02] border border-white/[0.05] rounded-xl mb-4">
-                    <div>
-                      <div class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Telefone</div>
-                      <div class="text-sm font-medium text-white mt-0.5">${kid.phone || '---'}</div>
-                    </div>
-                    <div>
-                      <div class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">CPF Resp.</div>
-                      <div class="text-sm font-medium text-white mt-0.5">${kid.cpf || '---'}</div>
-                    </div>
-                    <div class="col-span-2">
-                      <div class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Ponto de Referência</div>
-                      <div class="text-sm font-medium text-white mt-0.5 leading-snug">${kid.reference || '---'}</div>
-                    </div>
+              <div class="card-details bg-matte-bg/50">
+                <div class="card-details-inner px-4 pt-3 pb-4">
+                  <div class="grid grid-cols-2 gap-3 p-3 bg-white/[0.02] border border-white/[0.05] rounded-lg mb-4">
+                    <div><div class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Telefone</div><div class="text-sm font-medium text-white mt-0.5">${kid.phone || '---'}</div></div>
+                    <div><div class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">CPF Resp.</div><div class="text-sm font-medium text-white mt-0.5">${kid.cpf || '---'}</div></div>
+                    <div class="col-span-2"><div class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Ponto de Referência</div><div class="text-sm font-medium text-white mt-0.5 leading-snug">${kid.reference || '---'}</div></div>
                   </div>
-                  
-                  ${kid.notes ? `
-                    <div class="mb-4">
-                      <div class="text-[10px] font-bold text-blue-400/80 uppercase tracking-wider mb-1">Observações</div>
-                      <div class="text-sm text-zinc-300 leading-relaxed bg-blue-500/5 p-3 rounded-xl border border-blue-500/10">${kid.notes}</div>
-                    </div>
-                  ` : ''}
+                  ${kid.notes ? `<div class="mb-4"><div class="text-[10px] font-bold text-yellow-500/80 uppercase tracking-wider mb-1">Observações</div><div class="text-sm text-zinc-300 leading-relaxed bg-white/[0.02] p-3 rounded-lg border border-white/[0.02]">${kid.notes}</div></div>` : ''}
                   
                   <div class="flex gap-2">
-                    <button class="flex-1 py-3 rounded-xl text-sm font-bold bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 transition-colors flex items-center justify-center gap-2" onclick="App.editKid('${kid.id}', event)">
-                        <i class="ph-bold ph-pencil-simple"></i> Editar
-                    </button>
-                    <button class="flex-1 py-3 rounded-xl text-sm font-bold bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors flex items-center justify-center gap-2" onclick="App.confirmDelete('${kid.id}', event)">
-                        <i class="ph-bold ph-trash"></i> Excluir
-                    </button>
+                    <button class="flex-1 py-2.5 rounded-lg text-sm font-bold bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 transition-colors flex items-center justify-center gap-2" onclick="App.editKid('${kid.id}', event)"><i class="ph-bold ph-pencil-simple"></i> Editar</button>
+                    <button class="flex-1 py-2.5 rounded-lg text-sm font-bold bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors flex items-center justify-center gap-2" onclick="App.confirmDelete('${kid.id}', event)"><i class="ph-bold ph-trash"></i> Excluir</button>
                   </div>
                 </div>
               </div>
@@ -617,13 +546,13 @@
       updatePills: () => {
         document.querySelectorAll('#visitFilterContainer .pill').forEach(b => {
           const isActive = b.innerText.includes(State.visitFilter) || (State.visitFilter==='Parciais'&&b.innerText.includes('1')) || (State.visitFilter==='Concluidos'&&b.innerText.includes('Concluídos'));
-          if(isActive) b.className = "pill active px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border border-blue-500/30 bg-blue-500/10 text-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.1)] flex items-center gap-1.5";
-          else b.className = "pill px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border border-white/[0.05] bg-white/[0.02] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05] flex items-center gap-1.5";
+          if(isActive) b.className = "pill active px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent bg-white/10 text-white";
+          else b.className = "pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent bg-white/[0.02] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]";
         });
         document.querySelectorAll('#locFilterContainer .pill').forEach(b => {
           const isActive = b.innerText.includes(State.locFilter === 'Todas' ? 'Todas Áreas' : State.locFilter);
-          if(isActive) b.className = "pill active px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border border-blue-500/30 bg-blue-500/10 text-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.1)]";
-          else b.className = "pill px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border border-white/[0.05] bg-white/[0.02] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]";
+          if(isActive) b.className = "pill active px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent bg-white/10 text-white";
+          else b.className = "pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent bg-white/[0.02] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]";
         });
       },
       animateList: (cb) => {
@@ -633,31 +562,41 @@
     };
 
     const App = {
-      init: () => { 
-        Storage.load(); 
+      init: async () => { 
+        await Storage.load(); 
         UI.renderHeader(); 
         UI.renderStats(); 
         UI.updatePills();
         UI.renderList(); 
-        document.getElementById('fileInput').addEventListener('change', App.handleFileImport); 
       },
       changeMonth: (o) => UI.animateList(() => { State.viewDate.setMonth(State.viewDate.getMonth() + o); UI.renderHeader(); UI.renderStats(); UI.renderList(); }),
       goToCurrentMonth: () => UI.animateList(() => { State.viewDate = new Date(); State.viewDate.setDate(1); UI.renderHeader(); UI.renderStats(); UI.renderList(); }),
       setLocFilter: (l) => { State.locFilter = l; UI.updatePills(); UI.animateList(UI.renderList); },
       setVisitFilter: (s) => { State.visitFilter = s; UI.updatePills(); UI.animateList(UI.renderList); },
       handleSearch: (e) => { State.search = e.target.value; UI.renderList(); },
-      
       toggleCard: (id) => { 
         const c = document.getElementById(`card-${id}`); 
         document.querySelectorAll('.card.expanded').forEach(x => { if(x.id !== c.id) x.classList.remove('expanded'); }); 
         c.classList.toggle('expanded'); 
       },
       
-      setVisit: (id, target) => {
+      setVisit: async (id, target) => {
         const k = State.items.find(i => i.id === id); if(!k) return;
-        const mk = Utils.getMonthKey(State.viewDate); k.visits = k.visits || {}; let c = k.visits[mk] || 0;
-        if(target===1) k.visits[mk] = c>=1 ? 0 : 1; else if(target===2) k.visits[mk] = c>=2 ? 1 : 2;
-        Storage.save(); UI.renderStats(); UI.renderList();
+        const mk = Utils.getMonthKey(State.viewDate); 
+        k.visits = k.visits || {}; 
+        
+        let c = k.visits[mk] || 0;
+        const oldVal = c;
+        k.visits[mk] = (target===1) ? (c>=1 ? 0 : 1) : (c>=2 ? 1 : 2);
+        
+        // Atualização Otimista UI
+        UI.renderStats(); UI.renderList();
+
+        const success = await Storage.updateVisits(id, k.visits);
+        if(!success) {
+            k.visits[mk] = oldVal; // Reverte se der erro
+            UI.renderStats(); UI.renderList();
+        }
       },
       
       handlePhotoUpload: (e) => {
@@ -683,8 +622,7 @@
       },
 
       handlePregnancyChange: (cb) => {
-        const bdGroup = document.getElementById('birthDateGroup');
-        const nameLbl = document.getElementById('nameLabelText');
+        const bdGroup = document.getElementById('birthDateGroup'), nameLbl = document.getElementById('nameLabelText');
         if(cb.checked) {
           bdGroup.classList.add('hidden'); document.getElementById('formBirthDate').value = ''; document.getElementById('formBirthDate').required = false;
           nameLbl.innerHTML = 'Nome do Bebé (Opcional)';
@@ -700,22 +638,16 @@
       },
 
       showModalEl: (id) => {
-        const m = document.getElementById(id);
-        const c = m.querySelector('.modal-content');
+        const m = document.getElementById(id), c = m.querySelector('.modal-content');
         m.classList.remove('opacity-0', 'pointer-events-none');
-        setTimeout(() => {
-          if(c.classList.contains('translate-y-full')) c.classList.remove('translate-y-full');
-          if(c.classList.contains('scale-95')) c.classList.remove('scale-95');
-        }, 10);
+        setTimeout(() => { if(c.classList.contains('translate-y-full')) c.classList.remove('translate-y-full'); if(c.classList.contains('scale-95')) c.classList.remove('scale-95'); }, 10);
       },
 
       hideModalEl: (id) => {
-        const m = document.getElementById(id);
-        const c = m.querySelector('.modal-content');
-        if(c.classList.contains('translate-y-full') === false) c.classList.add('translate-y-full'); // Para bottom sheet
-        if(c.classList.contains('scale-95') === false) c.classList.add('scale-95'); // Para alerts
-        m.classList.add('opacity-0');
-        setTimeout(() => { m.classList.add('pointer-events-none'); }, 300);
+        const m = document.getElementById(id), c = m.querySelector('.modal-content');
+        if(c.classList.contains('translate-y-full') === false) c.classList.add('translate-y-full'); 
+        if(c.classList.contains('scale-95') === false) c.classList.add('scale-95'); 
+        m.classList.add('opacity-0'); setTimeout(() => { m.classList.add('pointer-events-none'); }, 300);
       },
 
       openFormModal: (kidId = null) => {
@@ -727,8 +659,7 @@
         
         State.currentPhotoBase64 = null;
         document.getElementById('photoPreview').style.backgroundImage = 'none';
-        document.getElementById('photoPreview').innerHTML = `<i class="ph-fill ph-camera text-3xl text-zinc-600 group-hover:opacity-0 transition-opacity"></i><div class="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm"><i class="ph-bold ph-upload-simple text-white text-xl"></i></div>`;
-        
+        document.getElementById('photoPreview').innerHTML = `<i class="ph ph-camera text-3xl text-zinc-500 group-hover:opacity-0 transition-opacity"></i><div class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><i class="ph-bold ph-upload-simple text-white text-xl"></i></div>`;
         App.handlePregnancyChange({checked: false});
 
         if (kidId) {
@@ -749,9 +680,7 @@
              if (k.birthDate.includes('-')) {
                  const [y,m,d] = k.birthDate.split('-');
                  document.getElementById('formBirthDate').value = `${d}/${m}/${y}`;
-             } else {
-                 document.getElementById('formBirthDate').value = k.birthDate;
-             }
+             } else document.getElementById('formBirthDate').value = k.birthDate;
           }
           
           document.getElementById('formResp').value = k.responsible||'';
@@ -763,13 +692,9 @@
           App.handleLocalityChange(document.getElementById('formLocality'));
         }
       },
-      closeModals: () => {
-        App.hideModalEl('formModal');
-        App.hideModalEl('deleteModal');
-        App.hideModalEl('importModal');
-      },
+      closeModals: () => { App.hideModalEl('formModal'); App.hideModalEl('deleteModal'); },
       
-      handleFormSubmit: () => {
+      handleFormSubmit: async () => {
         const isPreg = document.getElementById('formPregnancy').checked;
         let name = document.getElementById('formName').value.trim();
         if(!name) { if(isPreg) name = 'Bebé (Gestação)'; else return Utils.showToast('Nome é obrigatório.', 'error'); }
@@ -784,91 +709,55 @@
         if(!loc) return Utils.showToast('Localidade é obrigatória.', 'error');
 
         const k = {
-          id: document.getElementById('formId').value || Utils.generateId(),
-          isPregnancy: isPreg,
-          name, birthDate,
+          id: document.getElementById('formId').value || null, // null para o Supabase gerar o ID
+          isPregnancy: isPreg, name, birthDate,
           responsible: document.getElementById('formResp').value.trim(),
-          locality: loc,
-          reference: document.getElementById('formRef').value.trim(),
+          locality: loc, reference: document.getElementById('formRef').value.trim(),
           phone: document.getElementById('formPhone').value.trim(),
           cpf: document.getElementById('formCpf').value.trim(),
           notes: document.getElementById('formNotes').value.trim(),
           photoBase64: State.currentPhotoBase64
         };
 
-        Storage.addItem(k); App.closeModals(); UI.renderStats(); UI.renderList(); Utils.showToast('Salvo com sucesso!');
+        const btn = document.getElementById('btnSubmitForm');
+        const origTxt = btn.innerHTML;
+        btn.innerHTML = 'Salvando...'; btn.disabled = true;
+
+        const success = await Storage.addItem(k);
+        if(success) {
+            await Storage.load(); // Recarrega da nuvem
+            App.closeModals(); UI.renderStats(); UI.renderList(); 
+            Utils.showToast('Salvo na nuvem!');
+        }
+
+        btn.innerHTML = origTxt; btn.disabled = false;
       },
 
       editKid: (id, e) => { e.stopPropagation(); App.openFormModal(id); },
       confirmDelete: (id, e) => { 
         e.stopPropagation(); 
         App.showModalEl('deleteModal'); 
-        document.getElementById('confirmDeleteBtn').onclick = () => { 
-            Storage.deleteItem(id); 
-            App.closeModals(); 
-            UI.renderStats(); 
-            UI.renderList(); 
-            Utils.showToast('Registo Excluído.'); 
+        document.getElementById('confirmDeleteBtn').onclick = async () => { 
+            const btn = document.getElementById('confirmDeleteBtn');
+            const origTxt = btn.innerHTML;
+            btn.innerHTML = 'Excluindo...'; btn.disabled = true;
+
+            const success = await Storage.deleteItem(id);
+            if(success) {
+                await Storage.load();
+                App.closeModals(); UI.renderStats(); UI.renderList(); 
+                Utils.showToast('Apagado da Nuvem.'); 
+            }
+            btn.innerHTML = origTxt; btn.disabled = false;
         }; 
       },
       
       printData: () => {
         const items = Storage.getFiltered();
-        if (items.length === 0) return Utils.showToast('Sem registos para imprimir no filtro atual.', 'error');
-
-        let html = `
-          <div class="print-header">
-            <h1>Relatório de Visitas - ${State.locFilter === 'Todas' ? 'Todas Áreas' : State.locFilter}</h1>
-            <p>Referência: ${Utils.getMonthName(State.viewDate)} | Total listado: ${items.length}</p>
-          </div>
-          <div class="print-grid">
-        `;
-
-        items.forEach(kid => {
-          html += `
-            <div class="print-card">
-              <strong>${kid.name} ${kid.isPregnancy ? ' (Gestação)' : ` - Nasc: ${kid.birthDate || 'N/D'}`}</strong>
-              <p><span class="label">Resp:</span> ${kid.responsible}</p>
-              <p><span class="label">Tel:</span> ${kid.phone || '---'} &nbsp;|&nbsp; <span class="label">CPF:</span> ${kid.cpf || '---'}</p>
-              <p><span class="label">Local:</span> ${kid.locality}</p>
-              <p><span class="label">Ref:</span> ${kid.reference || '---'}</p>
-              ${kid.notes ? `<p style="margin-top:4px;"><span class="label">Obs:</span> ${kid.notes}</p>` : ''}
-            </div>
-          `;
-        });
-
-        html += `</div>`;
-        document.getElementById('printContainer').innerHTML = html;
-        window.print();
-      },
-
-      exportData: () => {
-        if(!State.items.length) return Utils.showToast('Sem dados para exportar.', 'error');
-        const l = document.createElement('a'); l.href = URL.createObjectURL(new Blob([JSON.stringify(State.items)], {type: 'application/json'}));
-        l.download = `backup_visitas_${new Date().toISOString().split('T')[0]}.json`; l.click(); Utils.showToast('Backup transferido!');
-      },
-      handleFileImport: (e) => {
-        const f = e.target.files[0]; if(!f) return; const r = new FileReader();
-        r.onload = (ev) => { 
-            try { 
-                const p = JSON.parse(ev.target.result); 
-                if(Array.isArray(p)) { 
-                    pendingImportData = p; 
-                    App.showModalEl('importModal'); 
-                } 
-            } catch(err) { Utils.showToast('Erro ao ler arquivo.', 'error'); } 
-        };
-        r.readAsText(f); e.target.value = '';
-      },
-      processImport: (t) => {
-        if(!pendingImportData) return;
-        if(t==='replace') State.items = pendingImportData;
-        else {
-          const ex = new Set(State.items.map(i=>i.id)); const n = pendingImportData.filter(i=>!ex.has(i.id));
-          pendingImportData.forEach(imp => { const idx = State.items.findIndex(i=>i.id===imp.id); if(idx!==-1) { imp.visits = imp.visits || State.items[idx].visits || {}; State.items[idx] = imp; } });
-          State.items = [...State.items, ...n];
-        }
-        Storage.save(); App.closeModals(); UI.renderStats(); UI.renderList(); pendingImportData = null; Utils.showToast('Dados restaurados!');
+        if (items.length === 0) return Utils.showToast('Sem registos para imprimir.', 'error');
+        let html = `<div class="print-header"><h1>Relatório de Visitas - ${State.locFilter === 'Todas' ? 'Todas Áreas' : State.locFilter}</h1><p>Referência: ${Utils.getMonthName(State.viewDate)} | Total listado: ${items.length}</p></div><div class="print-grid">`;
+        items.forEach(kid => { html += `<div class="print-card"><strong>${kid.name} ${kid.isPregnancy ? ' (Gestação)' : ` - Nasc: ${kid.birthDate || 'N/D'}`}</strong><p><span class="label">Resp:</span> ${kid.responsible}</p><p><span class="label">Tel:</span> ${kid.phone || '---'} &nbsp;|&nbsp; <span class="label">CPF:</span> ${kid.cpf || '---'}</p><p><span class="label">Local:</span> ${kid.locality}</p><p><span class="label">Ref:</span> ${kid.reference || '---'}</p>${kid.notes ? `<p style="margin-top:4px;"><span class="label">Obs:</span> ${kid.notes}</p>` : ''}</div>`; });
+        html += `</div>`; document.getElementById('printContainer').innerHTML = html; window.print();
       }
     };
 
