@@ -7,11 +7,82 @@
   <meta name="theme-color" content="#09090b">
   <title>Meu Hub Pessoal</title>
   
-  <!-- 1. CDN Supabase Oficial -->
+  <!-- CDN Supabase Oficial -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
-  <!-- 2. Nosso Cliente Centralizado (deve estar na mesma pasta) -->
-  <script src="supabase-client.js"></script>
+  <!-- ============================================================================
+       CLIENTE CENTRAL SUPABASE & AUTENTICAÇÃO (Embutido para testes)
+       * No GitHub Pages, você pode mover este bloco para "supabase-client.js"
+       ============================================================================ -->
+  <script>
+    // ⚠️ SUBSTITUA AQUI COM A SUA PROJECT URL
+    const SUPABASE_URL = 'https://SUA_PROJECT_URL_AQUI.supabase.co'; 
+    const SUPABASE_KEY = 'sb_publishable_JnDv-fxHXPTzNaFX9n3Z0w_4mqt47Js';
+
+    // Garante que a CDN carregou antes de inicializar
+    window.onloadInitSupabase = () => {
+      const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+      window.PortalDB = {
+          supabase: supabase,
+          
+          async getSession() {
+              try {
+                  const { data, error } = await supabase.auth.getSession();
+                  if (error) throw error;
+                  return data?.session;
+              } catch (error) {
+                  return null;
+              }
+          },
+          
+          async loginOrRegister(chaveAcesso) {
+              // Validação Restrita
+              if (chaveAcesso.length < 8 || chaveAcesso.length > 25) throw new Error('A chave deve ter entre 8 e 25 caracteres.');
+              if (!/[a-zA-Z]/.test(chaveAcesso) || !/[0-9]/.test(chaveAcesso)) throw new Error('A chave precisa conter pelo menos uma letra e um número.');
+              if (!/^[\x20-\x7E]+$/.test(chaveAcesso)) throw new Error('Caracteres inválidos. Use apenas o teclado padrão.');
+
+              // E-mail interno transparente
+              const internalEmail = `${chaveAcesso}@portal.internal`;
+              const internalPassword = chaveAcesso;
+
+              // 1. TENTA FAZER LOGIN
+              let { data, error } = await supabase.auth.signInWithPassword({
+                  email: internalEmail,
+                  password: internalPassword
+              });
+
+              if (error) {
+                  // 2. SE NÃO EXISTIR, CRIA A CONTA
+                  if (error.message.includes('Invalid login credentials')) {
+                      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+                          email: internalEmail,
+                          password: internalPassword
+                      });
+
+                      if (signUpError) {
+                          if (signUpError.message.includes('already registered')) {
+                              throw new Error('Esta chave já está registada por outro utilizador.');
+                          }
+                          throw new Error('Erro ao criar conta: ' + signUpError.message);
+                      }
+                      return signUpData.user;
+                  }
+                  throw new Error('Falha de conexão: ' + error.message);
+              }
+              
+              return data.user;
+          },
+          
+          async logout() {
+              await supabase.auth.signOut();
+          }
+      };
+
+      // Dispara a inicialização da UI após o Banco estar pronto
+      initializeAppUI();
+    };
+  </script>
 
   <!-- Tailwind CSS & Ícones -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -25,7 +96,6 @@
   <style>
     body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #09090b; color: #fafafa; overflow: hidden; -webkit-tap-highlight-color: transparent; }
     
-    /* Efeito Noise discreto */
     .noise-bg { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: -1; opacity: 0.015; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.5' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E"); }
     
     .h-screen-safe { height: 100vh; height: 100dvh; }
@@ -34,17 +104,14 @@
     .view-active { opacity: 1; pointer-events: auto; transform: scale(1); }
     #app-frame { width: 100%; height: 100%; border: none; background: transparent; }
     
-    /* Cartões */
     .card-hover-effect { transition: background-color 0.3s ease, border-color 0.3s ease; }
     .card-hover-effect:hover { background-color: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.1); }
     
-    /* Scrollbars */
     .custom-scroll::-webkit-scrollbar { width: 6px; }
     .custom-scroll::-webkit-scrollbar-track { background: transparent; }
     .custom-scroll::-webkit-scrollbar-thumb { background: #27272a; border-radius: 10px; }
     .custom-scroll::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
 
-    /* Modo Compacto Mobile */
     @media (max-width: 639px) {
       #apps-grid.is-compact { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
       #apps-grid.is-compact .app-card { padding: 1rem; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 110px; }
@@ -76,7 +143,6 @@
       </button>
     </div>
 
-    <!-- Header do App -->
     <div id="header-app" class="absolute inset-0 px-4 sm:px-6 flex items-center justify-between opacity-0 pointer-events-none transition-all duration-300">
       <button onclick="closeApp()" class="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors group">
         <div class="w-8 h-8 rounded-lg bg-white/[0.03] group-hover:bg-white/[0.08] flex items-center justify-center transition-colors">
@@ -110,7 +176,7 @@
   <div id="view-app" class="view-container view-hidden bg-transparent">
     <div id="app-loader" class="absolute inset-0 flex flex-col items-center justify-center bg-matte-bg z-10 transition-opacity duration-300">
       <div class="w-10 h-10 border-4 border-white/[0.05] border-t-blue-500 rounded-full animate-spin mb-4"></div>
-      <p class="text-xs font-bold text-zinc-500 uppercase tracking-widest animate-pulse">Carregando Nuvem...</p>
+      <p class="text-xs font-bold text-zinc-500 uppercase tracking-widest animate-pulse">Carregando...</p>
     </div>
     <iframe id="app-frame" src="" title="App Frame" onload="handleIframeLoad()"></iframe>
   </div>
@@ -133,7 +199,6 @@
       <div class="space-y-3">
         <div>
           <label class="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Chave de Acesso</label>
-          <!-- Apenas UM campo exigido -->
           <input type="password" id="login-keyword" placeholder="Sua chave secreta" maxlength="25" autocomplete="off" class="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl p-3.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-blue-500/50 transition-colors">
           <p id="login-error" class="text-xs font-medium text-red-400 mt-2 hidden"></p>
         </div>
@@ -141,7 +206,7 @@
         <ul class="text-[10px] font-medium text-zinc-500 space-y-1 mb-2 bg-white/[0.02] p-3 rounded-xl border border-white/[0.02]">
           <li id="rule-length" class="flex items-center gap-1.5"><i class="ph-bold ph-circle text-[8px]"></i> Entre 8 e 25 caracteres</li>
           <li id="rule-alnum" class="flex items-center gap-1.5"><i class="ph-bold ph-circle text-[8px]"></i> Pelo menos 1 letra e 1 número</li>
-          <li id="rule-chars" class="flex items-center gap-1.5"><i class="ph-bold ph-circle text-[8px]"></i> Apenas teclado padrão (Sem emojis)</li>
+          <li id="rule-chars" class="flex items-center gap-1.5"><i class="ph-bold ph-circle text-[8px]"></i> Apenas teclado padrão</li>
         </ul>
         
         <button onclick="executeCloudSync()" id="btn-login" class="w-full py-3.5 rounded-xl font-bold bg-white text-black hover:bg-zinc-200 transition-colors shadow-lg shadow-white/10 mt-2 flex items-center justify-center gap-2">
@@ -161,23 +226,23 @@
     let isCompactMode = localStorage.getItem('hub_compact_mode') === 'true';
     let isCloudConnected = false;
 
-    // INICIALIZAÇÃO: Verifica a Sessão Ativa automaticamente
-    window.onload = async () => {
+    // Função de Boot disparada quando o Supabase estiver pronto
+    window.onload = () => {
+        if(window.onloadInitSupabase) window.onloadInitSupabase();
+    };
+
+    async function initializeAppUI() {
       renderDashboard();
       
-      // Comunica com o supabase-client.js para checar a sessão
       const session = await window.PortalDB.getSession();
       if (session) {
         updateCloudStatus(true);
       }
-    };
+    }
 
     function updateCloudStatus(connected) {
       isCloudConnected = connected;
-      const btn = document.getElementById('btn-cloud-status');
-      const icon = document.getElementById('cloud-icon');
-      const text = document.getElementById('cloud-text');
-      
+      const btn = document.getElementById('btn-cloud-status'), icon = document.getElementById('cloud-icon'), text = document.getElementById('cloud-text');
       if (connected) {
         icon.className = 'ph-fill ph-cloud-check text-blue-400';
         text.innerText = 'Nuvem Ativa';
@@ -203,10 +268,8 @@
       }
     }
 
-    // DASHBOARD LAYOUT & RENDER
     function initLayoutMode() {
-      const grid = document.getElementById('apps-grid');
-      const icon = document.getElementById('layout-icon');
+      const grid = document.getElementById('apps-grid'), icon = document.getElementById('layout-icon');
       if (isCompactMode) { grid.classList.add('is-compact'); icon.className = 'ph-bold ph-list text-xl'; } 
       else { grid.classList.remove('is-compact'); icon.className = 'ph-bold ph-grid-four text-xl'; }
     }
@@ -238,7 +301,6 @@
       grid.innerHTML = html; initLayoutMode();
     }
 
-    // NAVEGAÇÃO DE IFRAME
     function openApp(file, title) {
       if(!file) return;
       document.getElementById('header-home').classList.add('opacity-0', 'pointer-events-none', 'scale-95');
@@ -248,10 +310,8 @@
       const frame = document.getElementById('app-frame'), loader = document.getElementById('app-loader');
       loader.style.opacity = '1'; loader.style.pointerEvents = 'auto'; frame.style.opacity = '0';
       
-      document.getElementById('view-dashboard').classList.remove('view-active');
-      document.getElementById('view-dashboard').classList.add('view-hidden');
-      document.getElementById('view-app').classList.remove('view-hidden');
-      document.getElementById('view-app').classList.add('view-active');
+      document.getElementById('view-dashboard').classList.remove('view-active'); document.getElementById('view-dashboard').classList.add('view-hidden');
+      document.getElementById('view-app').classList.remove('view-hidden'); document.getElementById('view-app').classList.add('view-active');
       
       setTimeout(() => { frame.src = file; }, 300);
     }
@@ -260,10 +320,8 @@
       document.getElementById('header-app').classList.add('opacity-0', 'pointer-events-none');
       document.getElementById('header-home').classList.remove('opacity-0', 'pointer-events-none', 'scale-95');
       
-      document.getElementById('view-app').classList.remove('view-active');
-      document.getElementById('view-app').classList.add('view-hidden');
-      document.getElementById('view-dashboard').classList.remove('view-hidden');
-      document.getElementById('view-dashboard').classList.add('view-active');
+      document.getElementById('view-app').classList.remove('view-active'); document.getElementById('view-app').classList.add('view-hidden');
+      document.getElementById('view-dashboard').classList.remove('view-hidden'); document.getElementById('view-dashboard').classList.add('view-active');
       
       setTimeout(() => { document.getElementById('app-frame').src = ''; }, 300);
     }
@@ -274,7 +332,6 @@
       setTimeout(() => { loader.style.opacity = '0'; loader.style.pointerEvents = 'none'; frame.style.opacity = '1'; }, 400);
     }
 
-    // MODAL & CHAMADA DA API SUPABASE (Login)
     function toggleAuthModal(show) {
       const modal = document.getElementById('auth-modal'), content = document.getElementById('auth-modal-content');
       if (show) {
@@ -294,19 +351,14 @@
       const btn = document.getElementById('btn-login');
       const originalText = btn.innerHTML;
 
-      // Reset erro UI
       errorEl.classList.add('hidden');
-      
-      // Estado de Carregamento
       btn.innerHTML = '<div class="w-5 h-5 border-2 border-black/20 border-t-black rounded-full animate-spin"></div>';
       btn.disabled = true;
 
       try {
-        // Envia a palavra-chave crua. Toda a lógica/validação está dentro do PortalDB
         await window.PortalDB.loginOrRegister(input);
         
-        // Sucesso
-        btn.innerHTML = '<i class="ph-bold ph-check text-lg"></i> Nuvem Conectada';
+        btn.innerHTML = '<i class="ph-bold ph-check text-lg"></i> Conectado';
         btn.classList.replace('bg-white', 'bg-blue-500'); btn.classList.replace('text-black', 'text-white');
         updateCloudStatus(true);
         
@@ -319,7 +371,6 @@
         }, 1200);
 
       } catch (err) {
-        // Exibe o erro gerado na validação ou retornado pelo Supabase (loginOrRegister)
         errorEl.innerText = err.message;
         errorEl.classList.remove('hidden');
         btn.innerHTML = originalText;
@@ -331,3 +382,4 @@
   </script>
 </body>
 </html>
+
