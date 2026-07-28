@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR" class="dark">
 <head>
@@ -5,10 +6,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Gestão de Visitas</title>
   
-  <!-- Tailwind CSS & Phosphor Icons -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/@phosphor-icons/web"></script>
-  <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
   <script>
@@ -31,7 +30,7 @@
     .chevron { transition: transform 0.3s ease; }
     .card.expanded .chevron { transform: rotate(180deg); }
 
-    input[type="text"], input[type="tel"], input[type="url"], select, textarea { color-scheme: dark; }
+    input[type="text"], input[type="tel"], input[type="password"], select, textarea { color-scheme: dark; }
     .avatar-preview { background-size: cover; background-position: center; }
 
     @keyframes slideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
@@ -60,7 +59,6 @@
 </head>
 <body class="antialiased flex flex-col relative min-h-screen">
 
-  <!-- HEADER -->
   <header class="sticky top-0 z-40 bg-matte-bg/90 backdrop-blur-md border-b border-white/[0.04]">
     <div class="max-w-3xl mx-auto px-4 py-3 flex justify-between items-center gap-4">
       <div class="flex items-center gap-3">
@@ -69,7 +67,7 @@
         </div>
         <div>
           <h1 class="text-base font-bold text-white leading-tight">Gestão de Visitas</h1>
-          <p class="text-[10px] text-zinc-500 font-medium tracking-wide">Sincronizado na Nuvem</p>
+          <p class="text-[10px] text-zinc-500 font-medium tracking-wide">Base de Dados</p>
         </div>
       </div>
       
@@ -83,7 +81,6 @@
 
   <main class="flex-1 w-full max-w-3xl mx-auto p-4 sm:p-6">
     
-    <!-- MÊS E NAVEGAÇÃO -->
     <div class="flex items-center justify-between bg-white/[0.02] border border-white/[0.05] rounded-xl p-3 mb-6">
       <button class="p-2 rounded-lg hover:bg-white/5 text-zinc-400 hover:text-white transition-colors" onclick="App.changeMonth(-1)">
         <i class="ph-bold ph-caret-left text-lg"></i>
@@ -99,10 +96,8 @@
       </button>
     </div>
 
-    <!-- PAINEL (STATS) -->
     <div class="grid grid-cols-2 gap-3 mb-8" id="statsContainer"></div>
 
-    <!-- FILTROS E BUSCA -->
     <div class="space-y-5 mb-6">
       <div class="relative">
         <i class="ph ph-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 text-lg"></i>
@@ -123,7 +118,7 @@
       <div>
         <span class="block text-[10px] uppercase font-bold text-zinc-500 tracking-wider mb-2">Localidade</span>
         <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1" id="locFilterContainer">
-          <button class="pill active px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent bg-white/10 text-white" onclick="App.setLocFilter('Todas')">Todas Áreas</button>
+          <button class="pill active px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent bg-white/10 text-white" onclick="App.setLocFilter('Todas')">Todas</button>
           <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent bg-white/[0.02] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]" onclick="App.setLocFilter('Rive')">Rive</button>
           <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent bg-white/[0.02] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]" onclick="App.setLocFilter('Vila Alta')">Vila Alta</button>
           <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent bg-white/[0.02] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]" onclick="App.setLocFilter('Vila do Sul')">Vila do Sul</button>
@@ -131,34 +126,29 @@
           <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent bg-white/[0.02] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]" onclick="App.setLocFilter('Café')">Café</button>
           <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent bg-white/[0.02] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]" onclick="App.setLocFilter('Celina')">Celina</button>
           <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent bg-white/[0.02] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]" onclick="App.setLocFilter('Centro')">Centro</button>
-          <button class="pill px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors border border-transparent bg-white/[0.02] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]" onclick="App.setLocFilter('Pendente')">Pendente</button>
         </div>
       </div>
     </div>
 
-    <!-- LISTA DE CARDS -->
     <div id="listContainer" class="space-y-3 transition-opacity duration-200">
-      <div class="text-center py-10 text-zinc-500 font-medium animate-pulse">Obtendo dados da nuvem...</div>
+      <div class="text-center py-10 text-zinc-500 font-medium animate-pulse">Obtendo dados...</div>
     </div>
     
-    <!-- Estado Vazio -->
     <div id="emptyState" class="hidden text-center py-16 px-4 bg-white/[0.01] border border-white/[0.05] rounded-xl mt-4">
       <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/[0.03] text-zinc-600 mb-4">
         <i class="ph ph-folder-open text-3xl"></i>
       </div>
       <h3 class="text-base font-bold text-zinc-300">Nenhum registo encontrado</h3>
-      <p class="text-sm text-zinc-500 mt-1 max-w-xs mx-auto">Ajuste os filtros ou adicione um novo acompanhamento.</p>
+      <p class="text-sm text-zinc-500 mt-1 max-w-xs mx-auto">Ajuste os filtros ou adicione um acompanhamento.</p>
     </div>
   </main>
 
-  <!-- FAB -->
   <button class="fab fixed bottom-6 right-6 w-14 h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-full flex items-center justify-center z-30 transition-transform active:scale-90" onclick="App.openFormModal()">
     <i class="ph-bold ph-plus text-2xl"></i>
   </button>
 
   <div id="printContainer"></div>
 
-  <!-- MODAL: FORMULÁRIO -->
   <div class="modal-overlay fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300" id="formModal">
     <div class="modal-content bg-matte-card w-full sm:max-w-md h-[90vh] sm:h-auto sm:max-h-[90vh] rounded-t-2xl sm:rounded-2xl border border-white/[0.05] shadow-2xl flex flex-col transform translate-y-full sm:scale-95 transition-all duration-300">
       
@@ -248,7 +238,6 @@
     </div>
   </div>
 
-  <!-- MODAL: EXCLUSÃO -->
   <div class="modal-overlay modal-alert fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300 p-4" id="deleteModal">
     <div class="modal-content bg-matte-card max-w-sm w-full rounded-2xl border border-white/[0.05] p-6 text-center transform scale-95 transition-all duration-300 shadow-2xl">
       <div class="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -265,7 +254,6 @@
 
   <div id="toast-container" class="fixed bottom-6 right-6 z-[60] flex flex-col gap-3 pointer-events-none"></div>
 
-  <!-- ================= SCRIPT ================= -->
   <script>
     const Utils = {
       getMonthKey: (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
@@ -321,12 +309,12 @@
     const State = { viewDate: new Date(), locFilter: 'Todas', visitFilter: 'Todos', search: '', items: [], currentPhotoBase64: null };
 
     // ==========================================
-    // CLOUD STORAGE (Supabase Integration)
+    // CLOUD STORAGE (Integração Supabase)
     // ==========================================
     const Storage = {
       getDB: () => {
         if (!window.parent || !window.parent.PortalDB) {
-          Utils.showToast('Nuvem não detetada! Abra pelo Início (Hub).', 'error');
+          Utils.showToast('Abra pelo Menu Inicial para sincronizar a nuvem.', 'error');
           return null;
         }
         return window.parent.PortalDB.supabase;
@@ -334,7 +322,7 @@
       load: async () => {
         const db = Storage.getDB();
         if (!db) {
-            document.getElementById('listContainer').innerHTML = '<div class="text-center py-10 text-red-400 font-medium">Conecte a Nuvem na página inicial primeiro.</div>';
+            document.getElementById('listContainer').innerHTML = '<div class="text-center py-10 text-red-400 font-medium">Nuvem não detetada. Abra a aplicação pela página inicial.</div>';
             return;
         }
 
@@ -589,12 +577,11 @@
         const oldVal = c;
         k.visits[mk] = (target===1) ? (c>=1 ? 0 : 1) : (c>=2 ? 1 : 2);
         
-        // Atualização Otimista UI
         UI.renderStats(); UI.renderList();
 
         const success = await Storage.updateVisits(id, k.visits);
         if(!success) {
-            k.visits[mk] = oldVal; // Reverte se der erro
+            k.visits[mk] = oldVal;
             UI.renderStats(); UI.renderList();
         }
       },
@@ -702,14 +689,14 @@
         let birthDate = null;
         if(!isPreg) {
            birthDate = document.getElementById('formBirthDate').value;
-           if(!birthDate || birthDate.length !== 10) return Utils.showToast('Data incompleta (DD/MM/AAAA).', 'error');
+           if(!birthDate || birthDate.length !== 10) return Utils.showToast('Data incompleta.', 'error');
         }
 
         const loc = document.getElementById('formLocality').value;
         if(!loc) return Utils.showToast('Localidade é obrigatória.', 'error');
 
         const k = {
-          id: document.getElementById('formId').value || null, // null para o Supabase gerar o ID
+          id: document.getElementById('formId').value || null,
           isPregnancy: isPreg, name, birthDate,
           responsible: document.getElementById('formResp').value.trim(),
           locality: loc, reference: document.getElementById('formRef').value.trim(),
@@ -725,7 +712,7 @@
 
         const success = await Storage.addItem(k);
         if(success) {
-            await Storage.load(); // Recarrega da nuvem
+            await Storage.load();
             App.closeModals(); UI.renderStats(); UI.renderList(); 
             Utils.showToast('Salvo na nuvem!');
         }
@@ -754,7 +741,7 @@
       
       printData: () => {
         const items = Storage.getFiltered();
-        if (items.length === 0) return Utils.showToast('Sem registos para imprimir.', 'error');
+        if (items.length === 0) return Utils.showToast('Sem registros para imprimir.', 'error');
         let html = `<div class="print-header"><h1>Relatório de Visitas - ${State.locFilter === 'Todas' ? 'Todas Áreas' : State.locFilter}</h1><p>Referência: ${Utils.getMonthName(State.viewDate)} | Total listado: ${items.length}</p></div><div class="print-grid">`;
         items.forEach(kid => { html += `<div class="print-card"><strong>${kid.name} ${kid.isPregnancy ? ' (Gestação)' : ` - Nasc: ${kid.birthDate || 'N/D'}`}</strong><p><span class="label">Resp:</span> ${kid.responsible}</p><p><span class="label">Tel:</span> ${kid.phone || '---'} &nbsp;|&nbsp; <span class="label">CPF:</span> ${kid.cpf || '---'}</p><p><span class="label">Local:</span> ${kid.locality}</p><p><span class="label">Ref:</span> ${kid.reference || '---'}</p>${kid.notes ? `<p style="margin-top:4px;"><span class="label">Obs:</span> ${kid.notes}</p>` : ''}</div>`; });
         html += `</div>`; document.getElementById('printContainer').innerHTML = html; window.print();
@@ -765,3 +752,4 @@
   </script>
 </body>
 </html>
+
