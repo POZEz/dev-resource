@@ -1,23 +1,24 @@
 
-// ============================================================================
-// CONFIGURAÇÃO DO SUPABASE
-// ============================================================================
-// ⚠️ SUBSTITUA a string abaixo pela Project URL do seu Supabase.
-const SUPABASE_URL = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'; 
+/**
+ * ============================================================================
+ * CLIENTE CENTRAL SUPABASE & AUTENTICAÇÃO
+ * ============================================================================
+ * Este ficheiro deve ser importado em todas as páginas do projeto após a CDN do Supabase.
+ */
+
+// ⚠️ IMPORTANTE: Substitua pela URL real do seu projeto Supabase
+const SUPABASE_URL = 'https://SEU_PROJETO_AQUI.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_JnDv-fxHXPTzNaFX9n3Z0w_4mqt47Js';
 
-// Inicializa a instância Global usando a biblioteca carregada via CDN no HTML
+// Inicializa a instância Global do Supabase
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// ============================================================================
-// GERENCIADOR CENTRAL DO BANCO DE DADOS (PortalDB)
-// ============================================================================
 window.PortalDB = {
-    // Exporta a instância para ser usada em consultas (select, insert, etc)
+    // Instância pronta para ser usada nos outros ficheiros (ex: PortalDB.supabase.from('...'))
     supabase: supabase,
     
     /**
-     * Verifica se existe uma sessão ativa
+     * Verifica automaticamente se há uma sessão ativa salva no navegador
      */
     async getSession() {
         try {
@@ -31,58 +32,65 @@ window.PortalDB = {
     },
     
     /**
-     * Lógica unificada: Faz login se a conta existir, cria a conta se não existir.
-     * Tudo utilizando apenas a "Chave de Acesso".
+     * Fluxo Transparente: Tenta fazer Login. Se a conta não existir, regista e faz login.
      */
-    async loginOrRegister(chave) {
-        // Converte a chave num e-mail interno invisível para o utilizador
-        const internalEmail = `${chave}@portal.internal`;
-        const internalPassword = chave;
+    async loginOrRegister(chaveAcesso) {
+        // Validação de segurança básica antes de enviar à nuvem
+        if (chaveAcesso.length < 8 || chaveAcesso.length > 25) {
+            throw new Error('A chave deve ter entre 8 e 25 caracteres.');
+        }
+        if (!/[a-zA-Z]/.test(chaveAcesso) || !/[0-9]/.test(chaveAcesso)) {
+            throw new Error('A chave precisa conter pelo menos uma letra e um número.');
+        }
+        if (!/^[\x20-\x7E]+$/.test(chaveAcesso)) {
+            throw new Error('Caracteres inválidos. Use apenas símbolos do teclado padrão.');
+        }
 
-        // 1. Tentativa de Login
-        const { data, error } = await supabase.auth.signInWithPassword({
+        // Conversão para o formato interno exigido pelo Supabase
+        const internalEmail = `${chaveAcesso}@portal.internal`;
+        const internalPassword = chaveAcesso;
+
+        // 1. TENTA FAZER O LOGIN PRIMEIRO
+        let { data, error } = await supabase.auth.signInWithPassword({
             email: internalEmail,
             password: internalPassword
         });
 
-        // 2. Tratamento de Erros e Registo
+        // 2. SE FALHAR PORQUE NÃO EXISTE, CRIA A CONTA
         if (error) {
-            // "Invalid login credentials" significa que a conta não existe, 
-            // pois a password é sempre igual ao e-mail interno nesta arquitetura.
             if (error.message.includes('Invalid login credentials')) {
-                
-                // Tentativa de Registo (Criação de Conta Automática)
+                // Registo Transparente
                 const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
                     email: internalEmail,
                     password: internalPassword
                 });
 
                 if (signUpError) {
-                    // Prevenção extra caso haja colisão de dados no Supabase
+                    // Trata colisão (caso a chave já exista noutro contexto ou erro de rede)
                     if (signUpError.message.includes('already registered')) {
-                        throw new Error('Esta chave já está registrada. Se for sua, verifique letras maiúsculas e minúsculas.');
+                        throw new Error('Esta chave já está em uso por outro utilizador. Escolha outra.');
                     }
-                    throw new Error('Erro ao criar conta: ' + signUpError.message);
+                    throw new Error('Erro ao criar sua nuvem: ' + signUpError.message);
                 }
                 
                 return signUpData.user;
             }
             
-            // Qualquer outro erro de login (ex: limite de tentativas, rede)
-            throw new Error('Falha na comunicação com a nuvem. Tente novamente.');
+            // Outros erros (rede, bloqueio, etc)
+            throw new Error('Falha de conexão: ' + error.message);
         }
         
-        // Retorna o utilizador logado
         return data.user;
     },
     
     /**
-     * Termina a sessão do utilizador em todos os módulos
+     * Desconecta o utilizador e limpa a sessão local
      */
     async logout() {
         const { error } = await supabase.auth.signOut();
-        if (error) console.error("Erro ao sair:", error);
+        if (error) {
+            console.error("Erro ao desconectar:", error);
+            throw error;
+        }
     }
 };
-
-
