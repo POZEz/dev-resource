@@ -1,228 +1,324 @@
 <!DOCTYPE html>
-<html lang="pt-PT" class="dark">
+<html lang="pt-BR" class="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <!-- Define a cor da barra de status do telemóvel para preto matte -->
   <meta name="theme-color" content="#09090b">
-  <title>Hub Profissional</title>
+  <title>Meu Hub Pessoal</title>
   
+  <!-- CDN Supabase Oficial -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <!-- Nosso cliente unificado (Deve estar na mesma pasta) -->
+  <script src="supabase-client.js"></script>
+
+  <!-- Tailwind CSS & Ícones -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/@phosphor-icons/web"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
-  <!-- Configuração Tailwind idêntica ao Foco Ifes -->
   <script>
-      tailwind.config = {
-          darkMode: 'class',
-          theme: {
-              extend: {
-                  fontFamily: { sans: ['Inter', 'sans-serif'] },
-                  colors: { 
-                      matte: {
-                          bg: '#09090b',
-                          card: '#18181b',
-                          border: '#27272a',
-                          hover: '#27272a',
-                          text: '#fafafa',
-                          muted: '#a1a1aa'
-                      }
-                  }
-              }
-          }
-      }
+    tailwind.config = { darkMode: 'class', theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'] }, colors: { matte: { bg: '#09090b', card: '#121214', border: '#27272a', text: '#fafafa', muted: '#a1a1aa' } } } } }
   </script>
 
   <style>
-    body, html { 
-      margin: 0; 
-      padding: 0; 
-      overflow: hidden; 
-      background-color: #09090b;
-      -webkit-tap-highlight-color: transparent;
-    }
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #09090b; color: #fafafa; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+    .noise-bg { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: -1; opacity: 0.015; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.5' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E"); }
+    .h-screen-safe { height: 100vh; height: 100dvh; }
+    .view-container { position: absolute; top: 64px; left: 0; right: 0; bottom: 0; transition: opacity 0.3s ease, transform 0.3s ease; z-index: 10; }
+    .view-hidden { opacity: 0; pointer-events: none; transform: scale(0.98); }
+    .view-active { opacity: 1; pointer-events: auto; transform: scale(1); }
+    #app-frame { width: 100%; height: 100%; border: none; background: transparent; }
+    .card-hover-effect { transition: background-color 0.3s ease, border-color 0.3s ease; }
+    .card-hover-effect:hover { background-color: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.1); }
+    .custom-scroll::-webkit-scrollbar { width: 6px; }
+    .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #27272a; border-radius: 10px; }
+    .custom-scroll::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
 
-    /* Altura segura para mobile */
-    .h-screen-dvh {
-      height: 100vh;
-      height: 100dvh;
-    }
-
-    /* Padding para o "Home Indicator" (risca inferior do iPhone) */
-    .pb-safe { padding-bottom: env(safe-area-inset-bottom, 12px); }
-    .pt-safe { padding-top: env(safe-area-inset-top, 0px); }
-
-    /* --- ESTILOS DOS BOTÕES DA NAVBAR --- */
-    .nav-btn {
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    
-    .nav-btn i {
-      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.3s ease;
-    }
-
-    /* Estado Ativo (O que está selecionado) */
-    .nav-btn.active-nav {
-      background-color: rgba(255, 255, 255, 0.04);
-      color: #fafafa;
-    }
-    
-    .nav-btn.active-nav i {
-      transform: translateY(-2px) scale(1.15);
-      color: #ffffff;
-    }
-
-    /* --- ANIMAÇÕES DO IFRAME (Blur, Slide & Scale) --- */
-    #app-frame { 
-      transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), filter 0.4s ease; 
-      transform-origin: center;
-    }
-    .frame-loading { 
-      opacity: 0; 
-      transform: scale(0.98) translateY(10px); 
-      filter: blur(4px); 
-    }
-    .frame-ready { 
-      opacity: 1; 
-      transform: scale(1) translateY(0); 
-      filter: blur(0px); 
-    }
-
-    /* --- NOVO LOADER --- */
-    .loader {
-      --color-1: #fff;
-      --size: 1px;
-      width: calc(48 * var(--size));
-      height: calc(48 * var(--size));
-      border-radius: 50%;
-      display: inline-block;
-      border-top: calc(3 * var(--size)) solid var(--color-1);
-      border-right: calc(3 * var(--size)) solid transparent;
-      box-sizing: border-box;
-      animation: rotation 1s linear infinite;
-    }
-
-    @keyframes rotation {
-      0% {
-        transform: rotate(0deg);
-      }
-      100% {
-        transform: rotate(360deg);
-      }
+    @media (max-width: 639px) {
+      #apps-grid.is-compact { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+      #apps-grid.is-compact .app-card { padding: 1rem; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 110px; }
+      #apps-grid.is-compact .app-header { margin-bottom: 0.5rem; justify-content: center; width: auto; }
+      #apps-grid.is-compact .app-arrow, #apps-grid.is-compact .app-desc { display: none; }
+      #apps-grid.is-compact .app-title { font-size: 0.85rem; line-height: 1.2; margin-bottom: 0; }
+      #apps-grid.is-compact .app-icon-wrapper { width: 3rem; height: 3rem; border-radius: 0.75rem; }
+      #apps-grid.is-compact .app-icon-wrapper i { font-size: 1.25rem; }
     }
   </style>
 </head>
+<body class="antialiased flex flex-col relative h-screen-safe font-sans z-0">
 
-<body class="flex flex-col-reverse sm:flex-col h-screen-dvh bg-matte-bg text-matte-text antialiased">
+  <div class="noise-bg"></div>
 
-  <!-- ================= NAVBAR (BARRA PRETA PREMIUM) ================= -->
-  <nav class="bg-matte-bg/95 backdrop-blur-md border-t sm:border-t-0 sm:border-b border-white/[0.04] z-50 flex-shrink-0 pb-safe pt-safe shadow-[0_-10px_30px_rgba(0,0,0,0.5)] sm:shadow-none">
-    <div class="max-w-5xl mx-auto px-2 sm:px-6 lg:px-8">
-      <div class="flex justify-between items-center h-[72px] sm:h-[70px]">
-        
-        <!-- Logótipo / Título (Desktop) -->
-        <div class="hidden sm:flex items-center gap-3">
-          <div class="bg-white/[0.04] border border-white/[0.05] p-2 rounded-xl text-white">
-            <i class="ph-fill ph-squares-four text-xl"></i>
-          </div>
-          <div class="flex flex-col">
-            <span class="font-bold text-lg tracking-tight text-white leading-none">My<span class="text-matte-muted font-medium">Hub</span></span>
-            <span class="text-[10px] text-matte-muted tracking-wide mt-1 uppercase font-semibold">Workspace</span>
-          </div>
+  <!-- HEADER -->
+  <header class="h-[64px] shrink-0 bg-matte-bg/80 backdrop-blur-xl border-b border-white/[0.04] z-50 flex items-center px-4 sm:px-6 relative">
+    <div id="header-home" class="w-full flex justify-between items-center transition-all duration-300">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-white/[0.05] border border-white/[0.08] flex items-center justify-center text-white shadow-lg">
+          <i class="ph-fill ph-planet text-lg"></i>
         </div>
-        
-        <!-- Botões de Navegação -->
-        <div class="flex w-full sm:w-auto justify-around sm:justify-end sm:gap-2 h-full items-center px-1 sm:px-0">
-          
-          <button onclick="loadApp('gestao.html', this)" class="nav-btn active-nav flex-1 sm:flex-none flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2.5 py-2 sm:px-5 sm:py-2.5 rounded-xl text-[11px] sm:text-sm font-medium text-matte-muted hover:text-white hover:bg-white/[0.02]">
-            <i class="ph-fill ph-users text-[24px] sm:text-[20px]"></i> 
-            <span class="tracking-wide">Gestão</span>
-          </button>
-          
-          <button onclick="loadApp('financas.html', this)" class="nav-btn flex-1 sm:flex-none flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2.5 py-2 sm:px-5 sm:py-2.5 rounded-xl text-[11px] sm:text-sm font-medium text-matte-muted hover:text-white hover:bg-white/[0.02]">
-            <i class="ph-fill ph-currency-dollar text-[24px] sm:text-[20px]"></i> 
-            <span class="tracking-wide">Finanças</span>
-          </button>
-          
-          <button onclick="loadApp('foco.html', this)" class="nav-btn flex-1 sm:flex-none flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2.5 py-2 sm:px-5 sm:py-2.5 rounded-xl text-[11px] sm:text-sm font-medium text-matte-muted hover:text-white hover:bg-white/[0.02]">
-            <i class="ph-fill ph-student text-[24px] sm:text-[20px]"></i> 
-            <span class="tracking-wide">Foco TADS</span>
-          </button>
-          
+        <h1 class="text-base font-bold text-white tracking-wide">Workspace</h1>
+      </div>
+      
+      <button id="btn-cloud-status" onclick="handleCloudButtonClick()" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.05] transition-colors text-sm font-medium text-zinc-300">
+        <i id="cloud-icon" class="ph-fill ph-cloud-slash text-zinc-400"></i>
+        <span id="cloud-text" class="hidden sm:inline">Offline</span>
+      </button>
+    </div>
+
+    <div id="header-app" class="absolute inset-0 px-4 sm:px-6 flex items-center justify-between opacity-0 pointer-events-none transition-all duration-300">
+      <button onclick="closeApp()" class="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors group">
+        <div class="w-8 h-8 rounded-lg bg-white/[0.03] group-hover:bg-white/[0.08] flex items-center justify-center transition-colors">
+          <i class="ph-bold ph-arrow-left text-lg"></i>
         </div>
+        <span class="text-sm font-bold">Voltar</span>
+      </button>
+      <div class="flex items-center gap-2">
+        <span id="current-app-title" class="text-sm font-bold text-zinc-300">Carregando...</span>
       </div>
     </div>
-  </nav>
+  </header>
 
-  <!-- ================= ÁREA DE CONTEÚDO ================= -->
-  <main class="flex-1 relative w-full h-full overflow-hidden bg-matte-bg">
-    
-    <!-- Loader Premium (Spinner Elegante) -->
-    <div id="loader" class="absolute inset-0 flex flex-col items-center justify-center bg-matte-bg z-20 transition-opacity duration-300">
-      <div class="loader mb-4"></div>
-      <p class="text-matte-muted font-semibold text-[10px] tracking-[0.2em] uppercase">A carregar</p>
+  <!-- DASHBOARD -->
+  <main id="view-dashboard" class="view-container view-active custom-scroll overflow-y-auto">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 py-8 pb-24">
+      <div class="flex justify-between items-end mb-8 sm:mb-10">
+        <div>
+          <h2 class="text-2xl sm:text-4xl font-bold text-white tracking-tight mb-1 sm:mb-2">Seu Espaço de Trabalho</h2>
+          <p class="text-sm sm:text-base text-zinc-500 font-medium">Escolha uma ferramenta para começar.</p>
+        </div>
+        <button id="btn-toggle-layout" onclick="toggleLayoutMode()" class="sm:hidden p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.05] text-zinc-400 hover:text-white transition-colors">
+          <i id="layout-icon" class="ph-bold ph-grid-four text-xl"></i>
+        </button>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6" id="apps-grid"></div>
     </div>
-    
-    <!-- Iframe -->
-    <iframe 
-      id="app-frame" 
-      src="gestao.html" 
-      class="w-full h-full border-none relative z-10 frame-loading" 
-      title="Hub Content" 
-      onload="handleIframeLoad()">
-    </iframe>
-    
   </main>
 
+  <!-- IFRAME APPS -->
+  <div id="view-app" class="view-container view-hidden bg-transparent">
+    <div id="app-loader" class="absolute inset-0 flex flex-col items-center justify-center bg-matte-bg z-10 transition-opacity duration-300">
+      <div class="w-10 h-10 border-4 border-white/[0.05] border-t-blue-500 rounded-full animate-spin mb-4"></div>
+      <p class="text-xs font-bold text-zinc-500 uppercase tracking-widest animate-pulse">Carregando Nuvem...</p>
+    </div>
+    <iframe id="app-frame" src="" title="App Frame" onload="handleIframeLoad()"></iframe>
+  </div>
+
+  <!-- MODAL: SINCRONIZAÇÃO EM NUVEM -->
+  <div id="auth-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300 p-4">
+    <div class="bg-matte-card w-full max-w-sm rounded-2xl border border-white/[0.05] p-6 sm:p-8 transform scale-95 transition-all duration-300 shadow-2xl relative" id="auth-modal-content">
+      
+      <button onclick="toggleAuthModal(false)" class="absolute top-4 right-4 p-2 text-zinc-500 hover:text-white bg-white/[0.02] hover:bg-white/[0.05] rounded-full transition-colors">
+        <i class="ph-bold ph-x text-sm"></i>
+      </button>
+      
+      <div class="w-16 h-16 rounded-2xl bg-blue-500/10 flex items-center justify-center mb-6 mx-auto">
+        <i class="ph-fill ph-cloud-check text-3xl text-blue-400"></i>
+      </div>
+      
+      <h3 class="text-xl font-bold text-white text-center mb-1">Sincronização em Nuvem</h3>
+      <p class="text-sm text-zinc-400 text-center mb-6">Cadastre ou acesse seus dados protegidos usando uma palavra-chave secreta.</p>
+
+      <div class="space-y-3">
+        <div>
+          <label class="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Sua Chave de Acesso</label>
+          <input type="text" id="login-keyword" placeholder="Ex: MasterKey2024" maxlength="25" autocomplete="off" class="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl p-3.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-blue-500/50 transition-colors">
+          <p id="login-error" class="text-xs font-medium text-red-400 mt-2 hidden"></p>
+        </div>
+
+        <ul class="text-[10px] font-medium text-zinc-500 space-y-1 mb-2 bg-white/[0.02] p-3 rounded-xl border border-white/[0.02]">
+          <li id="rule-length" class="flex items-center gap-1.5"><i class="ph-bold ph-circle text-[8px]"></i> Entre 8 e 25 caracteres</li>
+          <li id="rule-alnum" class="flex items-center gap-1.5"><i class="ph-bold ph-circle text-[8px]"></i> Pelo menos 1 letra e 1 número</li>
+          <li id="rule-chars" class="flex items-center gap-1.5"><i class="ph-bold ph-circle text-[8px]"></i> Apenas teclado padrão (Sem emojis)</li>
+        </ul>
+        
+        <button onclick="executeCloudSync()" id="btn-login" class="w-full py-3.5 rounded-xl font-bold bg-white text-black hover:bg-zinc-200 transition-colors shadow-lg shadow-white/10 mt-2 flex items-center justify-center gap-2">
+          Conectar à Nuvem
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script>
-    /**
-     * Alternar entre aplicações com transição suave
-     */
-    function loadApp(file, btn) {
-      // Evita recarregar se já estiver na tab atual
-      if(btn.classList.contains('active-nav')) return;
+    const appsList = [
+      { id: 'gestao', title: 'Gestão de Visitas', desc: 'Controle de visitas, acompanhamentos e relatórios.', icon: 'ph-users-three', color: 'text-blue-400', bgIcon: 'bg-blue-500/10', file: 'gestao.html' },
+      { id: 'financas', title: 'Controlo Financeiro', desc: 'Gestão de despesas, receitas, lucros e metas.', icon: 'ph-currency-dollar', color: 'text-emerald-400', bgIcon: 'bg-emerald-500/10', file: 'financas.html' },
+      { id: 'foco', title: 'Plano de Estudos', desc: 'Cronogramas, tarefas e acompanhamento de estudos.', icon: 'ph-student', color: 'text-purple-400', bgIcon: 'bg-purple-500/10', file: 'foco.html' }
+    ];
+
+    let isCompactMode = localStorage.getItem('hub_compact_mode') === 'true';
+    let isCloudConnected = false;
+
+    // INICIALIZAÇÃO E ESTADO DA SESSÃO
+    window.onload = async () => {
+      renderDashboard();
       
-      const frame = document.getElementById('app-frame');
-      const loader = document.getElementById('loader');
+      // Verifica se o Supabase já tem sessão ativa no LocalStorage ao abrir a app
+      const session = await window.PortalDB.getSession();
+      if (session) {
+        updateCloudStatus(true);
+      }
+    };
+
+    function updateCloudStatus(connected) {
+      isCloudConnected = connected;
+      const btn = document.getElementById('btn-cloud-status');
+      const icon = document.getElementById('cloud-icon');
+      const text = document.getElementById('cloud-text');
       
-      // Ativar Loader e iniciar animação de Blur/Fade-out no iframe
-      loader.style.opacity = '1';
-      loader.style.pointerEvents = 'auto';
-      frame.classList.remove('frame-ready');
-      frame.classList.add('frame-loading');
-      
-      // Aguardar o fim da animação de saída antes de mudar o SRC
-      setTimeout(() => {
-        frame.src = file;
-      }, 300); // Ligeiramente mais longo para acompanhar a animação
-      
-      // Atualizar classes visuais (Remover o ativo de todos)
-      document.querySelectorAll('.nav-btn').forEach(b => {
-        b.classList.remove('active-nav');
-      });
-      
-      // Ativar o botão clicado
-      btn.classList.add('active-nav');
+      if (connected) {
+        icon.className = 'ph-fill ph-cloud-check text-blue-400';
+        text.innerText = 'Nuvem Ativa';
+        btn.classList.replace('bg-white/[0.03]', 'bg-blue-500/10');
+        btn.classList.replace('border-white/[0.05]', 'border-blue-500/20');
+        btn.classList.add('text-blue-400');
+      } else {
+        icon.className = 'ph-fill ph-cloud-slash text-zinc-400';
+        text.innerText = 'Offline';
+        btn.classList.replace('bg-blue-500/10', 'bg-white/[0.03]');
+        btn.classList.replace('border-blue-500/20', 'border-white/[0.05]');
+        btn.classList.remove('text-blue-400');
+      }
     }
 
-    /**
-     * Disparado quando o Iframe termina de carregar o novo ficheiro
-     */
-    function handleIframeLoad() {
-      const frame = document.getElementById('app-frame');
-      const loader = document.getElementById('loader');
-      
-      // Pequeno atraso artificial para a animação ficar fluída
-      setTimeout(() => {
-        // Desvanecer o loader
-        loader.style.opacity = '0';
-        loader.style.pointerEvents = 'none';
-        
-        // Focar e revelar o iframe
-        frame.classList.remove('frame-loading');
-        frame.classList.add('frame-ready');
-      }, 250);
+    function handleCloudButtonClick() {
+      if (isCloudConnected) {
+        if(confirm("Deseja desconectar da nuvem? (Terá que inserir a chave novamente para aceder aos seus dados)")) {
+          window.PortalDB.logout().then(() => updateCloudStatus(false));
+        }
+      } else {
+        toggleAuthModal(true);
+      }
     }
+
+    // INTERFACE DASHBOARD
+    function initLayoutMode() {
+      const grid = document.getElementById('apps-grid');
+      const icon = document.getElementById('layout-icon');
+      if (isCompactMode) { grid.classList.add('is-compact'); icon.className = 'ph-bold ph-list text-xl'; } 
+      else { grid.classList.remove('is-compact'); icon.className = 'ph-bold ph-grid-four text-xl'; }
+    }
+
+    function toggleLayoutMode() {
+      isCompactMode = !isCompactMode;
+      localStorage.setItem('hub_compact_mode', isCompactMode);
+      initLayoutMode();
+    }
+
+    function renderDashboard() {
+      const grid = document.getElementById('apps-grid');
+      let html = '';
+      appsList.forEach(app => {
+        html += `
+          <button onclick="openApp('${app.file}', '${app.title}')" class="app-card text-left w-full bg-white/[0.02] border border-white/[0.04] rounded-2xl p-5 sm:p-6 flex flex-col h-full card-hover-effect group focus:outline-none focus:ring-2 focus:ring-blue-500/50">
+            <div class="app-header flex justify-between items-start mb-4 sm:mb-5 w-full">
+              <div class="app-icon-wrapper w-12 h-12 rounded-[14px] ${app.bgIcon} flex items-center justify-center transition-all">
+                <i class="app-icon ph-fill ${app.icon} text-2xl ${app.color} transition-all"></i>
+              </div>
+              <div class="app-arrow w-8 h-8 rounded-full bg-white/[0.02] group-hover:bg-white/[0.08] flex items-center justify-center text-zinc-500 group-hover:text-white transition-colors">
+                <i class="ph-bold ph-arrow-up-right text-sm"></i>
+              </div>
+            </div>
+            <h3 class="app-title text-base sm:text-lg font-bold text-white mb-1.5 sm:mb-2 transition-colors">${app.title}</h3>
+            <p class="app-desc text-sm text-zinc-400 leading-relaxed">${app.desc}</p>
+          </button>`;
+      });
+      grid.innerHTML = html; initLayoutMode();
+    }
+
+    // IFRAME NAVIGATION
+    function openApp(file, title) {
+      if(!file) return;
+      document.getElementById('header-home').classList.add('opacity-0', 'pointer-events-none', 'scale-95');
+      document.getElementById('header-app').classList.remove('opacity-0', 'pointer-events-none');
+      document.getElementById('current-app-title').innerText = title;
+      const frame = document.getElementById('app-frame'), loader = document.getElementById('app-loader');
+      loader.style.opacity = '1'; loader.style.pointerEvents = 'auto'; frame.style.opacity = '0';
+      document.getElementById('view-dashboard').classList.remove('view-active');
+      document.getElementById('view-dashboard').classList.add('view-hidden');
+      document.getElementById('view-app').classList.remove('view-hidden');
+      document.getElementById('view-app').classList.add('view-active');
+      setTimeout(() => { frame.src = file; }, 300);
+    }
+
+    function closeApp() {
+      document.getElementById('header-app').classList.add('opacity-0', 'pointer-events-none');
+      document.getElementById('header-home').classList.remove('opacity-0', 'pointer-events-none', 'scale-95');
+      document.getElementById('view-app').classList.remove('view-active');
+      document.getElementById('view-app').classList.add('view-hidden');
+      document.getElementById('view-dashboard').classList.remove('view-hidden');
+      document.getElementById('view-dashboard').classList.add('view-active');
+      setTimeout(() => { document.getElementById('app-frame').src = ''; }, 300);
+    }
+
+    function handleIframeLoad() {
+      const frame = document.getElementById('app-frame'), loader = document.getElementById('app-loader');
+      if (!frame.src || frame.src.endsWith(window.location.pathname)) return;
+      setTimeout(() => { loader.style.opacity = '0'; loader.style.pointerEvents = 'none'; frame.style.opacity = '1'; }, 400);
+    }
+
+    // AUTHENTICATION LOGIC
+    function toggleAuthModal(show) {
+      const modal = document.getElementById('auth-modal'), content = document.getElementById('auth-modal-content');
+      if (show) {
+        document.getElementById('login-keyword').value = '';
+        document.getElementById('login-error').classList.add('hidden');
+        modal.classList.remove('opacity-0', 'pointer-events-none');
+        setTimeout(() => content.classList.remove('scale-95'), 10);
+      } else {
+        content.classList.add('scale-95'); modal.classList.add('opacity-0');
+        setTimeout(() => modal.classList.add('pointer-events-none'), 300);
+      }
+    }
+
+    async function executeCloudSync() {
+      const input = document.getElementById('login-keyword').value;
+      const errorEl = document.getElementById('login-error');
+      const btn = document.getElementById('btn-login');
+      
+      // Validações Restritas
+      if (input.length < 8 || input.length > 25) {
+        errorEl.innerText = 'Erro: A chave deve ter entre 8 e 25 caracteres.'; errorEl.classList.remove('hidden'); return;
+      }
+      if (!/[a-zA-Z]/.test(input) || !/[0-9]/.test(input)) {
+        errorEl.innerText = 'Erro: A chave precisa conter pelo menos uma letra e um número.'; errorEl.classList.remove('hidden'); return;
+      }
+      if (!/^[\x20-\x7E]+$/.test(input)) {
+        errorEl.innerText = 'Erro: Caracteres inválidos. Use apenas símbolos do teclado padrão.'; errorEl.classList.remove('hidden'); return;
+      }
+
+      errorEl.classList.add('hidden');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '<div class="w-5 h-5 border-2 border-black/20 border-t-black rounded-full animate-spin"></div>';
+      btn.disabled = true;
+
+      try {
+        // Chamada oficial ao arquivo supabase-client.js
+        await window.PortalDB.loginOrRegister(input);
+        
+        btn.innerHTML = '<i class="ph-bold ph-check text-lg"></i> Nuvem Conectada';
+        btn.classList.replace('bg-white', 'bg-blue-500'); btn.classList.replace('text-black', 'text-white');
+        updateCloudStatus(true);
+        
+        setTimeout(() => {
+          toggleAuthModal(false);
+          setTimeout(() => {
+            btn.innerHTML = originalText; btn.disabled = false;
+            btn.classList.replace('bg-blue-500', 'bg-white'); btn.classList.replace('text-white', 'text-black');
+          }, 300);
+        }, 1200);
+
+      } catch (err) {
+        // Trata erro customizado lançado pelo supabase-client.js
+        errorEl.innerText = err.message;
+        errorEl.classList.remove('hidden');
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+      }
+    }
+
+    document.getElementById('login-keyword').addEventListener('keypress', (e) => { if (e.key === 'Enter') executeCloudSync(); });
   </script>
 </body>
 </html>
