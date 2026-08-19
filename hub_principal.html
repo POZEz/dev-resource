@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#09090b">
+  <title>My Hub</title>
+
+  <!-- CDN Supabase Oficial -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            matte: { bg: '#09090b', card: '#121214', border: '#27272a', text: '#fafafa', muted: '#a1a1aa' }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #09090b; color: #fafafa; -webkit-tap-highlight-color: transparent; }
+    .custom-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
+    .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #27272a; border-radius: 99px; }
+    .custom-scroll::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+
+    /* Visual Normal Expandido dos Cards */
+    .module-card {
+      background-color: #121214;
+      border: 1px solid #27272a;
+      border-radius: 16px;
+      padding: 16px;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .module-card:hover {
+      border-color: #3b82f6;
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+
+    /* Visão Compacta dos Cards (Quadrados Pequenos lado a lado) */
+    .compact-mode #tools-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+
+    @media (min-width: 640px) {
+      .compact-mode #tools-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+    }
+    @media (min-width: 768px) {
+      .compact-mode #tools-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+    }
+    @media (min-width: 1024px) {
+      .compact-mode #tools-grid { grid-template-columns: repeat(6, minmax(0, 1fr)) !important; }
+    }
+    @media (min-width: 1280px) {
+      .compact-mode #tools-grid { grid-template-columns: repeat(8, minmax(0, 1fr)) !important; }
+    }
+
+    .compact-mode .module-card {
+      padding: 12px;
+      border-radius: 12px;
+      aspect-ratio: 1 / 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    .compact-mode .module-card i {
+      font-size: 1.75rem !important;
+      margin-bottom: 6px !important;
+    }
+    .compact-mode .module-card h3 {
+      font-size: 0.75rem !important;
+      line-height: 1.1 !important;
+      margin-bottom: 0 !important;
+      text-align: center;
+    }
+    .compact-mode .module-card p {
+      display: none !important;
+    }
+
+    iframe { border: none; width: 100%; height: 100%; }
+
+    /* Animação do Menu Lateral Expansivo */
+    .sidebar-drawer {
+      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .sidebar-closed {
+      transform: translateX(-100%);
+    }
+    .sidebar-open {
+      transform: translateX(0);
+    }
+  </style>
+</head>
+<body class="antialiased flex flex-col h-screen font-sans bg-matte-bg select-none overflow-hidden">
+
+  <!-- ============================================================================
+       CLIENTE CENTRAL SUPABASE, AUTENTICAÇÃO E CACHE LOCAL INDEXEDB
+       ============================================================================ -->
+  <script>
+    const SUPABASE_URL = 'https://zlsdlcvtcsrykfacjvhf.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_JnDv-fxHXPTzNaFX9n3Z0w_4mqt47Js';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // Banco de Dados Local do Navegador para arquivos pesados
+    let localFileDB = null;
+    const dbReq = indexedDB.open("MyHubLocalMedia", 1);
+    dbReq.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains("heavy_files")) {
+        db.createObjectStore("heavy_files", { keyPath: "id" });
+      }
+    };
+    dbReq.onsuccess = (e) => { localFileDB = e.target.result; };
+
+    // PortalDB Global para Módulos e iFrames
+    window.PortalDB = {
+      supabase: supabase,
+
+      async getSession() {
+        try {
+          const { data, error } = await supabase.auth.getSession();
+          if (error) throw error;
+          return data?.session;
+        } catch (error) {
+          return null;
+        }
+      },
+
+      async login(email, password) {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        return data.user;
+      },
+
+      async register(email, password) {
+        const { data, error } = await supabase.auth.signUp({ email, password });
+        if (error) throw error;
+        return data.user;
+      },
+
+      async logout() {
+        await supabase.auth.signOut();
+        window.location.reload();
+      },
+
+      // Auxiliar para salvar arquivos pesados localmente
+      async saveHeavyFileLocal(id, blob, metadata) {
+        if (!localFileDB) return;
+        const tx = localFileDB.transaction("heavy_files", "readwrite");
+        const store = tx.objectStore("heavy_files");
+        store.put({ id, blob, metadata, updated_at: new Date().toISOString() });
+      },
+
+      async getHeavyFileLocal(id) {
+        if (!localFileDB) return null;
+        return new Promise((resolve) => {
+          const tx = localFileDB.transaction("heavy_files", "readonly");
+          const store = tx.objectStore("heavy_files");
+          const req = store.get(id);
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => resolve(null);
+        });
+      },
+
+      // Intermediação Gemini REST
+      async callGeminiEdge(prompt, context = {}) {
+        const session = await this.getSession();
+        if (!session) throw new Error("Acesso não autorizado.");
+
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/gemini-assist`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({ prompt, context })
+        });
+
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error || "Erro ao consultar a IA.");
+        }
+
+        return await response.json();
+      }
+    };
+  </script>
+
+  <!-- CABEÇALHO PRINCIPAL DO MY HUB -->
+  <header class="h-14 shrink-0 bg-matte-card border-b border-matte-border px-4 sm:px-6 flex items-center justify-between z-30">
+    <div class="flex items-center gap-3">
+      <!-- Botão para Abrir Menu Lateral Expansivo -->
+      <button onclick="toggleSidebarMenu(true)" class="p-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 hover:text-white transition-colors" title="Abrir Menu NAVEBAR">
+        <i class="ph-bold ph-list text-lg"></i>
+      </button>
+
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+          <i class="ph-bold ph-squares-four text-lg"></i>
+        </div>
+        <div>
+          <h1 class="text-sm font-bold text-white leading-tight">My Hub</h1>
+          <div id="global-sync-badge" class="flex items-center gap-1 text-[9px] font-semibold text-zinc-400">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            <span>Pronto</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BOTÕES MINIMALISTAS DO CABEÇALHO -->
+    <div class="flex items-center gap-1.5">
+      <!-- Ícone de Armazenamento: Abre Direto a Central de Meus Dados -->
+      <button onclick="openModule('Armazenamento', 'meus-dados.html')" class="p-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1.5" title="Armazenamento & Meus Dados">
+        <i class="ph-fill ph-database text-lg"></i>
+      </button>
+
+      <!-- Ícone Indicador de Conexão com Supabase (VERMELHO = Desconectado | AZUL = Conectado) -->
+      <div id="user-auth-section" class="flex items-center">
+        <button onclick="toggleAuthModal(true)" id="btn-login-trigger" class="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-500 transition-colors flex items-center gap-1.5 text-xs font-bold" title="Desconectado - Clique para conectar ao Supabase">
+          <i class="ph-fill ph-user-circle text-lg text-red-500"></i>
+          <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+          <span class="hidden md:inline">Desconectado</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- OVERLAY MASCARA DO MENU LATERAL -->
+  <div id="sidebar-backdrop" onclick="toggleSidebarMenu(false)" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-40 hidden transition-opacity"></div>
+
+  <!-- MENU LATERAL EXPANSIVO / SIDEBAR NAV (CATEGORIAS E FUNÇÕES) -->
+  <aside id="sidebar-menu" class="sidebar-drawer sidebar-closed fixed top-0 left-0 bottom-0 w-72 bg-matte-card border-r border-matte-border z-50 flex flex-col custom-scroll shadow-2xl">
+    
+    <!-- Cabeçalho da Sidebar -->
+    <div class="h-14 px-4 border-b border-matte-border flex items-center justify-between shrink-0">
+      <div class="flex items-center gap-2">
+        <div class="w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+          <i class="ph-bold ph-squares-four text-base"></i>
+        </div>
+        <span class="font-bold text-sm text-white">Navegação</span>
+      </div>
+      <button onclick="toggleSidebarMenu(false)" class="p-1.5 text-zinc-500 hover:text-white rounded-lg hover:bg-white/[0.05]">
+        <i class="ph-bold ph-x text-base"></i>
+      </button>
+    </div>
+
+    <!-- Lista Expansível e Categorizada -->
+    <div class="flex-1 overflow-y-auto p-4 space-y-4 custom-scroll text-xs">
+      
+      <!-- ITEM: Início -->
+      <div>
+        <button onclick="showHomeView()" class="w-full p-2.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 font-bold flex items-center gap-2.5 transition-colors">
+          <i class="ph-bold ph-house text-base"></i>
+          <span>Início</span>
+        </button>
+      </div>
+
+      <!-- SEÇÃO: FERRAMENTAS -->
+      <div class="space-y-2">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500 px-2">FERRAMENTAS</span>
+
+        <!-- CATEGORIA EXPANSÍVEL: Documentos -->
+        <div class="border border-matte-border rounded-xl bg-white/[0.01] overflow-hidden">
+          <button onclick="toggleCategoryGroup('cat-docs')" class="w-full p-2.5 flex items-center justify-between text-zinc-300 hover:text-white font-semibold hover:bg-white/[0.03]">
+            <div class="flex items-center gap-2">
+              <i class="ph-bold ph-file-text text-blue-400 text-sm"></i>
+              <span>Documentos</span>
+            </div>
+            <i id="chevron-cat-docs" class="ph-bold ph-caret-down text-zinc-500 transition-transform"></i>
+          </button>
+          <div id="cat-docs" class="hidden pl-6 pr-2 py-1.5 space-y-1 bg-black/20 border-t border-matte-border">
+            <button onclick="openModuleFromSidebar('01 — Editor de PDF', 'pdf.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Editor de PDF</button>
+            <button onclick="openModuleFromSidebar('10 — Editor de Documentos', 'documento.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Editor de Documentos</button>
+          </div>
+        </div>
+
+        <!-- CATEGORIA EXPANSÍVEL: Mídia -->
+        <div class="border border-matte-border rounded-xl bg-white/[0.01] overflow-hidden">
+          <button onclick="toggleCategoryGroup('cat-media')" class="w-full p-2.5 flex items-center justify-between text-zinc-300 hover:text-white font-semibold hover:bg-white/[0.03]">
+            <div class="flex items-center gap-2">
+              <i class="ph-bold ph-play-circle text-indigo-400 text-sm"></i>
+              <span>Mídia</span>
+            </div>
+            <i id="chevron-cat-media" class="ph-bold ph-caret-down text-zinc-500 transition-transform"></i>
+          </button>
+          <div id="cat-media" class="hidden pl-6 pr-2 py-1.5 space-y-1 bg-black/20 border-t border-matte-border">
+            <button onclick="openModuleFromSidebar('03 — Editor de Imagens', 'imagem.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Editor de Imagens</button>
+            <button onclick="openModuleFromSidebar('12 — Editor de Vídeo', 'video.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Editor de Vídeo</button>
+            <button onclick="openModuleFromSidebar('13 — Editor de Áudio', 'audio.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Editor de Áudio</button>
+            <button onclick="openModuleFromSidebar('14 — Apresentações', 'apresentacao.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Apresentações</button>
+          </div>
+        </div>
+
+        <!-- CATEGORIA EXPANSÍVEL: Dados -->
+        <div class="border border-matte-border rounded-xl bg-white/[0.01] overflow-hidden">
+          <button onclick="toggleCategoryGroup('cat-data')" class="w-full p-2.5 flex items-center justify-between text-zinc-300 hover:text-white font-semibold hover:bg-white/[0.03]">
+            <div class="flex items-center gap-2">
+              <i class="ph-bold ph-table text-amber-400 text-sm"></i>
+              <span>Dados</span>
+            </div>
+            <i id="chevron-cat-data" class="ph-bold ph-caret-down text-zinc-500 transition-transform"></i>
+          </button>
+          <div id="cat-data" class="hidden pl-6 pr-2 py-1.5 space-y-1 bg-black/20 border-t border-matte-border">
+            <button onclick="openModuleFromSidebar('05 — Tabelas e Dados', 'tabelas.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Tabelas & Dados</button>
+            <button onclick="openModuleFromSidebar('06 — Modelos de Dados', 'modelos.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Modelos de Dados</button>
+          </div>
+        </div>
+
+        <!-- FUNÇÃO ÚNICA SEM CATEGORIA EXPANSÍVEL: Desenho / CAD 2D -->
+        <button onclick="openModuleFromSidebar('11 — Editor CAD 2D', 'cad.html')" class="w-full p-2.5 rounded-xl border border-matte-border bg-white/[0.01] hover:bg-white/[0.04] text-zinc-300 hover:text-white font-semibold flex items-center justify-between transition-colors">
+          <div class="flex items-center gap-2">
+            <i class="ph-bold ph-compass text-blue-400 text-sm"></i>
+            <span>Desenho CAD 2D</span>
+          </div>
+          <span class="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 text-[9px] font-bold">Função</span>
+        </button>
+
+        <!-- CATEGORIA EXPANSÍVEL: Produtividade -->
+        <div class="border border-matte-border rounded-xl bg-white/[0.01] overflow-hidden">
+          <button onclick="toggleCategoryGroup('cat-prod')" class="w-full p-2.5 flex items-center justify-between text-zinc-300 hover:text-white font-semibold hover:bg-white/[0.03]">
+            <div class="flex items-center gap-2">
+              <i class="ph-bold ph-check-square-offset text-emerald-400 text-sm"></i>
+              <span>Produtividade</span>
+            </div>
+            <i id="chevron-cat-prod" class="ph-bold ph-caret-down text-zinc-500 transition-transform"></i>
+          </button>
+          <div id="cat-prod" class="hidden pl-6 pr-2 py-1.5 space-y-1 bg-black/20 border-t border-matte-border">
+            <button onclick="openModuleFromSidebar('07 — Controle Financeiro', 'financas.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Controle Financeiro</button>
+            <button onclick="openModuleFromSidebar('08 — Plano de Estudos', 'estudos.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Plano de Estudos</button>
+            <button onclick="openModuleFromSidebar('15 — Tarefas & Projetos', 'tarefas.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Tarefas & Projetos</button>
+          </div>
+        </div>
+
+        <!-- CATEGORIA EXPANSÍVEL: Utilidades -->
+        <div class="border border-matte-border rounded-xl bg-white/[0.01] overflow-hidden">
+          <button onclick="toggleCategoryGroup('cat-utils')" class="w-full p-2.5 flex items-center justify-between text-zinc-300 hover:text-white font-semibold hover:bg-white/[0.03]">
+            <div class="flex items-center gap-2">
+              <i class="ph-bold ph-wrench text-cyan-400 text-sm"></i>
+              <span>Utilidades</span>
+            </div>
+            <i id="chevron-cat-utils" class="ph-bold ph-caret-down text-zinc-500 transition-transform"></i>
+          </button>
+          <div id="cat-utils" class="hidden pl-6 pr-2 py-1.5 space-y-1 bg-black/20 border-t border-matte-border">
+            <button onclick="openModuleFromSidebar('02 — Conversor de Arquivos', 'conversor.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Conversor de Arquivos</button>
+          </div>
+        </div>
+
+        <!-- FUNÇÃO ÚNICA SEM CATEGORIA EXPANSÍVEL: QR Code Hub -->
+        <button onclick="openModuleFromSidebar('04 — QR Code', 'qrcode.html')" class="w-full p-2.5 rounded-xl border border-matte-border bg-white/[0.01] hover:bg-white/[0.04] text-zinc-300 hover:text-white font-semibold flex items-center justify-between transition-colors">
+          <div class="flex items-center gap-2">
+            <i class="ph-bold ph-qr-code text-emerald-400 text-sm"></i>
+            <span>QR Code Hub</span>
+          </div>
+          <span class="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[9px] font-bold">Função</span>
+        </button>
+      </div>
+
+      <!-- SEÇÃO: CONTA -->
+      <div class="space-y-2 pt-2 border-t border-matte-border">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500 px-2">CONTA</span>
+
+        <button onclick="toggleAuthModal(true); toggleSidebarMenu(false);" class="w-full p-2.5 rounded-xl border border-matte-border bg-white/[0.01] hover:bg-white/[0.04] text-zinc-300 hover:text-white font-semibold flex items-center gap-2 transition-colors">
+          <i class="ph-bold ph-user-circle text-blue-400 text-sm"></i>
+          <span>Perfil / Conectar</span>
+        </button>
+
+        <button onclick="openModuleFromSidebar('Armazenamento', 'meus-dados.html')" class="w-full p-2.5 rounded-xl border border-matte-border bg-white/[0.01] hover:bg-white/[0.04] text-zinc-300 hover:text-white font-semibold flex items-center gap-2 transition-colors">
+          <i class="ph-fill ph-database text-purple-400 text-sm"></i>
+          <span>Armazenamento</span>
+        </button>
+
+        <button onclick="alert('My Hub v2.0 - Plataforma unificada de ferramentas minimalistas.'); toggleSidebarMenu(false);" class="w-full p-2.5 rounded-xl border border-matte-border bg-white/[0.01] hover:bg-white/[0.04] text-zinc-300 hover:text-white font-semibold flex items-center gap-2 transition-colors">
+          <i class="ph-bold ph-question text-zinc-400 text-sm"></i>
+          <span>Ajuda</span>
+        </button>
+      </div>
+
+    </div>
+
+    <!-- Rodapé do Menu Sidebar -->
+    <div class="p-3 border-t border-matte-border text-center text-[10px] text-zinc-500">
+      My Hub &copy; 2026
+    </div>
+  </aside>
+
+  <!-- CONTEÚDO PRINCIPAL DO HUB -->
+  <main id="main-hub-view" class="flex-1 overflow-y-auto p-4 sm:p-6 custom-scroll relative">
+    
+    <div id="modules-grid-container" class="max-w-7xl mx-auto space-y-5">
+      
+      <!-- CAMPO DE BUSCA GLOBAL INTEGRADA -->
+      <div class="relative">
+        <i class="ph ph-magnifying-glass absolute left-3.5 top-3 text-zinc-500 text-sm"></i>
+        <input type="text" id="global-search-input" oninput="handleGlobalSearch(this.value)" placeholder="Pesquisar por nome ou ferramenta (ex: 'vendas', 'contrato')..." class="w-full bg-matte-card border border-matte-border rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500/50 shadow-lg">
+      </div>
+
+      <!-- PAINEL RESULTADOS BUSCA GLOBAL -->
+      <section id="global-search-results-panel" class="hidden bg-matte-card border border-blue-500/30 rounded-2xl p-4 flex flex-col gap-2">
+        <div class="flex items-center justify-between border-b border-matte-border pb-2">
+          <h3 class="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+            <i class="ph-bold ph-magnifying-glass"></i> Resultados da Busca
+          </h3>
+          <button onclick="clearGlobalSearch()" class="text-xs text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
+        </div>
+        <div id="global-search-items-list" class="space-y-1.5 max-h-60 overflow-y-auto custom-scroll pr-1"></div>
+      </section>
+
+      <!-- SEÇÃO DAS FERRAMENTAS COM BOTÃO DE ALTERNAR VISÃO -->
+      <div id="tools-grid-wrapper">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-zinc-500">Ferramentas de Produtividade</h2>
+          
+          <!-- Botão para Alternar entre Expandido e Quadrados -->
+          <button onclick="toggleCompactMode()" id="btn-toggle-compact" class="px-2.5 py-1 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-400 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors" title="Alternar entre formato Expandido e Quadrados">
+            <i id="compact-icon" class="ph ph-squares-four text-sm"></i>
+            <span id="compact-label" class="text-[11px]">Quadrados</span>
+          </button>
+        </div>
+
+        <!-- GRADE DE FERRAMENTAS (PADRÃO: EXPANDIDO HORIZONTAL | COMPACTO: QUADRADOS) -->
+        <div id="tools-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+
+          <div onclick="openModule('01 — Editor de PDF', 'pdf.html')" class="module-card">
+            <i class="ph-bold ph-file-pdf text-red-400 text-2xl mb-2 block"></i>
+            <div>
+              <h3 class="text-xs sm:text-sm font-bold text-white mb-1">Editor de PDF</h3>
+              <p class="text-[11px] text-zinc-400 leading-relaxed">Visualizar, assinar, cortar, unir e exportar PDFs.</p>
+            </div>
+          </div>
+
+          <div onclick="openModule('02 — Conversor de Arquivos', 'conversor.html')" class="module-card">
+            <i class="ph-bold ph-arrows-clockwise text-blue-400 text-2xl mb-2 block"></i>
+            <div>
+              <h3 class="text-xs sm:text-sm font-bold text-white mb-1">Conversor de Arquivos</h3>
+              <p class="text-[11px] text-zinc-400 leading-relaxed">Conversão entre PDF, PNG, JPG, WebP, SVG, TXT e DOCX.</p>
+            </div>
+          </div>
+
+          <div onclick="openModule('03 — Editor de Imagens', 'imagem.html')" class="module-card">
+            <i class="ph-bold ph-image text-indigo-400 text-2xl mb-2 block"></i>
+            <div>
+              <h3 class="text-xs sm:text-sm font-bold text-white mb-1">Editor de Imagens</h3>
+              <p class="text-[11px] text-zinc-400 leading-relaxed">Cortar, redimensionar, remover fundo e presets sociais.</p>
+            </div>
+          </div>
+
+          <div onclick="openModule('04 — QR Code', 'qrcode.html')" class="module-card">
+            <i class="ph-bold ph-qr-code text-emerald-400 text-2xl mb-2 block"></i>
+            <div>
+              <h3 class="text-xs sm:text-sm font-bold text-white mb-1">QR Code Hub</h3>
+              <p class="text-[11px] text-zinc-400 leading-relaxed">Gerar, personalizar e escanear QR Codes via câmera.</p>
+            </div>
+          </div>
+
+          <div onclick="openModule('05 — Tabelas e Dados', 'tabelas.html')" class="module-card">
+            <i class="ph-bold ph-table text-amber-400 text-2xl mb-2 block"></i>
+            <div>
+              <h3 class="text-xs sm:text-sm font-bold text-white mb-1">Tabelas & Dados</h3>
+              <p class="text-[11px] text-zinc-400 leading-relaxed">Transformar texto bruto em tabelas e gráficos com IA.</p>
+            </div>
+          </div>
+
+          <div onclick="openModule('06 — Modelos de Dados', 'modelos.html')" class="module-card">
+            <i class="ph-bold ph-squares-four text-cyan-400 text-2xl mb-2 block"></i>
+            <div>
+              <h3 class="text-xs sm:text-sm font-bold text-white mb-1">Modelos de Dados</h3>
+              <p class="text-[11px] text-zinc-400 leading-relaxed">10 templates com indicadores e gráficos automáticos.</p>
+            </div>
+          </div>
+
+          <div onclick="openModule('07 — Controle Financeiro', 'financas.html')" class="module-card">
+            <i class="ph-bold ph-wallet text-emerald-400 text-2xl mb-2 block"></i>
+            <div>
+              <h3 class="text-xs sm:text-sm font-bold text-white mb-1">Controle Financeiro</h3>
+              <p class="text-[11px] text-zinc-400 leading-relaxed">Receitas, despesas, contas, metas e comparação mensal.</p>
+            </div>
+          </div>
+
+          <div onclick="openModule('08 — Plano de Estudos', 'estudos.html')" class="module-card">
+            <i class="ph-bold ph-student text-blue-400 text-2xl mb-2 block"></i>
+            <div>
+              <h3 class="text-xs sm:text-sm font-bold text-white mb-1">Plano de Estudos</h3>
+              <p class="text-[11px] text-zinc-400 leading-relaxed">Cronograma inteligente, matérias e cronômetro.</p>
+            </div>
+          </div>
+
+          <div onclick="openModule('10 — Editor de Documentos', 'documento.html')" class="module-card">
+            <i class="ph-bold ph-file-text text-blue-400 text-2xl mb-2 block"></i>
+            <div>
+              <h3 class="text-xs sm:text-sm font-bold text-white mb-1">Editor de Documentos</h3>
+              <p class="text-[11px] text-zinc-400 leading-relaxed">Word simplificado estilo A4 com exportação PDF/DOCX.</p>
+            </div>
+          </div>
+
+          <div onclick="openModule('11 — Editor CAD 2D', 'cad.html')" class="module-card">
+            <i class="ph-bold ph-compass text-blue-400 text-2xl mb-2 block"></i>
+            <div>
+              <h3 class="text-xs sm:text-sm font-bold text-white mb-1">Editor CAD 2D</h3>
+              <p class="text-[11px] text-zinc-400 leading-relaxed">Desenhos técnicos, croquis, cotas e exportação DXF.</p>
+            </div>
+          </div>
+
+          <div onclick="openModule('12 — Editor de Vídeo', 'video.html')" class="module-card">
+            <i class="ph-bold ph-film-strip text-red-400 text-2xl mb-2 block"></i>
+            <div>
+              <h3 class="text-xs sm:text-sm font-bold text-white mb-1">Editor de Vídeo</h3>
+              <p class="text-[11px] text-zinc-400 leading-relaxed">Cortar, juntar, redes sociais e extrair áudio.</p>
+            </div>
+          </div>
+
+          <div onclick="openModule('13 — Editor de Áudio', 'audio.html')" class="module-card">
+            <i class="ph-bold ph-waveform text-purple-400 text-2xl mb-2 block"></i>
+            <div>
+              <h3 class="text-xs sm:text-sm font-bold text-white mb-1">Editor de Áudio</h3>
+              <p class="text-[11px] text-zinc-400 leading-relaxed">Waveform, cortes, normalização e remoção de silêncio.</p>
+            </div>
+          </div>
+
+          <div onclick="openModule('14 — Apresentações', 'apresentacao.html')" class="module-card">
+            <i class="ph-bold ph-presentation text-blue-400 text-2xl mb-2 block"></i>
+            <div>
+              <h3 class="text-xs sm:text-sm font-bold text-white mb-1">Apresentações</h3>
+              <p class="text-[11px] text-zinc-400 leading-relaxed">Criador de slides visuais com gerador IA e PPTX.</p>
+            </div>
+          </div>
+
+          <div onclick="openModule('15 — Tarefas & Projetos', 'tarefas.html')" class="module-card">
+            <i class="ph-bold ph-check-square-offset text-blue-400 text-2xl mb-2 block"></i>
+            <div>
+              <h3 class="text-xs sm:text-sm font-bold text-white mb-1">Tarefas & Projetos</h3>
+              <p class="text-[11px] text-zinc-400 leading-relaxed">Quadro Kanban, lista, subtarefas, prioridades e progresso.</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+
+    <!-- IFRAME PARA RENDERIZAÇÃO DO MÓDULO ABERTO -->
+    <div id="module-iframe-wrapper" class="hidden h-full w-full relative">
+      <div class="absolute top-2 right-4 z-40 flex items-center gap-2">
+        <button onclick="closeModuleIframe()" class="px-3 py-1.5 rounded-xl bg-matte-card border border-matte-border text-zinc-300 hover:text-white text-xs font-bold flex items-center gap-1.5 shadow-2xl">
+          <i class="ph-bold ph-arrow-left"></i> Voltar ao My Hub
+        </button>
+      </div>
+      <iframe id="module-iframe"></iframe>
+    </div>
+
+  </main>
+
+  <!-- MODAL DE AUTENTICAÇÃO SUPABASE -->
+  <div id="modal-auth" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-sm shadow-2xl flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3">
+        <h3 class="text-sm font-bold text-white">Conectar Conta Supabase</h3>
+        <button onclick="toggleAuthModal(false)" class="text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
+      </div>
+
+      <form onsubmit="handleAuthSubmit(event)" class="space-y-3">
+        <div>
+          <label class="text-[11px] font-semibold text-zinc-400 block mb-1">E-mail</label>
+          <input type="email" id="auth-email" required placeholder="seu@email.com" class="w-full bg-white/[0.03] border border-matte-border rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-blue-500">
+        </div>
+        <div>
+          <label class="text-[11px] font-semibold text-zinc-400 block mb-1">Senha (Mínimo 6 caracteres)</label>
+          <input type="password" id="auth-pass" required minlength="6" placeholder="Sua senha..." class="w-full bg-white/[0.03] border border-matte-border rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-blue-500">
+        </div>
+
+        <button type="submit" id="btn-auth-submit" class="w-full py-2.5 rounded-xl bg-white text-black font-bold text-xs hover:bg-zinc-200 transition-colors shadow-lg mt-2">
+          Entrar / Cadastrar
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- LÓGICA DO HUB, SIDEBAR EXPANSÍVEL E NAVEGAÇÃO -->
+  <script>
+    let activeUser = null;
+    let isCompact = false;
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      const session = await PortalDB.getSession();
+      if (session) {
+        activeUser = session.user;
+      }
+      updateUserUI();
+    });
+
+    // ==== MENU LATERAL DRAWER EXPANSIVO ====
+    function toggleSidebarMenu(show) {
+      const menu = document.getElementById('sidebar-menu');
+      const backdrop = document.getElementById('sidebar-backdrop');
+
+      if (show) {
+        backdrop.classList.remove('hidden');
+        menu.classList.remove('sidebar-closed');
+        menu.classList.add('sidebar-open');
+      } else {
+        backdrop.classList.add('hidden');
+        menu.classList.remove('sidebar-open');
+        menu.classList.add('sidebar-closed');
+      }
+    }
+
+    function toggleCategoryGroup(groupId) {
+      const groupEl = document.getElementById(groupId);
+      const chevron = document.getElementById(`chevron-${groupId}`);
+      const isHidden = groupEl.classList.contains('hidden');
+
+      if (isHidden) {
+        groupEl.classList.remove('hidden');
+        chevron.style.transform = 'rotate(180deg)';
+      } else {
+        groupEl.classList.add('hidden');
+        chevron.style.transform = 'rotate(0deg)';
+      }
+    }
+
+    function openModuleFromSidebar(title, fileUrl) {
+      toggleSidebarMenu(false);
+      openModule(title, fileUrl);
+    }
+
+    function showHomeView() {
+      toggleSidebarMenu(false);
+      closeModuleIframe();
+    }
+
+    function toggleCompactMode() {
+      isCompact = !isCompact;
+      const gridWrapper = document.getElementById('tools-grid-wrapper');
+      const btnIcon = document.getElementById('compact-icon');
+      const btnLabel = document.getElementById('compact-label');
+
+      gridWrapper.classList.toggle('compact-mode', isCompact);
+      
+      if (isCompact) {
+        btnIcon.className = "ph-bold ph-rows text-sm text-blue-400";
+        btnLabel.innerText = "Expandido";
+        btnLabel.classList.add("text-blue-400");
+      } else {
+        btnIcon.className = "ph ph-squares-four text-sm";
+        btnLabel.innerText = "Quadrados";
+        btnLabel.classList.remove("text-blue-400");
+      }
+    }
+
+    function updateUserUI() {
+      const sec = document.getElementById('user-auth-section');
+      if (activeUser) {
+        sec.innerHTML = `
+          <button onclick="PortalDB.logout()" class="p-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 transition-colors flex items-center gap-1.5 text-xs font-bold" title="Conectado: ${activeUser.email} (Clique para sair)">
+            <i class="ph-fill ph-user-circle text-lg text-blue-400"></i>
+            <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+            <span class="hidden md:inline">${activeUser.email.split('@')[0]}</span>
+          </button>
+        `;
+      } else {
+        sec.innerHTML = `
+          <button onclick="toggleAuthModal(true)" id="btn-login-trigger" class="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-500 transition-colors flex items-center gap-1.5 text-xs font-bold" title="Desconectado - Clique para conectar ao Supabase">
+            <i class="ph-fill ph-user-circle text-lg text-red-500"></i>
+            <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+            <span class="hidden md:inline">Desconectado</span>
+          </button>
+        `;
+      }
+    }
+
+    function openModule(title, fileUrl) {
+      document.getElementById('modules-grid-container').classList.add('hidden');
+      const wrapper = document.getElementById('module-iframe-wrapper');
+      const iframe = document.getElementById('module-iframe');
+
+      iframe.src = fileUrl;
+      wrapper.classList.remove('hidden');
+    }
+
+    function closeModuleIframe() {
+      document.getElementById('module-iframe-wrapper').classList.add('hidden');
+      document.getElementById('module-iframe').src = 'about:blank';
+      document.getElementById('modules-grid-container').classList.remove('hidden');
+    }
+
+    // ==== BUSCA GLOBAL ====
+    async function handleGlobalSearch(term) {
+      const panel = document.getElementById('global-search-results-panel');
+      const list = document.getElementById('global-search-items-list');
+
+      if (!term || term.trim().length < 2) {
+        panel.classList.add('hidden');
+        return;
+      }
+
+      panel.classList.remove('hidden');
+      list.innerHTML = `<p class="text-xs text-zinc-500 py-2">Pesquisando registros...</p>`;
+
+      try {
+        const session = await PortalDB.getSession();
+        if (!session) {
+          list.innerHTML = `<p class="text-xs text-zinc-500 py-2">Conecte sua conta para efetuar buscas globais na nuvem.</p>`;
+          return;
+        }
+
+        const { data } = await supabase
+          .from('user_artifacts')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .is('deleted_at', null)
+          .ilike('name', `%${term}%`)
+          .limit(8);
+
+        if (!data || data.length === 0) {
+          list.innerHTML = `<p class="text-xs text-zinc-500 py-2">Nenhum registro encontrado para "${term}".</p>`;
+          return;
+        }
+
+        list.innerHTML = data.map(item => `
+          <div onclick="openModule('${item.name}', 'meus-dados.html')" class="p-2.5 rounded-xl border border-matte-border bg-white/[0.02] hover:bg-white/[0.05] cursor-pointer flex items-center justify-between text-xs">
+            <span class="font-bold text-white truncate max-w-xs">${item.name}</span>
+            <span class="text-[10px] text-blue-400 font-bold uppercase">${item.tool_type}</span>
+          </div>
+        `).join('');
+
+      } catch (e) {
+        list.innerHTML = `<p class="text-xs text-red-400 py-2">Erro ao pesquisar.</p>`;
+      }
+    }
+
+    function clearGlobalSearch() {
+      document.getElementById('global-search-input').value = '';
+      document.getElementById('global-search-results-panel').classList.add('hidden');
+    }
+
+    // ==== AUTENTICAÇÃO ====
+    function toggleAuthModal(show) { document.getElementById('modal-auth').classList.toggle('hidden', !show); }
+
+    async function handleAuthSubmit(e) {
+      e.preventDefault();
+      const email = document.getElementById('auth-email').value.trim();
+      const pass = document.getElementById('auth-pass').value;
+
+      try {
+        let user;
+        try {
+          user = await PortalDB.login(email, pass);
+        } catch (err) {
+          user = await PortalDB.register(email, pass);
+        }
+
+        activeUser = user;
+        updateUserUI();
+        toggleAuthModal(false);
+      } catch (err) {
+        alert("Erro de autenticação: " + err.message);
+      }
+    }
+  </script>
+</body>
+</html>
