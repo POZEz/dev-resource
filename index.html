@@ -1,432 +1,350 @@
 <!DOCTYPE html>
 <html lang="pt-BR" class="dark">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="theme-color" content="#09090b">
-  <title>Meu Hub Pessoal</title>
-  
-  <!-- CDN Supabase Oficial -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  
-  <!-- ============================================================================
-       CLIENTE CENTRAL SUPABASE & AUTENTICAÇÃO
-       ============================================================================ -->
-  <script>
-    // Configurações do seu banco de dados
-    const SUPABASE_URL = 'https://zlsdlcvtcsrykfacjvhf.supabase.co'; 
-    const SUPABASE_KEY = 'sb_publishable_JnDv-fxHXPTzNaFX9n3Z0w_4mqt47Js';
-
-    window.onloadInitSupabase = () => {
-      const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-      // PortalDB é exposto globalmente para que os iframes (gestao, financas) possam acessá-lo
-      window.PortalDB = {
-          supabase: supabase,
-          
-          async getSession() {
-              try {
-                  const { data, error } = await supabase.auth.getSession();
-                  if (error) throw error;
-                  return data?.session;
-              } catch (error) {
-                  return null;
-              }
-          },
-
-          validateKey(chave) {
-              if (chave.length < 8 || chave.length > 25) throw new Error('A chave deve ter entre 8 e 25 caracteres.');
-              if (!/[a-zA-Z]/.test(chave) || !/[0-9]/.test(chave)) throw new Error('A chave precisa conter pelo menos uma letra e um número.');
-              if (!/^[\x20-\x7E]+$/.test(chave)) throw new Error('Caracteres inválidos. Use apenas o teclado padrão.');
-          },
-          
-          async login(chaveAcesso) {
-              this.validateKey(chaveAcesso);
-              const internalEmail = `${chaveAcesso}@portal.internal`;
-
-              const { data, error } = await supabase.auth.signInWithPassword({
-                  email: internalEmail,
-                  password: chaveAcesso
-              });
-
-              if (error) {
-                  if (error.message.includes('Invalid login credentials')) {
-                      throw new Error('Chave incorreta ou não registada.');
-                  }
-                  throw new Error('Erro de conexão: ' + error.message);
-              }
-              return data.user;
-          },
-
-          async register(chaveAcesso) {
-              this.validateKey(chaveAcesso);
-              const internalEmail = `${chaveAcesso}@portal.internal`;
-
-              const { data, error } = await supabase.auth.signUp({
-                  email: internalEmail,
-                  password: chaveAcesso
-              });
-
-              if (error) {
-                  if (error.message.includes('already registered') || error.message.includes('User already exists')) {
-                      throw new Error('Esta chave já está em uso. Tente "Acessar" em vez de criar.');
-                  }
-                  throw new Error('Erro ao criar nuvem: ' + error.message);
-              }
-              return data.user;
-          },
-          
-          async logout() {
-              await supabase.auth.signOut();
-          }
-      };
-
-      initializeAppUI();
-    };
-  </script>
-
-  <!-- Tailwind CSS & Ícones -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/@phosphor-icons/web"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  
-  <script>
-    tailwind.config = { darkMode: 'class', theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'] }, colors: { matte: { bg: '#09090b', card: '#121214', border: '#27272a', text: '#fafafa', muted: '#a1a1aa' } } } } }
-  </script>
-
-  <style>
-    body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #09090b; color: #fafafa; overflow: hidden; -webkit-tap-highlight-color: transparent; }
-    
-    /* Noise Fundo - Estritamente atrás de tudo */
-    .noise-bg { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: -10; opacity: 0.015; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.5' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E"); }
-    
-    .h-screen-safe { height: 100vh; height: 100dvh; }
-    
-    /* Modificadores de Cartão */
-    .card-hover-effect { transition: background-color 0.3s ease, border-color 0.3s ease; }
-    .card-hover-effect:hover { background-color: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.1); }
-    
-    /* Scrollbars */
-    .custom-scroll::-webkit-scrollbar { width: 6px; }
-    .custom-scroll::-webkit-scrollbar-track { background: transparent; }
-    .custom-scroll::-webkit-scrollbar-thumb { background: #27272a; border-radius: 10px; }
-    .custom-scroll::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
-
-    /* Modo Compacto Mobile */
-    @media (max-width: 639px) {
-      #apps-grid.is-compact { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
-      #apps-grid.is-compact .app-card { padding: 1rem; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 110px; }
-      #apps-grid.is-compact .app-header { margin-bottom: 0.5rem; justify-content: center; width: auto; }
-      #apps-grid.is-compact .app-arrow, #apps-grid.is-compact .app-desc { display: none; }
-      #apps-grid.is-compact .app-title { font-size: 0.85rem; line-height: 1.2; margin-bottom: 0; }
-      #apps-grid.is-compact .app-icon-wrapper { width: 3rem; height: 3rem; border-radius: 0.75rem; }
-      #apps-grid.is-compact .app-icon-wrapper i { font-size: 1.25rem; }
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#09090b">
+<title>Meu Hub Pessoal</title>
+​<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+​<script>
+tailwind.config = {
+darkMode: 'class',
+theme: {
+extend: {
+fontFamily: { sans: ['Inter', 'sans-serif'] },
+colors: {
+matte: { bg: '#09090b', card: '#121214', border: '#27272a', text: '#fafafa', muted: '#a1a1aa' }
+}
+}
+}
+};
+</script>
+​<style>
+body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #09090b; color: #fafafa; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+​.noise-bg {
+position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: -10; opacity: 0.015;
+background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.5' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+​.h-screen-safe { height: 100vh; height: 100dvh; }
+​.card-hover-effect { transition: background-color 0.2s ease, border-color 0.2s ease; }
+.card-hover-effect:hover { background-color: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.1); }
+​.custom-scroll::-webkit-scrollbar { width: 6px; }
+.custom-scroll::-webkit-scrollbar-track { background: transparent; }
+.custom-scroll::-webkit-scrollbar-thumb { background: #27272a; border-radius: 10px; }
+.custom-scroll::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+​@media (max-width: 639px) {
+#apps-grid.is-compact { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+#apps-grid.is-compact .app-card { padding: 1rem; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 110px; }
+#apps-grid.is-compact .app-header { margin-bottom: 0.5rem; justify-content: center; width: auto; }
+#apps-grid.is-compact .app-arrow, #apps-grid.is-compact .app-desc { display: none; }
+#apps-grid.is-compact .app-title { font-size: 0.85rem; line-height: 1.2; margin-bottom: 0; }
+#apps-grid.is-compact .app-icon-wrapper { width: 3rem; height: 3rem; border-radius: 0.75rem; }
+#apps-grid.is-compact .app-icon-wrapper i { font-size: 1.25rem; }
+}
+</style>
 </head>
 <body class="antialiased flex flex-col relative h-screen-safe font-sans z-0">
-
-  <div class="noise-bg"></div>
-
-  <!-- HEADER GERAL -->
-  <header class="h-[64px] shrink-0 bg-matte-bg/80 backdrop-blur-xl border-b border-white/[0.04] z-50 flex items-center px-4 sm:px-6 relative">
-    
-    <!-- Cabeçalho Inicio -->
-    <div id="header-home" class="w-full flex justify-between items-center transition-all duration-300">
-      <div class="flex items-center gap-3">
-        <div class="w-8 h-8 rounded-lg bg-white/[0.05] border border-white/[0.08] flex items-center justify-center text-white shadow-lg">
-          <i class="ph-fill ph-planet text-lg"></i>
-        </div>
-        <h1 class="text-base font-bold text-white tracking-wide">Workspace</h1>
-      </div>
-      
-      <button id="btn-cloud-status" onclick="handleCloudButtonClick()" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.05] transition-colors text-sm font-medium text-zinc-300">
-        <i id="cloud-icon" class="ph-fill ph-cloud-slash text-zinc-400"></i>
-        <span id="cloud-text" class="hidden sm:inline">Nuvem Offline</span>
-      </button>
-    </div>
-
-    <!-- Cabeçalho App -->
-    <div id="header-app" class="absolute inset-0 px-4 sm:px-6 flex items-center justify-between opacity-0 pointer-events-none transition-all duration-300">
-      <button onclick="closeApp()" class="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors group">
-        <div class="w-8 h-8 rounded-lg bg-white/[0.03] group-hover:bg-white/[0.08] flex items-center justify-center transition-colors">
-          <i class="ph-bold ph-arrow-left text-lg"></i>
-        </div>
-        <span class="text-sm font-bold">Início</span>
-      </button>
-      <div class="flex items-center gap-2">
-        <span id="current-app-title" class="text-sm font-bold text-zinc-300">Carregando...</span>
-      </div>
-    </div>
-  </header>
-
-  <!-- ÁREA DE CONTEÚDO (FLEX) -->
-  <div class="relative flex-1 w-full overflow-hidden">
-      
-      <!-- DASHBOARD (Visível por padrão) -->
-      <main id="view-dashboard" class="absolute inset-0 overflow-y-auto custom-scroll z-20 transition-opacity duration-300">
-        <div class="max-w-5xl mx-auto px-4 sm:px-6 py-8 pb-24">
-          <div class="flex justify-between items-end mb-8 sm:mb-10">
-            <div>
-              <h2 class="text-2xl sm:text-4xl font-bold text-white tracking-tight mb-1 sm:mb-2">Seu Espaço de Trabalho</h2>
-              <p class="text-sm sm:text-base text-zinc-500 font-medium">Escolha uma ferramenta para começar.</p>
-            </div>
-            <button id="btn-toggle-layout" onclick="toggleLayoutMode()" class="sm:hidden p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.05] text-zinc-400 hover:text-white transition-colors">
-              <i id="layout-icon" class="ph-bold ph-grid-four text-xl"></i>
-            </button>
-          </div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6" id="apps-grid"></div>
-        </div>
-      </main>
-
-      <!-- IFRAME APPS (Escondido por padrão) -->
-      <div id="view-app" class="absolute inset-0 bg-matte-bg z-10 hidden opacity-0 transition-opacity duration-300">
-        <div id="app-loader" class="absolute inset-0 flex flex-col items-center justify-center bg-matte-bg z-30 transition-opacity duration-300">
-          <div class="w-10 h-10 border-4 border-white/[0.05] border-t-blue-500 rounded-full animate-spin mb-4"></div>
-          <p class="text-xs font-bold text-zinc-500 uppercase tracking-widest animate-pulse">Carregando Módulo...</p>
-        </div>
-        <iframe id="app-frame" src="about:blank" class="w-full h-full border-none absolute inset-0 z-20" onload="handleIframeLoad()"></iframe>
-      </div>
-
-  </div>
-
-  <!-- MODAL: SINCRONIZAÇÃO EM NUVEM -->
-  <div id="auth-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300 p-4">
-    <div class="bg-matte-card w-full max-w-sm rounded-2xl border border-white/[0.05] p-6 sm:p-8 transform scale-95 transition-all duration-300 shadow-2xl relative" id="auth-modal-content">
-      
-      <button onclick="toggleAuthModal(false)" class="absolute top-4 right-4 p-2 text-zinc-500 hover:text-white bg-white/[0.02] hover:bg-white/[0.05] rounded-full transition-colors">
-        <i class="ph-bold ph-x text-sm"></i>
-      </button>
-      
-      <div class="w-16 h-16 rounded-2xl bg-blue-500/10 flex items-center justify-center mb-6 mx-auto">
-        <i class="ph-fill ph-cloud-check text-3xl text-blue-400"></i>
-      </div>
-
-      <!-- TABS: Acessar | Criar -->
-      <div class="flex p-1 bg-white/[0.02] border border-white/[0.05] rounded-xl mb-6">
-        <button id="tab-login" onclick="setAuthMode('login')" class="flex-1 py-2 text-sm font-bold rounded-lg bg-white/[0.05] text-white shadow-sm transition-colors">Acessar Conta</button>
-        <button id="tab-register" onclick="setAuthMode('register')" class="flex-1 py-2 text-sm font-bold rounded-lg text-zinc-500 hover:text-zinc-300 transition-colors">Criar Nova</button>
-      </div>
-
-      <div class="space-y-3">
-        <div>
-          <label class="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Sua Chave de Acesso</label>
-          <input type="password" id="login-keyword" placeholder="Senha super secreta" maxlength="25" autocomplete="off" class="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl p-3.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-blue-500/50 transition-colors">
-          <p id="login-error" class="text-xs font-medium text-red-400 mt-2 hidden"></p>
-        </div>
-
-        <ul class="text-[10px] font-medium text-zinc-500 space-y-1 mb-2 bg-white/[0.02] p-3 rounded-xl border border-white/[0.02]">
-          <li class="flex items-center gap-1.5"><i class="ph-bold ph-circle text-[8px]"></i> 8 a 25 caracteres</li>
-          <li class="flex items-center gap-1.5"><i class="ph-bold ph-circle text-[8px]"></i> Letras e números obrigatórios</li>
-          <li class="flex items-center gap-1.5"><i class="ph-bold ph-circle text-[8px]"></i> Apenas teclado padrão</li>
-        </ul>
-        
-        <button onclick="executeAuth()" id="btn-login" class="w-full py-3.5 rounded-xl font-bold bg-white text-black hover:bg-zinc-200 transition-colors shadow-lg shadow-white/10 mt-2 flex items-center justify-center gap-2">
-          Entrar na Nuvem
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    const appsList = [
-      { id: 'gestao', title: 'Gestão de Visitas', desc: 'Controle de visitas, acompanhamentos e relatórios.', icon: 'ph-users-three', color: 'text-blue-400', bgIcon: 'bg-blue-500/10', file: 'gestao.html' },
-      { id: 'financas', title: 'Controlo Financeiro', desc: 'Gestão de despesas, receitas e metas.', icon: 'ph-currency-dollar', color: 'text-emerald-400', bgIcon: 'bg-emerald-500/10', file: 'financas.html' },
-      { id: 'foco', title: 'Plano de Estudos', desc: 'Cronogramas e tarefas de estudos.', icon: 'ph-student', color: 'text-purple-400', bgIcon: 'bg-purple-500/10', file: 'foco.html' }
-    ];
-
-    let isCompactMode = localStorage.getItem('hub_compact_mode') === 'true';
-    let isCloudConnected = false;
-    let currentAuthMode = 'login'; 
-
-    window.onload = () => { if(window.onloadInitSupabase) window.onloadInitSupabase(); };
-
-    async function initializeAppUI() {
-      renderDashboard();
-      const session = await window.PortalDB.getSession();
-      if (session) updateCloudStatus(true);
-    }
-
-    function updateCloudStatus(connected) {
-      isCloudConnected = connected;
-      const btn = document.getElementById('btn-cloud-status'), icon = document.getElementById('cloud-icon'), text = document.getElementById('cloud-text');
-      if (connected) {
-        icon.className = 'ph-fill ph-cloud-check text-blue-400';
-        text.innerText = 'Sincronizado';
-        btn.classList.replace('bg-white/[0.03]', 'bg-blue-500/10');
-        btn.classList.replace('border-white/[0.05]', 'border-blue-500/20');
-        btn.classList.add('text-blue-400');
-      } else {
-        icon.className = 'ph-fill ph-cloud-slash text-zinc-400';
-        text.innerText = 'Nuvem Offline';
-        btn.classList.replace('bg-blue-500/10', 'bg-white/[0.03]');
-        btn.classList.replace('border-blue-500/20', 'border-white/[0.05]');
-        btn.classList.remove('text-blue-400');
-      }
-    }
-
-    function handleCloudButtonClick() {
-      if (isCloudConnected) {
-        if(confirm("Deseja desconectar a nuvem e encerrar a sessão?")) {
-          window.PortalDB.logout().then(() => updateCloudStatus(false));
-        }
-      } else {
-        toggleAuthModal(true);
-      }
-    }
-
-    function initLayoutMode() {
-      const grid = document.getElementById('apps-grid'), icon = document.getElementById('layout-icon');
-      if (isCompactMode) { grid.classList.add('is-compact'); icon.className = 'ph-bold ph-list text-xl'; } 
-      else { grid.classList.remove('is-compact'); icon.className = 'ph-bold ph-grid-four text-xl'; }
-    }
-
-    function toggleLayoutMode() {
-      isCompactMode = !isCompactMode;
-      localStorage.setItem('hub_compact_mode', isCompactMode);
-      initLayoutMode();
-    }
-
-    function renderDashboard() {
-      const grid = document.getElementById('apps-grid');
-      let html = '';
-      appsList.forEach(app => {
-        html += `
-          <button onclick="openApp('${app.file}', '${app.title}')" class="app-card text-left w-full bg-white/[0.02] border border-white/[0.04] rounded-2xl p-5 sm:p-6 flex flex-col h-full card-hover-effect group focus:outline-none focus:ring-2 focus:ring-blue-500/50">
-            <div class="app-header flex justify-between items-start mb-4 sm:mb-5 w-full">
-              <div class="app-icon-wrapper w-12 h-12 rounded-[14px] ${app.bgIcon} flex items-center justify-center transition-all">
-                <i class="app-icon ph-fill ${app.icon} text-2xl ${app.color} transition-all"></i>
-              </div>
-              <div class="app-arrow w-8 h-8 rounded-full bg-white/[0.02] group-hover:bg-white/[0.08] flex items-center justify-center text-zinc-500 group-hover:text-white transition-colors">
-                <i class="ph-bold ph-arrow-up-right text-sm"></i>
-              </div>
-            </div>
-            <h3 class="app-title text-base sm:text-lg font-bold text-white mb-1.5 sm:mb-2 transition-colors">${app.title}</h3>
-            <p class="app-desc text-sm text-zinc-400 leading-relaxed">${app.desc}</p>
-          </button>`;
-      });
-      grid.innerHTML = html; initLayoutMode();
-    }
-
-    // ==== NAVEGAÇÃO SEGURA (C/ Display None para evitar bloqueio de cliques) ====
-    function openApp(file, title) {
-      if(!file) return;
-      document.getElementById('header-home').classList.add('opacity-0', 'pointer-events-none');
-      document.getElementById('header-app').classList.remove('opacity-0', 'pointer-events-none');
-      document.getElementById('current-app-title').innerText = title;
-      
-      const dashboard = document.getElementById('view-dashboard');
-      const appView = document.getElementById('view-app');
-      const frame = document.getElementById('app-frame');
-      const loader = document.getElementById('app-loader');
-
-      loader.style.opacity = '1'; 
-      frame.style.opacity = '0';
-      
-      dashboard.style.display = 'none';
-      appView.style.display = 'block';
-      
-      setTimeout(() => {
-          appView.classList.remove('opacity-0');
-          frame.src = file;
-      }, 10);
-    }
-
-    function closeApp() {
-      document.getElementById('header-app').classList.add('opacity-0', 'pointer-events-none');
-      document.getElementById('header-home').classList.remove('opacity-0', 'pointer-events-none');
-      
-      const dashboard = document.getElementById('view-dashboard');
-      const appView = document.getElementById('view-app');
-      const frame = document.getElementById('app-frame');
-
-      appView.classList.add('opacity-0');
-      
-      setTimeout(() => {
-          appView.style.display = 'none';
-          dashboard.style.display = 'block';
-          frame.src = 'about:blank'; // Limpa a memória e previne bugs
-      }, 300);
-    }
-
-    function handleIframeLoad() {
-      const frame = document.getElementById('app-frame'), loader = document.getElementById('app-loader');
-      if (frame.src === 'about:blank' || frame.src === '') return;
-      setTimeout(() => { loader.style.opacity = '0'; frame.style.opacity = '1'; }, 300);
-    }
-
-    function setAuthMode(mode) {
-        currentAuthMode = mode;
-        const tabLogin = document.getElementById('tab-login');
-        const tabRegister = document.getElementById('tab-register');
-        const btn = document.getElementById('btn-login');
-        const errorEl = document.getElementById('login-error');
-        
-        errorEl.classList.add('hidden');
-        document.getElementById('login-keyword').value = '';
-
-        if (mode === 'login') {
-            tabLogin.className = 'flex-1 py-2 text-sm font-bold rounded-lg bg-white/[0.05] text-white shadow-sm transition-colors';
-            tabRegister.className = 'flex-1 py-2 text-sm font-bold rounded-lg text-zinc-500 hover:text-zinc-300 transition-colors';
-            btn.innerText = 'Acessar Nuvem';
-        } else {
-            tabRegister.className = 'flex-1 py-2 text-sm font-bold rounded-lg bg-white/[0.05] text-white shadow-sm transition-colors';
-            tabLogin.className = 'flex-1 py-2 text-sm font-bold rounded-lg text-zinc-500 hover:text-zinc-300 transition-colors';
-            btn.innerText = 'Criar Nova Conta';
-        }
-    }
-
-    function toggleAuthModal(show) {
-      const modal = document.getElementById('auth-modal'), content = document.getElementById('auth-modal-content');
-      if (show) {
-        setAuthMode('login'); 
-        modal.classList.remove('opacity-0', 'pointer-events-none');
-        setTimeout(() => content.classList.remove('scale-95'), 10);
-      } else {
-        content.classList.add('scale-95'); modal.classList.add('opacity-0');
-        setTimeout(() => modal.classList.add('pointer-events-none'), 300);
-      }
-    }
-
-    async function executeAuth() {
-      const input = document.getElementById('login-keyword').value;
-      const errorEl = document.getElementById('login-error');
-      const btn = document.getElementById('btn-login');
-      const originalText = btn.innerText;
-
-      errorEl.classList.add('hidden');
-      btn.innerHTML = '<div class="w-5 h-5 border-2 border-black/20 border-t-black rounded-full animate-spin"></div>';
-      btn.disabled = true;
-
-      try {
-        if (currentAuthMode === 'login') {
-            await window.PortalDB.login(input);
-        } else {
-            await window.PortalDB.register(input);
-        }
-        
-        btn.innerHTML = '<i class="ph-bold ph-check text-lg"></i> Conectado';
-        btn.classList.replace('bg-white', 'bg-blue-500'); btn.classList.replace('text-black', 'text-white');
-        updateCloudStatus(true);
-        
-        setTimeout(() => {
-          toggleAuthModal(false);
-          setTimeout(() => {
-            btn.innerHTML = originalText; btn.disabled = false;
-            btn.classList.replace('bg-blue-500', 'bg-white'); btn.classList.replace('text-white', 'text-black');
-          }, 300);
-        }, 1200);
-
-      } catch (err) {
-        errorEl.innerText = err.message;
-        errorEl.classList.remove('hidden');
-        btn.innerText = originalText;
-        btn.disabled = false;
-      }
-    }
-
-    document.getElementById('login-keyword').addEventListener('keypress', (e) => { if (e.key === 'Enter') executeAuth(); });
-  </script>
+​<div class="noise-bg"></div>
+​<!-- HEADER -->
+<header class="h-[64px] shrink-0 bg-matte-bg/80 backdrop-blur-xl border-b border-white/[0.04] z-50 flex items-center px-4 sm:px-6 relative">
+<div id="header-home" class="w-full flex justify-between items-center transition-opacity duration-200">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-white/[0.05] border border-white/[0.08] flex items-center justify-center text-white shadow-lg">
+<i class="ph-fill ph-planet text-lg"></i>
+</div>
+<h1 class="text-base font-bold text-white tracking-wide">Workspace</h1>
+</div>
+​<button id="btn-cloud-status" onclick="handleCloudButtonClick()" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.05] transition-all text-sm font-medium text-zinc-300">
+<i id="cloud-icon" class="ph-fill ph-cloud-slash text-zinc-400"></i>
+<span id="cloud-text" class="hidden sm:inline">Nuvem Offline</span>
+</button>
+</div>
+​<div id="header-app" class="absolute inset-0 px-4 sm:px-6 flex items-center justify-between opacity-0 pointer-events-none transition-opacity duration-200">
+<button onclick="closeApp()" class="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors group">
+<div class="w-8 h-8 rounded-lg bg-white/[0.03] group-hover:bg-white/[0.08] flex items-center justify-center transition-colors">
+<i class="ph-bold ph-arrow-left text-lg"></i>
+</div>
+<span class="text-sm font-bold">Início</span>
+</button>
+<span id="current-app-title" class="text-sm font-bold text-zinc-300">Carregando...</span>
+</div>
+</header>
+​<!-- WORKSPACE MAIN CONTENT -->
+<div class="relative flex-1 w-full overflow-hidden">
+<main id="view-dashboard" class="absolute inset-0 overflow-y-auto custom-scroll z-20 transition-opacity duration-200">
+<div class="max-w-5xl mx-auto px-4 sm:px-6 py-8 pb-24">
+<div class="flex justify-between items-end mb-8 sm:mb-10">
+<div>
+<h2 class="text-2xl sm:text-4xl font-bold text-white tracking-tight mb-1 sm:mb-2">Seu Espaço de Trabalho</h2>
+<p class="text-sm sm:text-base text-zinc-500 font-medium">Escolha uma ferramenta para começar.</p>
+</div>
+<button id="btn-toggle-layout" onclick="toggleLayoutMode()" class="sm:hidden p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.05] text-zinc-400 hover:text-white transition-colors" aria-label="Alternar Layout">
+<i id="layout-icon" class="ph-bold ph-grid-four text-xl"></i>
+</button>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6" id="apps-grid"></div>
+</div>
+</main>
+​<div id="view-app" class="absolute inset-0 bg-matte-bg z-10 hidden opacity-0 transition-opacity duration-200">
+<div id="app-loader" class="absolute inset-0 flex flex-col items-center justify-center bg-matte-bg z-30 transition-opacity duration-200">
+<div class="w-10 h-10 border-4 border-white/[0.05] border-t-blue-500 rounded-full animate-spin mb-4"></div>
+<p class="text-xs font-bold text-zinc-500 uppercase tracking-widest animate-pulse">Carregando Módulo...</p>
+</div>
+<iframe id="app-frame" src="about:blank" class="w-full h-full border-none absolute inset-0 z-20" onload="handleIframeLoad()"></iframe>
+</div>
+</div>
+​<!-- AUTH MODAL -->
+<div id="auth-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-200 p-4">
+<div id="auth-modal-content" class="bg-matte-card w-full max-w-sm rounded-2xl border border-white/[0.05] p-6 sm:p-8 transform scale-95 transition-transform duration-200 shadow-2xl relative">
+​<button onclick="toggleAuthModal(false)" class="absolute top-4 right-4 p-2 text-zinc-500 hover:text-white bg-white/[0.02] hover:bg-white/[0.05] rounded-full transition-colors">
+<i class="ph-bold ph-x text-sm"></i>
+</button>
+​<div class="w-16 h-16 rounded-2xl bg-blue-500/10 flex items-center justify-center mb-6 mx-auto">
+<i class="ph-fill ph-cloud-check text-3xl text-blue-400"></i>
+</div>
+​<div class="flex p-1 bg-white/[0.02] border border-white/[0.05] rounded-xl mb-6">
+<button id="tab-login" onclick="setAuthMode('login')" class="flex-1 py-2 text-sm font-bold rounded-lg bg-white/[0.05] text-white shadow-sm transition-colors">Acessar Conta</button>
+<button id="tab-register" onclick="setAuthMode('register')" class="flex-1 py-2 text-sm font-bold rounded-lg text-zinc-500 hover:text-zinc-300 transition-colors">Criar Nova</button>
+</div>
+​<div class="space-y-3">
+<div>
+<label for="login-keyword" class="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Sua Chave de Acesso</label>
+<input type="password" id="login-keyword" placeholder="Senha super secreta" maxlength="25" autocomplete="current-password" class="w-full bg-white/[0.02] border border-white/[0.05] rounded-xl p-3.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-blue-500/50 transition-colors">
+<p id="login-error" class="text-xs font-medium text-red-400 mt-2 hidden"></p>
+</div>
+​<ul class="text-[10px] font-medium text-zinc-500 space-y-1 mb-2 bg-white/[0.02] p-3 rounded-xl border border-white/[0.02]">
+<li class="flex items-center gap-1.5"><i class="ph-bold ph-circle text-[8px]"></i> 8 a 25 caracteres</li>
+<li class="flex items-center gap-1.5"><i class="ph-bold ph-circle text-[8px]"></i> Letras e números obrigatórios</li>
+<li class="flex items-center gap-1.5"><i class="ph-bold ph-circle text-[8px]"></i> Apenas teclado padrão</li>
+</ul>
+​<button onclick="executeAuth()" id="btn-login" class="w-full py-3.5 rounded-xl font-bold bg-white text-black hover:bg-zinc-200 transition-colors shadow-lg shadow-white/10 mt-2 flex items-center justify-center gap-2">
+Entrar na Nuvem
+</button>
+</div>
+</div>
+</div>
+​<script>
+const SUPABASE_URL = 'https://zlsdlcvtcsrykfacjvhf.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_JnDv-fxHXPTzNaFX9n3Z0w_4mqt47Js';
+​const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+​// exposto em window.PortalDB para consumo nos iframes
+window.PortalDB = {
+supabase,
+​async getSession() {
+try {
+const { data, error } = await supabase.auth.getSession();
+if (error) throw error;
+return data?.session;
+} catch {
+return null;
+}
+},
+​validateKey(key) {
+if (!key || key.length < 8 || key.length > 25) {
+throw new Error('A chave deve ter entre 8 e 25 caracteres.');
+}
+if (!/[a-zA-Z]/.test(key) || !/[0-9]/.test(key)) {
+throw new Error('A chave precisa conter pelo menos uma letra e um número.');
+}
+if (!/^[\x20-\x7E]+$/.test(key)) {
+throw new Error('Caracteres inválidos. Use apenas o teclado padrão.');
+}
+},
+​async login(key) {
+this.validateKey(key);
+const email = ${key}@portal.internal;
+const { data, error } = await supabase.auth.signInWithPassword({ email, password: key });
+​if (error) {
+if (error.message.includes('Invalid login credentials')) {
+throw new Error('Chave incorreta ou não registrada.');
+}
+throw new Error('Erro de conexão: ' + error.message);
+}
+return data.user;
+},
+​async register(key) {
+this.validateKey(key);
+const email = ${key}@portal.internal;
+const { data, error } = await supabase.auth.signUp({ email, password: key });
+​if (error) {
+if (error.message.includes('already registered') || error.message.includes('User already exists')) {
+throw new Error('Esta chave já está em uso. Tente "Acessar" em vez de criar.');
+}
+throw new Error('Erro ao criar nuvem: ' + error.message);
+}
+return data.user;
+},
+​async logout() {
+await supabase.auth.signOut();
+}
+};
+​const appsList = [
+{ id: 'gestao', title: 'Gestão de Visitas', desc: 'Controle de visitas, acompanhamentos e relatórios.', icon: 'ph-users-three', color: 'text-blue-400', bgIcon: 'bg-blue-500/10', file: 'gestao.html' },
+{ id: 'financas', title: 'Controlo Financeiro', desc: 'Gestão de despesas, receitas e metas.', icon: 'ph-currency-dollar', color: 'text-emerald-400', bgIcon: 'bg-emerald-500/10', file: 'financas.html' },
+{ id: 'foco', title: 'Plano de Estudos', desc: 'Cronogramas e tarefas de estudos.', icon: 'ph-student', color: 'text-purple-400', bgIcon: 'bg-purple-500/10', file: 'foco.html' }
+];
+​let isCompactMode = localStorage.getItem('hub_compact_mode') === 'true';
+let isCloudConnected = false;
+let currentAuthMode = 'login';
+​document.addEventListener('DOMContentLoaded', async () => {
+renderDashboard();
+const session = await window.PortalDB.getSession();
+if (session) updateCloudStatus(true);
+​document.getElementById('login-keyword').addEventListener('keypress', (e) => {
+if (e.key === 'Enter') executeAuth();
+});
+});
+​function updateCloudStatus(connected) {
+isCloudConnected = connected;
+const btn = document.getElementById('btn-cloud-status');
+const icon = document.getElementById('cloud-icon');
+const text = document.getElementById('cloud-text');
+​if (connected) {
+icon.className = 'ph-fill ph-cloud-check text-blue-400';
+text.innerText = 'Sincronizado';
+btn.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-sm font-medium transition-all';
+} else {
+icon.className = 'ph-fill ph-cloud-slash text-zinc-400';
+text.innerText = 'Nuvem Offline';
+btn.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.05] text-zinc-300 text-sm font-medium transition-all';
+}
+}
+​async function handleCloudButtonClick() {
+if (isCloudConnected) {
+if (confirm('Deseja desconectar a nuvem e encerrar a sessão?')) {
+await window.PortalDB.logout();
+updateCloudStatus(false);
+}
+} else {
+toggleAuthModal(true);
+}
+}
+​function applyLayoutMode() {
+const grid = document.getElementById('apps-grid');
+const icon = document.getElementById('layout-icon');
+if (isCompactMode) {
+grid.classList.add('is-compact');
+icon.className = 'ph-bold ph-list text-xl';
+} else {
+grid.classList.remove('is-compact');
+icon.className = 'ph-bold ph-grid-four text-xl';
+}
+}
+​function toggleLayoutMode() {
+isCompactMode = !isCompactMode;
+localStorage.setItem('hub_compact_mode', isCompactMode);
+applyLayoutMode();
+}
+​function renderDashboard() {
+const grid = document.getElementById('apps-grid');
+grid.innerHTML = appsList.map(app => <button onclick="openApp('${app.file}', '${app.title}')" class="app-card text-left w-full bg-white/[0.02] border border-white/[0.04] rounded-2xl p-5 sm:p-6 flex flex-col h-full card-hover-effect group focus:outline-none focus:ring-2 focus:ring-blue-500/50"> <div class="app-header flex justify-between items-start mb-4 sm:mb-5 w-full"> <div class="app-icon-wrapper w-12 h-12 rounded-[14px] ${app.bgIcon} flex items-center justify-center transition-all"> <i class="app-icon ph-fill ${app.icon} text-2xl ${app.color}"></i> </div> <div class="app-arrow w-8 h-8 rounded-full bg-white/[0.02] group-hover:bg-white/[0.08] flex items-center justify-center text-zinc-500 group-hover:text-white transition-colors"> <i class="ph-bold ph-arrow-up-right text-sm"></i> </div> </div> <h3 class="app-title text-base sm:text-lg font-bold text-white mb-1.5 sm:mb-2">${app.title}</h3> <p class="app-desc text-sm text-zinc-400 leading-relaxed">${app.desc}</p> </button>).join('');
+​applyLayoutMode();
+}
+​function openApp(file, title) {
+if (!file) return;
+document.getElementById('header-home').classList.add('opacity-0', 'pointer-events-none');
+document.getElementById('header-app').classList.remove('opacity-0', 'pointer-events-none');
+document.getElementById('current-app-title').innerText = title;
+​const dashboard = document.getElementById('view-dashboard');
+const appView = document.getElementById('view-app');
+const frame = document.getElementById('app-frame');
+const loader = document.getElementById('app-loader');
+​loader.style.opacity = '1';
+frame.style.opacity = '0';
+dashboard.style.display = 'none';
+appView.style.display = 'block';
+​requestAnimationFrame(() => {
+appView.classList.remove('opacity-0');
+frame.src = file;
+});
+}
+​function closeApp() {
+document.getElementById('header-app').classList.add('opacity-0', 'pointer-events-none');
+document.getElementById('header-home').classList.remove('opacity-0', 'pointer-events-none');
+​const dashboard = document.getElementById('view-dashboard');
+const appView = document.getElementById('view-app');
+const frame = document.getElementById('app-frame');
+​appView.classList.add('opacity-0');
+​setTimeout(() => {
+appView.style.display = 'none';
+dashboard.style.display = 'block';
+frame.src = 'about:blank';
+}, 200);
+}
+​function handleIframeLoad() {
+const frame = document.getElementById('app-frame');
+const loader = document.getElementById('app-loader');
+if (frame.src === 'about:blank' || !frame.src) return;
+​loader.style.opacity = '0';
+frame.style.opacity = '1';
+}
+​function setAuthMode(mode) {
+currentAuthMode = mode;
+const tabLogin = document.getElementById('tab-login');
+const tabRegister = document.getElementById('tab-register');
+const btn = document.getElementById('btn-login');
+​document.getElementById('login-error').classList.add('hidden');
+document.getElementById('login-keyword').value = '';
+​const activeTabStyle = 'flex-1 py-2 text-sm font-bold rounded-lg bg-white/[0.05] text-white shadow-sm transition-colors';
+const inactiveTabStyle = 'flex-1 py-2 text-sm font-bold rounded-lg text-zinc-500 hover:text-zinc-300 transition-colors';
+​if (mode === 'login') {
+tabLogin.className = activeTabStyle;
+tabRegister.className = inactiveTabStyle;
+btn.innerText = 'Acessar Nuvem';
+} else {
+tabRegister.className = activeTabStyle;
+tabLogin.className = inactiveTabStyle;
+btn.innerText = 'Criar Nova Conta';
+}
+}
+​function toggleAuthModal(show) {
+const modal = document.getElementById('auth-modal');
+const content = document.getElementById('auth-modal-content');
+​if (show) {
+setAuthMode('login');
+modal.classList.remove('opacity-0', 'pointer-events-none');
+content.classList.remove('scale-95');
+} else {
+content.classList.add('scale-95');
+modal.classList.add('opacity-0');
+setTimeout(() => modal.classList.add('pointer-events-none'), 200);
+}
+}
+​async function executeAuth() {
+const input = document.getElementById('login-keyword').value;
+const errorEl = document.getElementById('login-error');
+const btn = document.getElementById('btn-login');
+const originalText = btn.innerText;
+​errorEl.classList.add('hidden');
+btn.innerHTML = '<div class="w-5 h-5 border-2 border-black/20 border-t-black rounded-full animate-spin"></div>';
+btn.disabled = true;
+​try {
+if (currentAuthMode === 'login') {
+await window.PortalDB.login(input);
+} else {
+await window.PortalDB.register(input);
+}
+​btn.innerHTML = '<i class="ph-bold ph-check text-lg"></i> Conectado';
+btn.className = 'w-full py-3.5 rounded-xl font-bold bg-blue-500 text-white transition-colors shadow-lg shadow-blue-500/20 mt-2 flex items-center justify-center gap-2';
+updateCloudStatus(true);
+​setTimeout(() => {
+toggleAuthModal(false);
+setTimeout(() => {
+btn.innerText = originalText;
+btn.className = 'w-full py-3.5 rounded-xl font-bold bg-white text-black hover:bg-zinc-200 transition-colors shadow-lg shadow-white/10 mt-2 flex items-center justify-center gap-2';
+btn.disabled = false;
+}, 200);
+}, 800);
+​} catch (err) {
+errorEl.innerText = err.message;
+errorEl.classList.remove('hidden');
+btn.innerText = originalText;
+btn.disabled = false;
+}
+}
+</script>
 </body>
 </html>
-
