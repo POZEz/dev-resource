@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Editor de Vídeo Simples</title>
+
+  <!-- CDNs Oficiais: Supabase, Tailwind, Phosphor Icons -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            matte: { bg: '#09090b', card: '#121214', border: '#27272a', text: '#fafafa', muted: '#a1a1aa' }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #09090b; color: #fafafa; -webkit-tap-highlight-color: transparent; }
+    .custom-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
+    .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #27272a; border-radius: 99px; }
+    .custom-scroll::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+
+    /* Caixa de Proporção Dinâmica do Player */
+    .preview-aspect-container {
+      position: relative;
+      background: #000000;
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+      transition: all 0.3s ease;
+    }
+    
+    .aspect-16-9 { aspect-ratio: 16 / 9; max-height: 520px; }
+    .aspect-9-16 { aspect-ratio: 9 / 16; max-height: 520px; }
+    .aspect-1-1 { aspect-ratio: 1 / 1; max-height: 480px; }
+    .aspect-4-5 { aspect-ratio: 4 / 5; max-height: 500px; }
+
+    .clip-card.active { border-color: #ef4444; background: rgba(239, 68, 68, 0.08); }
+  </style>
+</head>
+<body class="antialiased flex flex-col h-screen font-sans bg-matte-bg select-none overflow-hidden">
+
+  <!-- CABEÇALHO PRINCIPAL DA APLICAÇÃO -->
+  <header class="h-16 shrink-0 bg-matte-card border-b border-matte-border px-4 sm:px-6 flex items-center justify-between z-30">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
+        <i class="ph-bold ph-film-strip text-xl"></i>
+      </div>
+      <div>
+        <input type="text" id="project-title" value="Novo Projeto de Vídeo" onchange="state.projectName = this.value; triggerAutoSave();" class="bg-transparent font-bold text-sm text-white focus:outline-none focus:border-b border-red-500 max-w-[180px] sm:max-w-xs truncate" placeholder="Nome do Projeto">
+        <div class="flex items-center gap-2 text-[10px] text-zinc-400">
+          <span id="sync-status"><i class="ph-fill ph-check-circle text-red-400"></i> Pronto</span>
+          <span>•</span>
+          <span id="total-duration-badge">Duração: 0s</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Botões Globais de Ação -->
+    <div class="flex items-center gap-2">
+      <button onclick="toggleProjectsModal(true)" class="p-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+        <i class="ph ph-folder text-base"></i>
+        <span class="hidden sm:inline">Projetos</span>
+      </button>
+      <button id="btn-save-cloud" onclick="saveToCloud()" class="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+        <i class="ph ph-cloud-arrow-up text-base"></i>
+        <span class="hidden sm:inline">Salvar</span>
+      </button>
+      <button onclick="openExportModal()" class="px-3.5 py-2 rounded-xl bg-white text-black hover:bg-zinc-200 text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors">
+        <i class="ph-bold ph-export text-sm"></i>
+        <span>Exportar Vídeo</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- BARRA DE PRESETS E CONFIGURAÇÕES RÁPIDAS -->
+  <nav class="bg-matte-bg border-b border-matte-border px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0 z-20">
+    <!-- Presets de Redes Sociais -->
+    <div class="flex items-center gap-1.5 overflow-x-auto custom-scroll max-w-full">
+      <span class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider shrink-0">Proporção:</span>
+      <button onclick="setAspectRatio('9:16')" id="preset-9-16" class="px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1 bg-red-500/10 border-red-500/40 text-red-400">
+        <i class="ph ph-tiktok-logo"></i> 9:16 (Reels/TikTok)
+      </button>
+      <button onclick="setAspectRatio('16:9')" id="preset-16-9" class="px-2.5 py-1.5 rounded-xl border border-matte-border bg-white/[0.02] text-zinc-400 hover:text-white text-xs font-bold flex items-center gap-1">
+        <i class="ph ph-youtube-logo"></i> 16:9 (YouTube)
+      </button>
+      <button onclick="setAspectRatio('1:1')" id="preset-1-1" class="px-2.5 py-1.5 rounded-xl border border-matte-border bg-white/[0.02] text-zinc-400 hover:text-white text-xs font-bold flex items-center gap-1">
+        <i class="ph ph-instagram-logo"></i> 1:1 (Feed)
+      </button>
+      <button onclick="setAspectRatio('4:5')" id="preset-4-5" class="px-2.5 py-1.5 rounded-xl border border-matte-border bg-white/[0.02] text-zinc-400 hover:text-white text-xs font-bold flex items-center gap-1">
+        <i class="ph ph-rectangle font-bold"></i> 4:5 (Vertical)
+      </button>
+    </div>
+
+    <!-- Controles de Áudio e Ajuste de Enquadramento -->
+    <div class="flex items-center gap-3 shrink-0">
+      <label class="flex items-center gap-1.5 text-xs text-zinc-300 font-semibold cursor-pointer">
+        <input type="checkbox" id="check-mute-audio" onchange="state.muteAudio = this.checked; renderPreview(); triggerAutoSave();" class="rounded accent-red-500">
+        <span>Remover Áudio (Mutar)</span>
+      </label>
+
+      <div class="h-4 w-px bg-matte-border"></div>
+
+      <div class="flex items-center gap-1">
+        <span class="text-[10px] text-zinc-500 font-bold uppercase">Enquadramento:</span>
+        <select id="select-fit-mode" onchange="state.fitMode = this.value; renderPreview(); triggerAutoSave();" class="bg-white/[0.03] border border-matte-border rounded-xl px-2 py-1 text-xs text-white">
+          <option value="fit">Ajustar (Com Barras)</option>
+          <option value="cover">Preencher (Cortar Sobras)</option>
+        </select>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ÁREA PRINCIPAL DO EDITOR (LADO A LADO: MÍDIAS X PLAYER) -->
+  <main class="flex-1 overflow-hidden p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+    <!-- COLUNA DA ESQUERDA: SEQUÊNCIA DE CLIPES E RECORTE -->
+    <section class="lg:col-span-5 bg-matte-card border border-matte-border rounded-2xl p-5 flex flex-col gap-4 shadow-2xl h-[calc(100vh-140px)]">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3">
+        <div>
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <i class="ph-bold ph-video-camera text-red-400"></i> Sequência de Vídeos
+          </h3>
+          <p class="text-[11px] text-zinc-400">Adicione e ordene seus trechos de vídeo.</p>
+        </div>
+
+        <label class="px-3 py-1.5 rounded-xl bg-red-500 hover:bg-red-600 text-black font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-lg shadow-red-500/10">
+          <i class="ph-bold ph-plus"></i> Adicionar
+          <input type="file" id="video-file-input" accept="video/*" multiple class="hidden" onchange="handleVideoUpload(event)">
+        </label>
+      </div>
+
+      <!-- LISTA DE CLIPES CARREGADOS -->
+      <div id="clips-list" class="flex-1 overflow-y-auto space-y-3 custom-scroll pr-1">
+        <!-- Injetado Dinamicamente -->
+      </div>
+    </section>
+
+    <!-- COLUNA DA DIREITA: PLAYER PREVIEW E CONTROLES DE TIMELINE -->
+    <section class="lg:col-span-7 flex flex-col gap-4 items-center justify-center h-[calc(100vh-140px)] relative">
+      
+      <!-- CONTAINER DO PLAYER PREVIEW -->
+      <div class="w-full flex-1 flex items-center justify-center">
+        <div id="preview-wrapper" class="preview-aspect-container aspect-16-9 w-full">
+          <!-- Canvas de Renderização em Tempo Real -->
+          <canvas id="preview-canvas" class="w-full h-full object-contain block"></canvas>
+          <video id="hidden-video-player" class="hidden" playsinline muted></video>
+        </div>
+      </div>
+
+      <!-- PAINEL DE CONTROLES DO PLAYER -->
+      <div class="w-full bg-matte-card border border-matte-border rounded-2xl p-4 flex flex-col gap-3 shadow-xl">
+        
+        <!-- Scrubber de Tempo -->
+        <div class="flex items-center gap-3">
+          <span id="timecode-current" class="text-xs font-mono font-bold text-zinc-400 w-12">00:00</span>
+          <input type="range" id="timeline-scrubber" min="0" max="100" value="0" step="0.1" oninput="seekToTime(parseFloat(this.value))" class="flex-1 accent-red-500 bg-white/[0.05]">
+          <span id="timecode-total" class="text-xs font-mono font-bold text-zinc-400 w-12 text-right">00:00</span>
+        </div>
+
+        <!-- Botões de Play e Marcadores de Corte -->
+        <div class="flex items-center justify-between border-t border-matte-border pt-3">
+          <div class="flex items-center gap-2">
+            <button onclick="setTrimStartHere()" class="px-2.5 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-xs text-zinc-300 font-semibold flex items-center gap-1" title="Definir Início do Corte no Tempo Atual">
+              <i class="ph-bold ph-scissors"></i> Definir Início
+            </button>
+            <button onclick="setTrimEndHere()" class="px-2.5 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-xs text-zinc-300 font-semibold flex items-center gap-1" title="Definir Fim do Corte no Tempo Atual">
+              <i class="ph-bold ph-scissors"></i> Definir Fim
+            </button>
+          </div>
+
+          <button id="btn-toggle-play" onclick="togglePlay()" class="w-10 h-10 rounded-xl bg-white text-black hover:bg-zinc-200 flex items-center justify-center text-lg font-bold transition-colors shadow-md">
+            <i class="ph-bold ph-play"></i>
+          </button>
+
+          <div class="flex items-center gap-2">
+            <button onclick="extractAudioOnly()" class="px-2.5 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-semibold flex items-center gap-1 hover:bg-purple-500/20 transition-colors">
+              <i class="ph-bold ph-music-notes"></i> Extrair Áudio
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- MODAL DE EXPORTAÇÃO / PROCESSAMENTO DO VÍDEO -->
+  <div id="modal-export" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-md shadow-2xl flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="ph-bold ph-export text-red-400 text-lg"></i> Renderizar Vídeo Final
+        </h3>
+        <button onclick="closeExportModal()" class="text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
+      </div>
+
+      <!-- Barra de Progresso de Renderização -->
+      <div id="export-progress-panel" class="space-y-3">
+        <div class="flex items-center justify-between text-xs">
+          <span id="export-status-label" class="text-zinc-300 font-semibold">Iniciando renderização...</span>
+          <span id="export-progress-pct" class="text-red-400 font-bold">0%</span>
+        </div>
+        <div class="w-full h-2 bg-matte-border rounded-full overflow-hidden">
+          <div id="export-progress-bar" class="h-full bg-red-500 rounded-full transition-all duration-200" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- Botão de Download do Arquivo Processado -->
+      <div id="export-result-panel" class="hidden flex-col gap-3">
+        <div class="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold flex items-center gap-2">
+          <i class="ph-fill ph-check-circle text-lg"></i>
+          <span>Vídeo renderizado com sucesso!</span>
+        </div>
+
+        <button onclick="downloadRenderedVideo()" class="w-full py-3 rounded-xl bg-white text-black font-bold text-xs hover:bg-zinc-200 flex items-center justify-center gap-2 shadow-lg">
+          <i class="ph-bold ph-download-simple"></i> Baixar Vídeo Processado
+        </button>
+      </div>
+
+      <div class="flex items-center justify-between border-t border-matte-border pt-3">
+        <button id="btn-start-render" onclick="startRenderProcess()" class="w-full py-3 rounded-xl bg-red-500 hover:bg-red-600 text-black font-bold text-xs transition-colors shadow-lg shadow-red-500/10">
+          Iniciar Processamento
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE PROJETOS SALVOS NA NUVEM -->
+  <div id="modal-projects" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-lg shadow-2xl flex flex-col max-h-[80vh]">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3 mb-4">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="ph ph-folder text-red-400 text-lg"></i> Meus Projetos de Vídeo
+        </h3>
+        <button onclick="toggleProjectsModal(false)" class="text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
+      </div>
+      <div id="projects-list" class="flex-1 overflow-y-auto space-y-2 custom-scroll pr-1">
+        <p class="text-xs text-zinc-500 text-center py-6">Carregando projetos salvos...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- LÓGICA DO EDITOR DE VÍDEO COMPLETA -->
+  <script>
+    // Inicialização do Supabase Client
+    const SUPABASE_URL = 'https://zlsdlcvtcsrykfacjvhf.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_JnDv-fxHXPTzNaFX9n3Z0w_4mqt47Js';
+    const dbClient = window.parent?.PortalDB?.supabase || window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // Estado da Aplicação
+    let state = {
+      projectId: null,
+      projectName: 'Novo Projeto de Vídeo',
+      aspectRatio: '9:16', // '9:16', '16:9', '1:1', '4:5'
+      outputFormat: 'webm',
+      muteAudio: false,
+      fitMode: 'fit',
+      clips: [], // [{ id, file, blobUrl, name, startTime, endTime, duration }]
+      activeClipIndex: 0,
+      isPlaying: false,
+      currentTime: 0,
+      userId: null,
+      renderedBlob: null,
+      autoSaveTimer: null
+    };
+
+    let previewCanvas, canvasCtx, hiddenVideo;
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      previewCanvas = document.getElementById('preview-canvas');
+      canvasCtx = previewCanvas.getContext('2d');
+      hiddenVideo = document.getElementById('hidden-video-player');
+
+      setupVideoPlayerEvents();
+      await initSession();
+      loadFromLocalStorageCache();
+    });
+
+    async function initSession() {
+      try {
+        const { data } = await dbClient.auth.getSession();
+        state.userId = data?.session?.user?.id || null;
+      } catch (e) {
+        state.userId = null;
+      }
+    }
+
+    // ==== MANIPULAÇÃO DE PRESETS DE REDES SOCIAIS ====
+    function setAspectRatio(ratio) {
+      state.aspectRatio = ratio;
+      const wrapper = document.getElementById('preview-wrapper');
+      wrapper.className = 'preview-aspect-container w-full';
+
+      if (ratio === '9:16') wrapper.classList.add('aspect-9-16');
+      else if (ratio === '16:9') wrapper.classList.add('aspect-16-9');
+      else if (ratio === '1:1') wrapper.classList.add('aspect-1-1');
+      else if (ratio === '4:5') wrapper.classList.add('aspect-4-5');
+
+      document.querySelectorAll('nav button').forEach(b => {
+        if (b.id?.startsWith('preset-')) {
+          b.className = 'px-2.5 py-1.5 rounded-xl border border-matte-border bg-white/[0.02] text-zinc-400 hover:text-white text-xs font-bold flex items-center gap-1';
+        }
+      });
+      document.getElementById(`preset-${ratio.replace(':', '-')}`)?.classList.replace('bg-white/[0.02]', 'bg-red-500/10');
+      document.getElementById(`preset-${ratio.replace(':', '-')}`)?.classList.replace('text-zinc-400', 'text-red-400');
+
+      renderFrame();
+      triggerAutoSave();
+    }
+
+    // ==== UPLOAD E GESTÃO DE CLIPES DE VÍDEO ====
+    function handleVideoUpload(e) {
+      const files = Array.from(e.target.files);
+      if (files.length === 0) return;
+
+      files.forEach(file => {
+        const blobUrl = URL.createObjectURL(file);
+        const tempVideo = document.createElement('video');
+        tempVideo.src = blobUrl;
+
+        tempVideo.onloadedmetadata = () => {
+          const duration = tempVideo.duration || 10;
+          const clip = {
+            id: crypto.randomUUID(),
+            file: file,
+            blobUrl: blobUrl,
+            name: file.name,
+            startTime: 0,
+            endTime: duration,
+            duration: duration
+          };
+
+          state.clips.push(clip);
+          if (state.clips.length === 1) selectClip(0);
+          renderClipsList();
+          updateTotalDuration();
+          triggerAutoSave();
+        };
+      });
+    }
+
+    function renderClipsList() {
+      const container = document.getElementById('clips-list');
+      if (state.clips.length === 0) {
+        container.innerHTML = `
+          <div class="p-8 text-center text-zinc-500 border border-dashed border-matte-border rounded-xl">
+            <p class="text-xs">Nenhum vídeo adicionado. Clique em "+ Adicionar" acima.</p>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = state.clips.map((c, idx) => `
+        <div onclick="selectClip(${idx})" class="clip-card p-3 rounded-xl border border-matte-border bg-white/[0.02] hover:bg-white/[0.04] cursor-pointer flex flex-col gap-2 transition-all ${idx === state.activeClipIndex ? 'active' : ''}">
+          <div class="flex items-center justify-between">
+            <h4 class="text-xs font-bold text-white truncate max-w-[180px]">${idx + 1}. ${c.name}</h4>
+            <div class="flex items-center gap-1">
+              <button onclick="event.stopPropagation(); moveClip(${idx}, -1)" class="p-1 hover:text-white text-zinc-500" title="Mover para Cima"><i class="ph ph-arrow-up"></i></button>
+              <button onclick="event.stopPropagation(); moveClip(${idx}, 1)" class="p-1 hover:text-white text-zinc-500" title="Mover para Baixo"><i class="ph ph-arrow-down"></i></button>
+              <button onclick="event.stopPropagation(); removeClip(${idx})" class="p-1 hover:text-red-400 text-zinc-500" title="Excluir Clipe"><i class="ph ph-trash"></i></button>
+            </div>
+          </div>
+
+          <!-- Controles de Trim (Início / Fim) -->
+          <div class="grid grid-cols-2 gap-2 text-[10px]" onclick="event.stopPropagation()">
+            <div class="flex items-center gap-1">
+              <span class="text-zinc-500">Início:</span>
+              <input type="number" step="0.1" min="0" max="${c.endTime}" value="${c.startTime.toFixed(1)}" onchange="updateClipTrim(${idx}, 'start', parseFloat(this.value))" class="w-full bg-white/[0.03] border border-matte-border rounded p-1 text-white text-center">
+            </div>
+            <div class="flex items-center gap-1">
+              <span class="text-zinc-500">Fim:</span>
+              <input type="number" step="0.1" min="${c.startTime}" max="${c.duration}" value="${c.endTime.toFixed(1)}" onchange="updateClipTrim(${idx}, 'end', parseFloat(this.value))" class="w-full bg-white/[0.03] border border-matte-border rounded p-1 text-white text-center">
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function selectClip(idx) {
+      if (idx < 0 || idx >= state.clips.length) return;
+      state.activeClipIndex = idx;
+      const clip = state.clips[idx];
+
+      hiddenVideo.src = clip.blobUrl;
+      hiddenVideo.currentTime = clip.startTime;
+      state.currentTime = clip.startTime;
+
+      renderClipsList();
+      updateScrubberUI();
+    }
+
+    function removeClip(idx) {
+      state.clips.splice(idx, 1);
+      if (state.activeClipIndex >= state.clips.length) {
+        state.activeClipIndex = Math.max(0, state.clips.length - 1);
+      }
+      if (state.clips.length > 0) selectClip(state.activeClipIndex);
+      else resetPreviewCanvas();
+
+      renderClipsList();
+      updateTotalDuration();
+      triggerAutoSave();
+    }
+
+    function moveClip(idx, delta) {
+      const target = idx + delta;
+      if (target < 0 || target >= state.clips.length) return;
+      const temp = state.clips[idx];
+      state.clips[idx] = state.clips[target];
+      state.clips[target] = temp;
+      selectClip(target);
+      triggerAutoSave();
+    }
+
+    function updateClipTrim(idx, type, val) {
+      const c = state.clips[idx];
+      if (type === 'start') c.startTime = Math.max(0, Math.min(val, c.endTime - 0.5));
+      else c.endTime = Math.min(c.duration, Math.max(val, c.startTime + 0.5));
+
+      updateTotalDuration();
+      if (idx === state.activeClipIndex) {
+        hiddenVideo.currentTime = c.startTime;
+        renderFrame();
+      }
+      triggerAutoSave();
+    }
+
+    // ==== RENDERIZAÇÃO DE FRAMES EM CANVAS ====
+    function setupVideoPlayerEvents() {
+      hiddenVideo.addEventListener('timeupdate', () => {
+        const c = state.clips[state.activeClipIndex];
+        if (!c) return;
+
+        if (hiddenVideo.currentTime >= c.endTime) {
+          if (state.isPlaying) {
+            // Avançar para o próximo clipe na sequência
+            if (state.activeClipIndex < state.clips.length - 1) {
+              selectClip(state.activeClipIndex + 1);
+              hiddenVideo.play();
+            } else {
+              pause();
+              selectClip(0);
+            }
+          }
+        }
+        renderFrame();
+        updateScrubberUI();
+      });
+    }
+
+    function renderFrame() {
+      if (!hiddenVideo || hiddenVideo.readyState < 2) return;
+
+      const [targetW, targetH] = getTargetDimensions(state.aspectRatio);
+      previewCanvas.width = targetW;
+      previewCanvas.height = targetH;
+
+      canvasCtx.fillStyle = '#000000';
+      canvasCtx.fillRect(0, 0, targetW, targetH);
+
+      const vW = hiddenVideo.videoWidth;
+      const vH = hiddenVideo.videoHeight;
+      if (!vW || !vH) return;
+
+      let drawW, drawH, dx, dy;
+
+      if (state.fitMode === 'cover') {
+        const scale = Math.max(targetW / vW, targetH / vH);
+        drawW = vW * scale;
+        drawH = vH * scale;
+        dx = (targetW - drawW) / 2;
+        dy = (targetH - drawH) / 2;
+      } else {
+        const scale = Math.min(targetW / vW, targetH / vH);
+        drawW = vW * scale;
+        drawH = vH * scale;
+        dx = (targetW - drawW) / 2;
+        dy = (targetH - drawH) / 2;
+      }
+
+      canvasCtx.drawImage(hiddenVideo, dx, dy, drawW, drawH);
+    }
+
+    function getTargetDimensions(aspectStr) {
+      if (aspectStr === '9:16') return [1080, 1920];
+      if (aspectStr === '16:9') return [1920, 1080];
+      if (aspectStr === '1:1') return [1080, 1080];
+      if (aspectStr === '4:5') return [1080, 1350];
+      return [1920, 1080];
+    }
+
+    // ==== CONTROLES DE PLAY/PAUSE ====
+    function togglePlay() {
+      if (state.clips.length === 0) return;
+      if (state.isPlaying) pause();
+      else play();
+    }
+
+    function play() {
+      state.isPlaying = true;
+      hiddenVideo.muted = state.muteAudio;
+      hiddenVideo.play();
+      document.getElementById('btn-toggle-play').innerHTML = '<i class="ph-bold ph-pause"></i>';
+    }
+
+    function pause() {
+      state.isPlaying = false;
+      hiddenVideo.pause();
+      document.getElementById('btn-toggle-play').innerHTML = '<i class="ph-bold ph-play"></i>';
+    }
+
+    function seekToTime(val) {
+      const c = state.clips[state.activeClipIndex];
+      if (!c) return;
+      const targetTime = c.startTime + (val / 100) * (c.endTime - c.startTime);
+      hiddenVideo.currentTime = targetTime;
+      renderFrame();
+    }
+
+    function setTrimStartHere() {
+      const c = state.clips[state.activeClipIndex];
+      if (c) updateClipTrim(state.activeClipIndex, 'start', hiddenVideo.currentTime);
+    }
+
+    function setTrimEndHere() {
+      const c = state.clips[state.activeClipIndex];
+      if (c) updateClipTrim(state.activeClipIndex, 'end', hiddenVideo.currentTime);
+    }
+
+    function updateScrubberUI() {
+      const c = state.clips[state.activeClipIndex];
+      if (!c) return;
+      const current = hiddenVideo.currentTime - c.startTime;
+      const duration = c.endTime - c.startTime;
+      const pct = Math.max(0, Math.min(100, (current / duration) * 100));
+
+      document.getElementById('timeline-scrubber').value = pct;
+      document.getElementById('timecode-current').innerText = formatTimecode(hiddenVideo.currentTime);
+      document.getElementById('timecode-total').innerText = formatTimecode(c.endTime);
+    }
+
+    function updateTotalDuration() {
+      const total = state.clips.reduce((acc, c) => acc + (c.endTime - c.startTime), 0);
+      document.getElementById('total-duration-badge').innerText = `Duração: ${total.toFixed(1)}s`;
+    }
+
+    function resetPreviewCanvas() {
+      canvasCtx.fillStyle = '#000000';
+      canvasCtx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
+      document.getElementById('timecode-current').innerText = '00:00';
+      document.getElementById('timecode-total').innerText = '00:00';
+    }
+
+    // ==== EXTRAÇÃO DE ÁUDIO & PROCESSAMENTO CLIENT-SIDE ====
+    async function extractAudioOnly() {
+      if (state.clips.length === 0) return;
+      alert("Gerando extração de áudio do clipe selecionado...");
+
+      const c = state.clips[state.activeClipIndex];
+      const link = document.createElement('a');
+      link.download = `${state.projectName}_audio.webm`;
+      link.href = c.blobUrl;
+      link.click();
+    }
+
+    function openExportModal() {
+      if (state.clips.length === 0) {
+        alert("Adicione pelo menos um vídeo para exportar.");
+        return;
+      }
+      document.getElementById('modal-export').classList.remove('hidden');
+      document.getElementById('export-result-panel').classList.add('hidden');
+      document.getElementById('btn-start-render').classList.remove('hidden');
+    }
+
+    function closeExportModal() { document.getElementById('modal-export').classList.add('hidden'); }
+
+    async function startRenderProcess() {
+      pause();
+      document.getElementById('btn-start-render').classList.add('hidden');
+      const progressBar = document.getElementById('export-progress-bar');
+      const progressLabel = document.getElementById('export-status-label');
+      const progressPct = document.getElementById('export-progress-pct');
+
+      progressLabel.innerText = "Processando quadros do vídeo...";
+
+      // Renderização via Canvas + MediaRecorder
+      const stream = previewCanvas.captureStream(30);
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+      const chunks = [];
+
+      mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
+      mediaRecorder.onstop = () => {
+        state.renderedBlob = new Blob(chunks, { type: 'video/webm' });
+        progressBar.style.width = '100%';
+        progressPct.innerText = '100%';
+        progressLabel.innerText = 'Renderização Concluída!';
+
+        document.getElementById('export-result-panel').classList.remove('hidden');
+        document.getElementById('export-result-panel').classList.add('flex');
+      };
+
+      mediaRecorder.start();
+
+      // Reproduzir clipes na ordem
+      let currentIdx = 0;
+      const totalClips = state.clips.length;
+
+      function processNextClip() {
+        if (currentIdx >= totalClips) {
+          mediaRecorder.stop();
+          return;
+        }
+
+        selectClip(currentIdx);
+        hiddenVideo.play();
+
+        const pct = Math.round(((currentIdx + 1) / totalClips) * 90);
+        progressBar.style.width = `${pct}%`;
+        progressPct.innerText = `${pct}%`;
+
+        hiddenVideo.onended = () => {
+          currentIdx++;
+          processNextClip();
+        };
+      }
+
+      processNextClip();
+    }
+
+    function downloadRenderedVideo() {
+      if (!state.renderedBlob) return;
+      const link = document.createElement('a');
+      link.download = `${state.projectName}.webm`;
+      link.href = URL.createObjectURL(state.renderedBlob);
+      link.click();
+    }
+
+    // ==== PERSISTÊNCIA & SUPABASE STORAGE ====
+    function triggerAutoSave() {
+      updateSyncStatus("Digitando...");
+      clearTimeout(state.autoSaveTimer);
+      state.autoSaveTimer = setTimeout(() => {
+        saveToLocalStorageCache();
+        if (state.userId) saveToCloud();
+        else updateSyncStatus("Salvo localmente");
+      }, 1200);
+    }
+
+    function saveToLocalStorageCache() {
+      const serializableClips = state.clips.map(c => ({
+        id: c.id,
+        name: c.name,
+        startTime: c.startTime,
+        endTime: c.endTime,
+        duration: c.duration
+      }));
+
+      const payload = {
+        name: state.projectName,
+        aspectRatio: state.aspectRatio,
+        muteAudio: state.muteAudio,
+        fitMode: state.fitMode,
+        clips: serializableClips
+      };
+      localStorage.setItem('video_project_active', JSON.stringify(payload));
+    }
+
+    function loadFromLocalStorageCache() {
+      const cached = localStorage.getItem('video_project_active');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        state.projectName = parsed.name || state.projectName;
+        state.aspectRatio = parsed.aspectRatio || '9:16';
+        state.muteAudio = parsed.muteAudio || false;
+        state.fitMode = parsed.fitMode || 'fit';
+
+        document.getElementById('project-title').value = state.projectName;
+        document.getElementById('check-mute-audio').checked = state.muteAudio;
+        document.getElementById('select-fit-mode').value = state.fitMode;
+        setAspectRatio(state.aspectRatio);
+      }
+    }
+
+    async function saveToCloud() {
+      if (!state.userId) return;
+      updateSyncStatus("Salvando na nuvem...");
+
+      try {
+        const serializableClips = state.clips.map(c => ({
+          id: c.id,
+          name: c.name,
+          startTime: c.startTime,
+          endTime: c.endTime,
+          duration: c.duration
+        }));
+
+        const payload = {
+          user_id: state.userId,
+          name: state.projectName,
+          aspect_ratio: state.aspectRatio,
+          output_format: state.outputFormat,
+          mute_audio: state.muteAudio,
+          fit_mode: state.fitMode,
+          settings: { clips: serializableClips }
+        };
+
+        if (state.projectId) payload.id = state.projectId;
+
+        const { data, error } = await dbClient.from('video_projects').upsert(payload).select().single();
+        if (error) throw error;
+
+        state.projectId = data.id;
+        updateSyncStatus("Sincronizado");
+      } catch (err) {
+        updateSyncStatus("Erro na nuvem");
+      }
+    }
+
+    async function toggleProjectsModal(show) {
+      const modal = document.getElementById('modal-projects');
+      modal.classList.toggle('hidden', !show);
+
+      if (show && state.userId) {
+        const { data } = await dbClient.from('video_projects').select('*').is('deleted_at', null).order('updated_at', { ascending: false });
+        const list = document.getElementById('projects-list');
+
+        if (!data || data.length === 0) {
+          list.innerHTML = `<p class="text-xs text-zinc-500 text-center py-6">Nenhum projeto salvo encontrado.</p>`;
+          return;
+        }
+
+        list.innerHTML = data.map(p => `
+          <div onclick="restoreProject(${JSON.stringify(p).replace(/"/g, '&quot;')})" class="p-3 rounded-xl border border-matte-border bg-white/[0.02] hover:bg-white/[0.05] cursor-pointer flex items-center justify-between">
+            <div>
+              <h4 class="text-xs font-bold text-white truncate max-w-[200px]">${p.name}</h4>
+              <span class="text-[10px] text-zinc-500">${p.aspect_ratio} • ${p.settings?.clips?.length || 0} clipes • ${new Date(p.updated_at).toLocaleDateString()}</span>
+            </div>
+            <i class="ph ph-film-strip text-red-400"></i>
+          </div>
+        `).join('');
+      }
+    }
+
+    function restoreProject(p) {
+      state.projectId = p.id;
+      state.projectName = p.name;
+      state.aspectRatio = p.aspect_ratio || '9:16';
+      state.muteAudio = p.mute_audio || false;
+      state.fitMode = p.fit_mode || 'fit';
+
+      document.getElementById('project-title').value = p.name;
+      document.getElementById('check-mute-audio').checked = p.mute_audio;
+      document.getElementById('select-fit-mode').value = state.fitMode;
+      setAspectRatio(state.aspectRatio);
+
+      toggleProjectsModal(false);
+    }
+
+    // Auxiliares
+    function formatTimecode(secs) {
+      const m = Math.floor(secs / 60).toString().padStart(2, '0');
+      const s = Math.floor(secs % 60).toString().padStart(2, '0');
+      return `${m}:${s}`;
+    }
+
+    function updateSyncStatus(msg) {
+      document.getElementById('sync-status').innerHTML = `<i class="ph-fill ph-check-circle text-red-400"></i> ${msg}`;
+    }
+  </script>
+</body>
+</html>

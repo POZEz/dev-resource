@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Conversor de Arquivos</title>
+
+  <!-- CDNs Supabase, Processadores de PDF, DOCX e Estilização -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            matte: { bg: '#09090b', card: '#121214', border: '#27272a', text: '#fafafa', muted: '#a1a1aa' }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #09090b; color: #fafafa; -webkit-tap-highlight-color: transparent; }
+    .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #27272a; border-radius: 99px; }
+    .custom-scroll::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+    
+    .drop-zone { border: 2px dashed #27272a; transition: all 0.2s ease; }
+    .drop-zone.drag-over { border-color: #3b82f6; background-color: rgba(59, 130, 246, 0.05); }
+  </style>
+</head>
+<body class="antialiased flex flex-col min-h-screen font-sans bg-matte-bg custom-scroll">
+
+  <!-- CABEÇALHO DA CENTRAL -->
+  <header class="h-16 shrink-0 bg-matte-card border-b border-matte-border px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+        <i class="ph-bold ph-arrows-clockwise text-xl"></i>
+      </div>
+      <div>
+        <h1 class="text-base font-bold text-white leading-tight">Conversor de Arquivos</h1>
+        <p class="text-[11px] text-zinc-400 font-medium">Processamento 100% privado no seu navegador</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <button onclick="toggleHistoryModal(true)" class="px-3 py-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 text-xs font-semibold flex items-center gap-2 transition-colors">
+        <i class="ph ph-folder-star text-base"></i>
+        <span class="hidden sm:inline">Arquivos Salvos</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ÁREA PRINCIPAL DA CONVERSÃO -->
+  <main class="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-8 flex flex-col gap-6">
+
+    <!-- ZONA DE SELEÇÃO E DRAG & DROP DE ARQUIVO -->
+    <section>
+      <div id="drop-zone" class="drop-zone rounded-2xl p-8 sm:p-12 text-center flex flex-col items-center justify-center cursor-pointer bg-matte-card/50 hover:bg-matte-card transition-colors relative" onclick="triggerFileInput()" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleFileDrop(event)">
+        <input type="file" id="file-input" class="hidden" onchange="handleFileSelect(event)">
+        
+        <div id="drop-prompt" class="flex flex-col items-center">
+          <div class="w-16 h-16 rounded-2xl bg-white/[0.03] border border-matte-border flex items-center justify-center text-zinc-400 mb-4 shadow-xl">
+            <i class="ph-fill ph-file-arrow-up text-3xl"></i>
+          </div>
+          <h3 class="text-base font-bold text-white mb-1">Arraste e solte o seu arquivo aqui</h3>
+          <p class="text-xs text-zinc-400 mb-4 max-w-md">Suporta documentos e imagens: PDF, PNG, JPG, WebP, SVG, TXT e DOCX.</p>
+          <span class="px-4 py-2 rounded-xl bg-white text-black font-bold text-xs shadow-md">Selecionar do Computador</span>
+        </div>
+
+        <!-- PRÉ-VISUALIZAÇÃO DO ARQUIVO SELECIONADO -->
+        <div id="file-preview-card" class="hidden w-full flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-xl bg-white/[0.02] border border-matte-border text-left">
+          <div class="flex items-center gap-3 w-full sm:w-auto">
+            <div id="file-type-icon" class="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 text-2xl shrink-0">
+              <i class="ph-fill ph-file"></i>
+            </div>
+            <div class="overflow-hidden">
+              <h4 id="file-name" class="text-sm font-bold text-white truncate max-w-xs">documento.pdf</h4>
+              <div class="flex items-center gap-2 text-[11px] text-zinc-400 mt-0.5">
+                <span id="file-detected-format" class="uppercase font-bold text-blue-400">PDF</span>
+                <span>•</span>
+                <span id="file-size">0 KB</span>
+              </div>
+            </div>
+          </div>
+
+          <button onclick="event.stopPropagation(); resetConverter()" class="p-2 rounded-lg hover:bg-red-500/10 text-zinc-400 hover:text-red-400 text-xs font-medium transition-colors">
+            <i class="ph ph-trash text-base"></i>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- OPOÇÕES DE CONVERSÃO -->
+    <section id="conversion-options-section" class="hidden bg-matte-card border border-matte-border rounded-2xl p-6 flex-col gap-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-matte-border">
+        <div>
+          <h3 class="text-sm font-bold text-white">Converter para qual formato?</h3>
+          <p class="text-xs text-zinc-400">Selecione o formato de destino desejado.</p>
+        </div>
+
+        <!-- GRID DE FORMATOS DE SAÍDA DISPONÍVEIS -->
+        <div id="target-formats-grid" class="flex flex-wrap gap-2">
+          <!-- Botões injetados dinamicamente com base no arquivo enviado -->
+        </div>
+      </div>
+
+      <!-- PAINEL DE AJUSTES OPCIONAIS DA CONVERSÃO -->
+      <div id="extra-settings-panel" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div id="setting-quality" class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold text-zinc-300 flex justify-between">
+            <span>Qualidade da Imagem</span>
+            <span id="quality-val-label" class="text-blue-400">90%</span>
+          </label>
+          <input type="range" id="quality-range" min="10" max="100" value="90" oninput="document.getElementById('quality-val-label').innerText = this.value + '%'" class="accent-blue-500 bg-white/[0.05]">
+        </div>
+
+        <div id="setting-page-select" class="flex flex-col gap-1.5 hidden">
+          <label class="text-xs font-semibold text-zinc-300">Páginas a Converter</label>
+          <select id="pdf-page-mode" class="bg-white/[0.03] border border-matte-border rounded-xl p-2 text-xs text-white focus:outline-none focus:border-blue-500">
+            <option value="all">Todas as páginas (Juntar)</option>
+            <option value="first">Apenas a primeira página</option>
+          </select>
+        </div>
+      </div>
+
+      <button id="btn-execute-convert" onclick="executeConversion()" class="w-full py-3.5 rounded-xl font-bold bg-white text-black hover:bg-zinc-200 transition-colors shadow-lg flex items-center justify-center gap-2 text-xs">
+        <i class="ph-bold ph-arrows-clockwise text-sm"></i> Iniciar Conversão
+      </button>
+    </section>
+
+    <!-- RESULTADO DA CONVERSÃO -->
+    <section id="conversion-result-section" class="hidden bg-matte-card border border-emerald-500/30 rounded-2xl p-6 flex flex-col gap-4 bg-emerald-500/[0.02]">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2 text-emerald-400 font-bold text-sm">
+          <i class="ph-fill ph-check-circle text-lg"></i>
+          <span>Conversão Concluída!</span>
+        </div>
+        <span id="result-format-badge" class="px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase">PNG</span>
+      </div>
+
+      <div class="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-matte-border">
+        <div class="overflow-hidden">
+          <h4 id="result-filename" class="text-xs font-bold text-white truncate">arquivo_convertido.png</h4>
+          <span id="result-filesize" class="text-[10px] text-zinc-400">Tamanho final: 120 KB</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button onclick="downloadConvertedFile()" class="px-3 py-2 rounded-lg bg-white text-black hover:bg-zinc-200 text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors">
+            <i class="ph-bold ph-download-simple"></i> Baixar
+          </button>
+          <button id="btn-save-cloud" onclick="saveConvertedFileToCloud()" class="px-3 py-2 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 text-xs font-bold flex items-center gap-1.5 transition-colors">
+            <i class="ph-bold ph-cloud-arrow-up"></i> Salvar na Nuvem
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL DE HISTÓRICO / NUVEM -->
+  <div id="modal-history" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-lg shadow-2xl flex flex-col max-h-[80vh]">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3 mb-4">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="ph ph-cloud-check text-blue-400 text-lg"></i> Meus Arquivos Salvos
+        </h3>
+        <button onclick="toggleHistoryModal(false)" class="text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
+      </div>
+      <div id="saved-files-list" class="flex-1 overflow-y-auto space-y-2 custom-scroll pr-1">
+        <p class="text-xs text-zinc-500 text-center py-6">Carregando seus arquivos salvos...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- LÓGICA COMPLETA DE CONVERSÃO -->
+  <script>
+    // Configuração do Supabase Client
+    const SUPABASE_URL = 'https://zlsdlcvtcsrykfacjvhf.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_JnDv-fxHXPTzNaFX9n3Z0w_4mqt47Js';
+    const dbClient = window.parent?.PortalDB?.supabase || window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // Estado Local do Módulo
+    let state = {
+      file: null,
+      fileBuffer: null,
+      sourceFormat: null, // 'pdf', 'png', 'jpg', 'webp', 'svg', 'txt', 'docx'
+      targetFormat: null,
+      convertedBlob: null,
+      convertedFilename: '',
+      userId: null
+    };
+
+    // Matriz de Formatos Válidos para Conversão
+    const conversionMatrix = {
+      pdf: ['png', 'jpg', 'webp', 'txt', 'docx'],
+      png: ['jpg', 'webp', 'pdf', 'svg', 'txt', 'docx'],
+      jpg: ['png', 'webp', 'pdf', 'svg', 'txt', 'docx'],
+      webp: ['png', 'jpg', 'pdf', 'svg', 'txt', 'docx'],
+      svg: ['png', 'jpg', 'webp', 'pdf', 'txt'],
+      txt: ['pdf', 'docx', 'png', 'jpg', 'webp'],
+      docx: ['pdf', 'txt', 'png', 'jpg', 'webp']
+    };
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      await initSession();
+    });
+
+    async function initSession() {
+      try {
+        const { data } = await dbClient.auth.getSession();
+        state.userId = data?.session?.user?.id || null;
+      } catch (e) {
+        state.userId = null;
+      }
+    }
+
+    // ==== SELEÇÃO E DETECÇÃO DE ARQUIVO ====
+    function triggerFileInput() {
+      if (!state.file) document.getElementById('file-input').click();
+    }
+
+    function handleDragOver(e) {
+      e.preventDefault();
+      document.getElementById('drop-zone').classList.add('drag-over');
+    }
+
+    function handleDragLeave(e) {
+      document.getElementById('drop-zone').classList.remove('drag-over');
+    }
+
+    function handleFileDrop(e) {
+      e.preventDefault();
+      document.getElementById('drop-zone').classList.remove('drag-over');
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        processSelectedFile(e.dataTransfer.files[0]);
+      }
+    }
+
+    function handleFileSelect(e) {
+      if (e.target.files && e.target.files[0]) {
+        processSelectedFile(e.target.files[0]);
+      }
+    }
+
+    async function processSelectedFile(file) {
+      state.file = file;
+      state.fileBuffer = await file.arrayBuffer();
+      state.sourceFormat = detectFormat(file);
+
+      if (!state.sourceFormat) {
+        alert("Formato de arquivo não suportado. Escolha PDF, PNG, JPG, WebP, SVG, TXT ou DOCX.");
+        resetConverter();
+        return;
+      }
+
+      // Atualizar UI da Pré-Visualização
+      document.getElementById('drop-prompt').classList.add('hidden');
+      document.getElementById('file-preview-card').classList.remove('hidden');
+      document.getElementById('file-preview-card').classList.add('flex');
+      document.getElementById('file-name').innerText = file.name;
+      document.getElementById('file-size').innerText = formatBytes(file.size);
+      document.getElementById('file-detected-format').innerText = state.sourceFormat.toUpperCase();
+
+      renderTargetFormatsOptions();
+      document.getElementById('conversion-options-section').classList.remove('hidden');
+      document.getElementById('conversion-options-section').classList.add('flex');
+    }
+
+    function detectFormat(file) {
+      const ext = file.name.split('.').pop().toLowerCase();
+      const mime = file.type;
+
+      if (ext === 'pdf' || mime === 'application/pdf') return 'pdf';
+      if (ext === 'png' || mime === 'image/png') return 'png';
+      if (ext === 'jpg' || ext === 'jpeg' || mime === 'image/jpeg') return 'jpg';
+      if (ext === 'webp' || mime === 'image/webp') return 'webp';
+      if (ext === 'svg' || mime === 'image/svg+xml') return 'svg';
+      if (ext === 'txt' || mime.startsWith('text/')) return 'txt';
+      if (ext === 'docx' || mime.includes('wordprocessingml')) return 'docx';
+
+      return null;
+    }
+
+    function renderTargetFormatsOptions() {
+      const targets = conversionMatrix[state.sourceFormat] || [];
+      const grid = document.getElementById('target-formats-grid');
+      grid.innerHTML = '';
+
+      targets.forEach((fmt, index) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `px-3.5 py-1.5 rounded-xl border text-xs font-bold uppercase transition-all ${index === 0 ? 'bg-blue-500/10 border-blue-500/40 text-blue-400' : 'bg-white/[0.02] border-matte-border text-zinc-400 hover:text-white'}`;
+        btn.innerText = fmt;
+        btn.onclick = () => selectTargetFormat(fmt, btn);
+        grid.appendChild(btn);
+      });
+
+      if (targets.length > 0) selectTargetFormat(targets[0], grid.children[0]);
+    }
+
+    function selectTargetFormat(fmt, btnEl) {
+      state.targetFormat = fmt;
+      Array.from(document.getElementById('target-formats-grid').children).forEach(b => {
+        b.className = 'px-3.5 py-1.5 rounded-xl border border-matte-border bg-white/[0.02] text-zinc-400 hover:text-white text-xs font-bold uppercase transition-all';
+      });
+      btnEl.className = 'px-3.5 py-1.5 rounded-xl border border-blue-500/40 bg-blue-500/10 text-blue-400 text-xs font-bold uppercase transition-all';
+
+      // Exibir controles secundários relevantes
+      const qualityPanel = document.getElementById('setting-quality');
+      const pageSelectPanel = document.getElementById('setting-page-select');
+
+      qualityPanel.classList.toggle('hidden', !['jpg', 'webp'].includes(fmt));
+      pageSelectPanel.classList.toggle('hidden', state.sourceFormat !== 'pdf' || !['png', 'jpg', 'webp'].includes(fmt));
+    }
+
+    // ==== MOTOR PRINCIPAL DE CONVERSÃO ====
+    async function executeConversion() {
+      if (!state.file || !state.targetFormat) return;
+
+      const btn = document.getElementById('btn-execute-convert');
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = '<div class="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div> Processando...';
+      btn.disabled = true;
+
+      try {
+        let resultBlob = null;
+        const srcFmt = state.sourceFormat;
+        const tgtFmt = state.targetFormat;
+        const quality = parseFloat(document.getElementById('quality-range').value) / 100;
+
+        // Route para as funções específicas de conversão
+        if (srcFmt === 'pdf') {
+          if (['png', 'jpg', 'webp'].includes(tgtFmt)) resultBlob = await convertPdfToImage(tgtFmt, quality);
+          else if (tgtFmt === 'txt') resultBlob = await convertPdfToTxt();
+          else if (tgtFmt === 'docx') resultBlob = await convertPdfToDocx();
+        } 
+        else if (['png', 'jpg', 'webp', 'svg'].includes(srcFmt)) {
+          if (['png', 'jpg', 'webp'].includes(tgtFmt)) resultBlob = await convertRasterToRaster(tgtFmt, quality);
+          else if (tgtFmt === 'pdf') resultBlob = await convertImageToPdf();
+          else if (tgtFmt === 'svg') resultBlob = await convertImageToSvg();
+          else if (tgtFmt === 'txt') resultBlob = await convertImageToTxt();
+          else if (tgtFmt === 'docx') resultBlob = await convertImageToDocx();
+        } 
+        else if (srcFmt === 'txt') {
+          if (tgtFmt === 'pdf') resultBlob = await convertTxtToPdf();
+          else if (tgtFmt === 'docx') resultBlob = await convertTxtToDocx();
+          else if (['png', 'jpg', 'webp'].includes(tgtFmt)) resultBlob = await convertTxtToImage(tgtFmt, quality);
+        } 
+        else if (srcFmt === 'docx') {
+          if (tgtFmt === 'txt') resultBlob = await convertDocxToTxt();
+          else if (tgtFmt === 'pdf') resultBlob = await convertDocxToPdf();
+          else if (['png', 'jpg', 'webp'].includes(tgtFmt)) resultBlob = await convertDocxToImage(tgtFmt, quality);
+        }
+
+        if (!resultBlob) throw new Error("A conversão não gerou dados válidos.");
+
+        state.convertedBlob = resultBlob;
+        const baseName = state.file.name.substring(0, state.file.name.lastIndexOf('.'));
+        state.convertedFilename = `${baseName}_convertido.${tgtFmt}`;
+
+        // Exibir Cartão de Resultado
+        document.getElementById('result-filename').innerText = state.convertedFilename;
+        document.getElementById('result-filesize').innerText = `Tamanho final: ${formatBytes(resultBlob.size)}`;
+        document.getElementById('result-format-badge').innerText = tgtFmt;
+        document.getElementById('conversion-result-section').classList.remove('hidden');
+
+      } catch (err) {
+        alert("Erro ao converter arquivo: " + err.message);
+      } finally {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+      }
+    }
+
+    // ==== ALGORITMOS CLIENT-SIDE DE CONVERSÃO ====
+
+    // 1. PDF -> Imagem / Texto / DOCX
+    async function convertPdfToImage(tgtFmt, quality) {
+      const pdfJsDoc = await pdfjsLib.getDocument({ data: state.fileBuffer.slice(0) }).promise;
+      const pageMode = document.getElementById('pdf-page-mode').value;
+      const numPages = pageMode === 'first' ? 1 : pdfJsDoc.numPages;
+
+      const canvases = [];
+      let totalWidth = 0, totalHeight = 0;
+
+      for (let i = 1; i <= numPages; i++) {
+        const page = await pdfJsDoc.getPage(i);
+        const viewport = page.getViewport({ scale: 1.5 });
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext('2d');
+        await page.render({ canvasContext: ctx, viewport }).promise;
+
+        canvases.push(canvas);
+        totalWidth = Math.max(totalWidth, viewport.width);
+        totalHeight += viewport.height;
+      }
+
+      // Unir em um único canvas se houver múltiplas páginas
+      const mergedCanvas = document.createElement('canvas');
+      mergedCanvas.width = totalWidth;
+      mergedCanvas.height = totalHeight;
+      const mCtx = mergedCanvas.getContext('2d');
+      mCtx.fillStyle = '#ffffff';
+      mCtx.fillRect(0, 0, totalWidth, totalHeight);
+
+      let currentY = 0;
+      canvases.forEach(c => {
+        mCtx.drawImage(c, 0, currentY);
+        currentY += c.height;
+      });
+
+      const mime = tgtFmt === 'jpg' ? 'image/jpeg' : `image/${tgtFmt}`;
+      return new Promise(resolve => mergedCanvas.toBlob(resolve, mime, quality));
+    }
+
+    async function convertPdfToTxt() {
+      const pdfJsDoc = await pdfjsLib.getDocument({ data: state.fileBuffer.slice(0) }).promise;
+      let fullText = '';
+      for (let i = 1; i <= pdfJsDoc.numPages; i++) {
+        const page = await pdfJsDoc.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map(item => item.str).join(' ');
+        fullText += `--- Página ${i} ---\n${pageText}\n\n`;
+      }
+      return new Blob([fullText], { type: 'text/plain;charset=utf-8' });
+    }
+
+    async function convertPdfToDocx() {
+      const txtBlob = await convertPdfToTxt();
+      const text = await txtBlob.text();
+      const htmlContent = text.split('\n').map(p => `<p>${escapeHtml(p)}</p>`).join('');
+      return createDocxBlobFromHtml(htmlContent, state.file.name);
+    }
+
+    // 2. Imagens -> Outras Imagens / PDF / SVG / TXT / DOCX
+    async function convertRasterToRaster(tgtFmt, quality) {
+      const img = await loadImageFromBlob(new Blob([state.fileBuffer]));
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+
+      if (tgtFmt === 'jpg') {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+      ctx.drawImage(img, 0, 0);
+
+      const mime = tgtFmt === 'jpg' ? 'image/jpeg' : `image/${tgtFmt}`;
+      return new Promise(resolve => canvas.toBlob(resolve, mime, quality));
+    }
+
+    async function convertImageToPdf() {
+      const pdfDoc = await PDFLib.PDFDocument.create();
+      let imageEmbed;
+
+      if (state.sourceFormat === 'png') imageEmbed = await pdfDoc.embedPng(state.fileBuffer);
+      else if (['jpg', 'jpeg'].includes(state.sourceFormat)) imageEmbed = await pdfDoc.embedJpg(state.fileBuffer);
+      else {
+        // Converter previamente WebP/SVG para PNG em canvas
+        const pngBlob = await convertRasterToRaster('png', 1.0);
+        const pngBuffer = await pngBlob.arrayBuffer();
+        imageEmbed = await pdfDoc.embedPng(pngBuffer);
+      }
+
+      const page = pdfDoc.addPage([imageEmbed.width, imageEmbed.height]);
+      page.drawImage(imageEmbed, { x: 0, y: 0, width: imageEmbed.width, height: imageEmbed.height });
+      const pdfBytes = await pdfDoc.save();
+      return new Blob([pdfBytes], { type: 'application/pdf' });
+    }
+
+    async function convertImageToSvg() {
+      const dataUrl = await blobToDataURL(new Blob([state.fileBuffer]));
+      const img = await loadImageFromBlob(new Blob([state.fileBuffer]));
+      const svgString = `<svg xmlns="http://www.w3.org/2000/svg" width="${img.width}" height="${img.height}">
+        <image href="${dataUrl}" width="${img.width}" height="${img.height}"/>
+      </svg>`;
+      return new Blob([svgString], { type: 'image/svg+xml' });
+    }
+
+    async function convertImageToTxt() {
+      const info = `Nome do Arquivo: ${state.file.name}\nTamanho: ${formatBytes(state.file.size)}\nFormato Original: ${state.sourceFormat.toUpperCase()}\nData de Processamento: ${new Date().toLocaleString()}`;
+      return new Blob([info], { type: 'text/plain' });
+    }
+
+    async function convertImageToDocx() {
+      const dataUrl = await blobToDataURL(new Blob([state.fileBuffer]));
+      const htmlContent = `<div style="text-align:center;"><img src="${dataUrl}" style="max-width:100%;"/></div>`;
+      return createDocxBlobFromHtml(htmlContent, state.file.name);
+    }
+
+    // 3. TXT -> PDF / DOCX / Imagem
+    async function convertTxtToPdf() {
+      const text = new TextDecoder().decode(state.fileBuffer);
+      const pdfDoc = await PDFLib.PDFDocument.create();
+      let page = pdfDoc.addPage([595.28, 841.89]); // A4
+      const { height } = page.getSize();
+      
+      const lines = text.split('\n');
+      let y = height - 40;
+
+      for (const line of lines) {
+        if (y < 40) {
+          page = pdfDoc.addPage([595.28, 841.89]);
+          y = height - 40;
+        }
+        page.drawText(line.substring(0, 80), { x: 40, y, size: 10 });
+        y -= 14;
+      }
+
+      const pdfBytes = await pdfDoc.save();
+      return new Blob([pdfBytes], { type: 'application/pdf' });
+    }
+
+    async function convertTxtToDocx() {
+      const text = new TextDecoder().decode(state.fileBuffer);
+      const htmlContent = text.split('\n').map(p => `<p>${escapeHtml(p)}</p>`).join('');
+      return createDocxBlobFromHtml(htmlContent, state.file.name);
+    }
+
+    async function convertTxtToImage(tgtFmt, quality) {
+      const text = new TextDecoder().decode(state.fileBuffer);
+      const lines = text.split('\n').slice(0, 30); // Limite simples para imagem
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 800;
+      canvas.height = Math.max(400, lines.length * 24 + 60);
+      const ctx = canvas.getContext('2d');
+
+      ctx.fillStyle = '#121214';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#fafafa';
+      ctx.font = '14px monospace';
+
+      let y = 40;
+      lines.forEach(l => {
+        ctx.fillText(l.substring(0, 90), 30, y);
+        y += 24;
+      });
+
+      const mime = tgtFmt === 'jpg' ? 'image/jpeg' : `image/${tgtFmt}`;
+      return new Promise(resolve => canvas.toBlob(resolve, mime, quality));
+    }
+
+    // 4. DOCX -> TXT / PDF / Imagem
+    async function convertDocxToTxt() {
+      const result = await mammoth.extractRawText({ arrayBuffer: state.fileBuffer });
+      return new Blob([result.value], { type: 'text/plain;charset=utf-8' });
+    }
+
+    async function convertDocxToPdf() {
+      const txtBlob = await convertDocxToTxt();
+      state.fileBuffer = await txtBlob.arrayBuffer();
+      return convertTxtToPdf();
+    }
+
+    async function convertDocxToImage(tgtFmt, quality) {
+      const txtBlob = await convertDocxToTxt();
+      state.fileBuffer = await txtBlob.arrayBuffer();
+      return convertTxtToImage(tgtFmt, quality);
+    }
+
+    // ==== DOWLOAD LOCAL E SALVAMENTO NA NUVEM ====
+    function downloadConvertedFile() {
+      if (!state.convertedBlob) return;
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(state.convertedBlob);
+      link.download = state.convertedFilename;
+      link.click();
+    }
+
+    async function saveConvertedFileToCloud() {
+      if (!state.userId) {
+        alert("Conecte sua conta na nuvem para salvar arquivos salvos.");
+        return;
+      }
+      if (!state.convertedBlob) return;
+
+      const btn = document.getElementById('btn-save-cloud');
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = '<div class="w-3.5 h-3.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div> Salvando...';
+      btn.disabled = true;
+
+      try {
+        const filePath = `${state.userId}/${crypto.randomUUID()}_${state.convertedFilename}`;
+
+        // 1. Upload do Arquivo Convertido para o Supabase Storage
+        const { error: storageErr } = await dbClient.storage
+          .from('converted-files')
+          .upload(filePath, state.convertedBlob, { upsert: true });
+
+        if (storageErr) throw storageErr;
+
+        // 2. Gravar Registro na Tabela converted_files
+        const payload = {
+          user_id: state.userId,
+          name: state.convertedFilename,
+          format: state.targetFormat,
+          file_size: state.convertedBlob.size,
+          file_path: filePath
+        };
+
+        const { error: dbErr } = await dbClient.from('converted_files').insert(payload);
+        if (dbErr) throw dbErr;
+
+        btn.innerHTML = '<i class="ph-bold ph-check text-emerald-400"></i> Salvo na Nuvem!';
+        setTimeout(() => { btn.innerHTML = originalHtml; btn.disabled = false; }, 2000);
+
+      } catch (err) {
+        alert("Erro ao salvar arquivo na nuvem: " + err.message);
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+      }
+    }
+
+    // ==== HISTÓRICO DE ARQUIVOS SALVOS ====
+    async function toggleHistoryModal(show) {
+      const modal = document.getElementById('modal-history');
+      modal.classList.toggle('hidden', !show);
+
+      if (show && state.userId) {
+        const { data, error } = await dbClient
+          .from('converted_files')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        const list = document.getElementById('saved-files-list');
+        if (!data || data.length === 0) {
+          list.innerHTML = `<p class="text-xs text-zinc-500 text-center py-6">Nenhum arquivo salvo até o momento.</p>`;
+          return;
+        }
+
+        list.innerHTML = data.map(item => `
+          <div class="p-3 rounded-xl border border-matte-border bg-white/[0.02] flex items-center justify-between">
+            <div class="overflow-hidden">
+              <h4 class="text-xs font-bold text-white truncate max-w-[200px]">${item.name}</h4>
+              <span class="text-[10px] text-zinc-500">${formatBytes(item.file_size)} • ${new Date(item.created_at).toLocaleDateString()}</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button onclick="downloadFromCloud('${item.file_path}', '${item.name}')" class="p-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 text-xs" title="Baixar">
+                <i class="ph ph-download-simple"></i>
+              </button>
+              <button onclick="deleteFromCloud('${item.id}', '${item.file_path}')" class="p-1.5 rounded-lg bg-white/[0.05] hover:bg-red-500/10 text-zinc-400 hover:text-red-400 text-xs" title="Excluir">
+                <i class="ph ph-trash"></i>
+              </button>
+            </div>
+          </div>
+        `).join('');
+      }
+    }
+
+    async function downloadFromCloud(path, filename) {
+      const { data, error } = await dbClient.storage.from('converted-files').download(path);
+      if (data) {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(data);
+        link.download = filename;
+        link.click();
+      }
+    }
+
+    async function deleteFromCloud(id, path) {
+      await dbClient.storage.from('converted-files').remove([path]);
+      await dbClient.from('converted_files').delete().eq('id', id);
+      toggleHistoryModal(true);
+    }
+
+    // ==== FUNÇÕES UTILITÁRIAS ====
+    function resetConverter() {
+      state.file = null;
+      state.fileBuffer = null;
+      state.sourceFormat = null;
+      state.convertedBlob = null;
+      
+      document.getElementById('file-input').value = '';
+      document.getElementById('drop-prompt').classList.remove('hidden');
+      document.getElementById('file-preview-card').classList.add('hidden');
+      document.getElementById('conversion-options-section').classList.add('hidden');
+      document.getElementById('conversion-result-section').classList.add('hidden');
+    }
+
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 Bytes';
+      const k = 1024, sizes = ['Bytes', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    function loadImageFromBlob(blob) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = URL.createObjectURL(blob);
+      });
+    }
+
+    function blobToDataURL(blob) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    function createDocxBlobFromHtml(htmlContent, title) {
+      const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+      <head><meta charset='utf-8'><title>${escapeHtml(title)}</title>
+      <style>body { font-family: 'Calibri', 'Arial', sans-serif; font-size: 11pt; line-height: 1.5; color: #000000; } p { margin-bottom: 10pt; }</style>
+      </head><body>`;
+      const footer = `</body></html>`;
+      return new Blob(['\ufeff' + header + htmlContent + footer], { type: 'application/msword' });
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+  </script>
+</body>
+</html>

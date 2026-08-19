@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Controle Financeiro</title>
+
+  <!-- CDNs Supabase, Chart.js, Tailwind & Phosphor Icons -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            matte: { bg: '#09090b', card: '#121214', border: '#27272a', text: '#fafafa', muted: '#a1a1aa' }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #09090b; color: #fafafa; -webkit-tap-highlight-color: transparent; }
+    .custom-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
+    .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #27272a; border-radius: 99px; }
+    .custom-scroll::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+  </style>
+</head>
+<body class="antialiased flex flex-col min-h-screen font-sans bg-matte-bg custom-scroll">
+
+  <!-- CABEÇALHO DA APLICAÇÃO -->
+  <header class="h-16 shrink-0 bg-matte-card border-b border-matte-border px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+        <i class="ph-bold ph-wallet text-xl"></i>
+      </div>
+      <div>
+        <h1 class="text-base font-bold text-white leading-tight">Controle Financeiro</h1>
+        <p class="text-[11px] text-zinc-400 font-medium" id="sync-status"><i class="ph-fill ph-check-circle text-emerald-400"></i> Pronto</p>
+      </div>
+    </div>
+
+    <!-- Botões Globais de Ação -->
+    <div class="flex items-center gap-2">
+      <button onclick="toggleAccountsModal(true)" class="p-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+        <i class="ph ph-bank text-sm"></i>
+        <span class="hidden sm:inline">Contas</span>
+      </button>
+      <button onclick="toggleCategoriesModal(true)" class="p-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+        <i class="ph ph-tag text-sm"></i>
+        <span class="hidden sm:inline">Categorias</span>
+      </button>
+      <button onclick="openTransactionModal()" class="px-3 py-2 rounded-xl bg-emerald-500 text-black hover:bg-emerald-400 font-bold text-xs flex items-center gap-1.5 transition-colors shadow-lg shadow-emerald-500/10">
+        <i class="ph-bold ph-plus text-sm"></i>
+        <span>Nova Transação</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- FILTROS DE PERÍODO & COMPARAÇÃO -->
+  <nav class="bg-matte-bg border-b border-matte-border px-4 sm:px-8 py-3 flex flex-wrap items-center justify-between gap-4 z-20">
+    <div class="flex items-center gap-2">
+      <span class="text-xs font-semibold text-zinc-400">Mês de Referência:</span>
+      <input type="month" id="filter-month" onchange="state.filterMonth = this.value; loadFinancialData();" class="bg-white/[0.03] border border-matte-border rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500/50">
+    </div>
+
+    <!-- Ação Explícita de IA -->
+    <button onclick="analyzeFinancesWithGemini()" id="btn-ai-analysis" class="px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 hover:bg-purple-500/20 text-xs font-bold flex items-center gap-1.5 transition-colors">
+      <i class="ph-fill ph-sparkle"></i> Analisar Finanças com IA
+    </button>
+  </nav>
+
+  <!-- ÁREA PRINCIPAL DO DASHBOARD -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-8 space-y-6 custom-scroll">
+
+    <!-- CARDS DE SALDO E RESUMO MENSAL -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      
+      <!-- Saldo Geral -->
+      <div class="bg-matte-card border border-matte-border rounded-2xl p-5 flex flex-col justify-between shadow-xl">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Saldo Total Geral</span>
+          <div class="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+            <i class="ph-bold ph-bank"></i>
+          </div>
+        </div>
+        <h3 id="kpi-total-balance" class="text-xl font-bold text-white truncate">R$ 0,00</h3>
+        <span class="text-[10px] text-zinc-500 mt-1">Soma de todas as contas ativas</span>
+      </div>
+
+      <!-- Receitas do Mês -->
+      <div class="bg-matte-card border border-matte-border rounded-2xl p-5 flex flex-col justify-between shadow-xl">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Receitas do Mês</span>
+          <div class="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+            <i class="ph-bold ph-arrow-circle-down-right"></i>
+          </div>
+        </div>
+        <h3 id="kpi-month-income" class="text-xl font-bold text-emerald-400 truncate">R$ 0,00</h3>
+        <span id="kpi-income-comparison" class="text-[10px] text-zinc-500 mt-1">Comparando com o mês anterior</span>
+      </div>
+
+      <!-- Despesas do Mês -->
+      <div class="bg-matte-card border border-matte-border rounded-2xl p-5 flex flex-col justify-between shadow-xl">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Despesas do Mês</span>
+          <div class="w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
+            <i class="ph-bold ph-arrow-circle-up-right"></i>
+          </div>
+        </div>
+        <h3 id="kpi-month-expense" class="text-xl font-bold text-red-400 truncate">R$ 0,00</h3>
+        <span id="kpi-expense-comparison" class="text-[10px] text-zinc-500 mt-1">Comparando com o mês anterior</span>
+      </div>
+
+      <!-- Balanço do Mês -->
+      <div class="bg-matte-card border border-matte-border rounded-2xl p-5 flex flex-col justify-between shadow-xl">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Balanço do Mês</span>
+          <div class="w-8 h-8 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+            <i class="ph-bold ph-scales"></i>
+          </div>
+        </div>
+        <h3 id="kpi-month-balance" class="text-xl font-bold text-white truncate">R$ 0,00</h3>
+        <span class="text-[10px] text-zinc-500 mt-1">Receitas - Despesas no período</span>
+      </div>
+
+    </section>
+
+    <!-- GRÁFICOS E PAINEL DE METAS -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      
+      <!-- GRÁFICO DE DESPESAS POR CATEGORIA -->
+      <div class="lg:col-span-8 bg-matte-card border border-matte-border rounded-2xl p-5 flex flex-col gap-4 shadow-xl h-[360px]">
+        <div class="flex items-center justify-between border-b border-matte-border pb-3">
+          <h3 class="text-xs font-bold text-white flex items-center gap-2">
+            <i class="ph-bold ph-chart-pie text-emerald-400"></i> Despesas por Categoria
+          </h3>
+          <span class="text-[10px] text-zinc-500">Distribuição Mensal</span>
+        </div>
+        <div class="flex-1 w-full relative flex items-center justify-center">
+          <canvas id="category-chart-canvas"></canvas>
+        </div>
+      </div>
+
+      <!-- METAS FINANCEIRAS -->
+      <div class="lg:col-span-4 bg-matte-card border border-matte-border rounded-2xl p-5 flex flex-col gap-4 shadow-xl max-h-[360px]">
+        <div class="flex items-center justify-between border-b border-matte-border pb-3">
+          <h3 class="text-xs font-bold text-white flex items-center gap-2">
+            <i class="ph-bold ph-target text-purple-400"></i> Metas de Economia
+          </h3>
+          <button onclick="openGoalModal()" class="text-xs text-purple-400 hover:text-purple-300 font-bold">+ Nova Meta</button>
+        </div>
+        <div id="goals-list-container" class="flex-1 overflow-y-auto space-y-3 custom-scroll pr-1">
+          <!-- Injetado via JS -->
+        </div>
+      </div>
+
+    </section>
+
+    <!-- PAINEL DE RESULTADOS DA IA (EXIBIDO SOMENTE APÓS AÇÃO DO USUÁRIO) -->
+    <section id="ai-insight-panel" class="hidden bg-purple-500/[0.03] border border-purple-500/20 rounded-2xl p-5 flex flex-col gap-3">
+      <div class="flex items-center justify-between">
+        <h3 class="text-xs font-bold text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
+          <i class="ph-fill ph-sparkle"></i> Análise e Recomendações Financeiras (IA)
+        </h3>
+        <button onclick="document.getElementById('ai-insight-panel').classList.add('hidden')" class="text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
+      </div>
+      <p id="ai-insight-text" class="text-xs text-zinc-300 leading-relaxed font-sans"></p>
+    </section>
+
+    <!-- LISTA DE TRANSAÇÕES RECENTES DO PERÍODO -->
+    <section class="bg-matte-card border border-matte-border rounded-2xl p-5 flex flex-col gap-4 shadow-xl">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-matte-border pb-4">
+        <div>
+          <h3 class="text-sm font-bold text-white">Transações do Período</h3>
+          <p class="text-xs text-zinc-400">Entradas e saídas registradas para o mês selecionado.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <input type="text" id="search-trans-input" oninput="renderTransactionsList()" placeholder="Filtrar lançamentos..." class="bg-white/[0.03] border border-matte-border rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500/50">
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead class="bg-white/[0.02] border-b border-matte-border text-zinc-400 font-bold uppercase tracking-wider">
+            <tr>
+              <th class="p-3">Data</th>
+              <th class="p-3">Descrição</th>
+              <th class="p-3">Categoria</th>
+              <th class="p-3">Conta</th>
+              <th class="p-3">Recorrência</th>
+              <th class="p-3 text-right">Valor</th>
+              <th class="p-3 text-center">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="transactions-table-body" class="divide-y divide-matte-border">
+            <!-- Injetado via JS -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL DE TRANSAÇÃO (LANCAR / EDITAR) -->
+  <div id="modal-transaction" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-md shadow-2xl flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3">
+        <h3 id="modal-trans-title" class="text-sm font-bold text-white">Nova Transação</h3>
+        <button onclick="closeTransactionModal()" class="text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
+      </div>
+
+      <form id="trans-form" onsubmit="saveTransaction(event)" class="space-y-4">
+        <!-- Tipo de Transação -->
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" id="btn-type-income" onclick="setTransType('income')" class="py-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 font-bold text-xs">
+            <i class="ph-bold ph-arrow-down-left"></i> Receita
+          </button>
+          <button type="button" id="btn-type-expense" onclick="setTransType('expense')" class="py-2 rounded-xl border border-matte-border bg-white/[0.02] text-zinc-400 font-bold text-xs">
+            <i class="ph-bold ph-arrow-up-right"></i> Despesa
+          </button>
+        </div>
+
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold text-zinc-300">Descrição</label>
+          <input type="text" id="trans-desc" required placeholder="Ex: Supermercado, Salário..." class="bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500/50">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs font-semibold text-zinc-300">Valor (R$)</label>
+            <input type="number" step="0.01" min="0.01" id="trans-amount" required placeholder="0.00" class="bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500/50">
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs font-semibold text-zinc-300">Data</label>
+            <input type="date" id="trans-date" required class="bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500/50">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs font-semibold text-zinc-300">Conta</label>
+            <select id="trans-account" required class="bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white focus:outline-none"></select>
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs font-semibold text-zinc-300">Categoria</label>
+            <select id="trans-category" required class="bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white focus:outline-none"></select>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 pt-2">
+          <input type="checkbox" id="trans-recurring" class="rounded accent-emerald-500">
+          <label for="trans-recurring" class="text-xs text-zinc-300">Transação Recorrente (Mensal)</label>
+        </div>
+
+        <button type="submit" class="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-xs transition-colors shadow-lg shadow-emerald-500/10">
+          Salvar Lançamento
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL DE GERENCIAMENTO DE CONTAS -->
+  <div id="modal-accounts" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-md shadow-2xl flex flex-col gap-4 max-h-[85vh]">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="ph ph-bank text-blue-400"></i> Gerenciar Contas
+        </h3>
+        <button onclick="toggleAccountsModal(false)" class="text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
+      </div>
+
+      <form onsubmit="addAccount(event)" class="grid grid-cols-2 gap-2 pb-2 border-b border-matte-border">
+        <input type="text" id="acc-name" required placeholder="Nome da Conta" class="bg-white/[0.03] border border-matte-border rounded-xl p-2.5 text-xs text-white">
+        <input type="number" step="0.01" id="acc-balance" required placeholder="Saldo Inicial" class="bg-white/[0.03] border border-matte-border rounded-xl p-2.5 text-xs text-white">
+        <button type="submit" class="col-span-2 py-2 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs">Adicionar Conta</button>
+      </form>
+
+      <div id="accounts-list" class="flex-1 overflow-y-auto space-y-2 custom-scroll pr-1"></div>
+    </div>
+  </div>
+
+  <!-- MODAL DE GERENCIAMENTO DE CATEGORIAS -->
+  <div id="modal-categories" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-md shadow-2xl flex flex-col gap-4 max-h-[85vh]">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="ph ph-tag text-emerald-400"></i> Gerenciar Categorias
+        </h3>
+        <button onclick="toggleCategoriesModal(false)" class="text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
+      </div>
+
+      <form onsubmit="addCategory(event)" class="grid grid-cols-2 gap-2 pb-2 border-b border-matte-border">
+        <input type="text" id="cat-name" required placeholder="Nome da Categoria" class="bg-white/[0.03] border border-matte-border rounded-xl p-2.5 text-xs text-white">
+        <select id="cat-type" class="bg-white/[0.03] border border-matte-border rounded-xl p-2.5 text-xs text-white">
+          <option value="expense">Despesa</option>
+          <option value="income">Receita</option>
+        </select>
+        <button type="submit" class="col-span-2 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-xs">Adicionar Categoria</button>
+      </form>
+
+      <div id="categories-list" class="flex-1 overflow-y-auto space-y-2 custom-scroll pr-1"></div>
+    </div>
+  </div>
+
+  <!-- MODAL DE NOVA META -->
+  <div id="modal-goal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-sm shadow-2xl flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="ph ph-target text-purple-400"></i> Nova Meta Financeira
+        </h3>
+        <button onclick="closeGoalModal()" class="text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
+      </div>
+
+      <form onsubmit="saveGoal(event)" class="space-y-3">
+        <input type="text" id="goal-title" required placeholder="Título da Meta" class="w-full bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white">
+        <input type="number" step="0.01" id="goal-target" required placeholder="Valor Alvo (R$)" class="w-full bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white">
+        <input type="number" step="0.01" id="goal-current" placeholder="Valor Atual Acumulado (R$)" class="w-full bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white">
+        <button type="submit" class="w-full py-2.5 rounded-xl bg-purple-500 hover:bg-purple-600 text-white font-bold text-xs">Salvar Meta</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- LÓGICA COMPLETA DO MÓDULO FINANCIAL -->
+  <script>
+    // Inicialização do Supabase Client
+    const SUPABASE_URL = 'https://zlsdlcvtcsrykfacjvhf.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_JnDv-fxHXPTzNaFX9n3Z0w_4mqt47Js';
+    const dbClient = window.parent?.PortalDB?.supabase || window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // Chave padrão da API Gemini obtida do ambiente de execução
+    const apiKey = "";
+
+    // Estado da Aplicação
+    let state = {
+      userId: null,
+      filterMonth: new Date().toISOString().substring(0, 7), // YYYY-MM
+      accounts: [],
+      categories: [],
+      transactions: [],
+      goals: [],
+      activeTransType: 'expense',
+      editingTransId: null,
+      chartInstance: null
+    };
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      document.getElementById('filter-month').value = state.filterMonth;
+      document.getElementById('trans-date').valueAsDate = new Date();
+      await initSession();
+      await loadFinancialData();
+    });
+
+    async function initSession() {
+      try {
+        const { data } = await dbClient.auth.getSession();
+        state.userId = data?.session?.user?.id || null;
+      } catch (e) {
+        state.userId = null;
+      }
+    }
+
+    // ==== CARREGAMENTO COMPLETO DE DADOS ====
+    async function loadFinancialData() {
+      updateSyncStatus("Carregando...");
+      if (!state.userId) {
+        updateSyncStatus("Modo Offline");
+        return;
+      }
+
+      try {
+        // 1. Carregar Contas
+        const { data: accs } = await dbClient.from('financial_accounts').select('*').eq('user_id', state.userId);
+        state.accounts = accs || [];
+
+        // 2. Carregar Categorias
+        const { data: cats } = await dbClient.from('financial_categories').select('*').eq('user_id', state.userId);
+        state.categories = cats || [];
+
+        // Seed inicial de categorias se vazio
+        if (state.categories.length === 0) {
+          await seedDefaultCategories();
+        }
+
+        // Seed inicial de conta se vazio
+        if (state.accounts.length === 0) {
+          await addAccountDirect("Conta Corrente Principal", 0);
+        }
+
+        // 3. Carregar Transações (Exclusão Lógica: deleted_at IS NULL)
+        const { data: trans } = await dbClient
+          .from('financial_transactions')
+          .select('*, account:financial_accounts(name), category:financial_categories(name, color)')
+          .eq('user_id', state.userId)
+          .is('deleted_at', null)
+          .order('date', { ascending: false });
+
+        state.transactions = trans || [];
+
+        // 4. Carregar Metas
+        const { data: goals } = await dbClient.from('financial_goals').select('*').eq('user_id', state.userId);
+        state.goals = goals || [];
+
+        renderDashboard();
+        renderTransactionsList();
+        renderGoalsList();
+        updateSyncStatus("Sincronizado");
+
+      } catch (err) {
+        updateSyncStatus("Erro na nuvem");
+      }
+    }
+
+    // ==== CÁLCULO DE KPIS E DASHBOARD ====
+    function renderDashboard() {
+      // 1. Saldo Geral (Soma dos saldos iniciais + transações acumuladas de todas as contas)
+      let totalBalance = state.accounts.reduce((acc, a) => acc + Number(a.initial_balance || 0), 0);
+      state.transactions.forEach(t => {
+        if (t.type === 'income') totalBalance += Number(t.amount);
+        else totalBalance -= Number(t.amount);
+      });
+      document.getElementById('kpi-total-balance').innerText = formatCurrency(totalBalance);
+
+      // 2. Métricas do Mês Atual Selecionado
+      const currentMonthTrans = state.transactions.filter(t => t.date.startsWith(state.filterMonth));
+      const monthIncome = currentMonthTrans.filter(t => t.type === 'income').reduce((acc, t) => acc + Number(t.amount), 0);
+      const monthExpense = currentMonthTrans.filter(t => t.type === 'expense').reduce((acc, t) => acc + Number(t.amount), 0);
+      const monthBalance = monthIncome - monthExpense;
+
+      document.getElementById('kpi-month-income').innerText = formatCurrency(monthIncome);
+      document.getElementById('kpi-month-expense').innerText = formatCurrency(monthExpense);
+      document.getElementById('kpi-month-balance').innerText = formatCurrency(monthBalance);
+
+      // 3. Comparação com Mês Anterior
+      const prevMonthStr = getPreviousMonthStr(state.filterMonth);
+      const prevMonthTrans = state.transactions.filter(t => t.date.startsWith(prevMonthStr));
+      const prevIncome = prevMonthTrans.filter(t => t.type === 'income').reduce((acc, t) => acc + Number(t.amount), 0);
+      const prevExpense = prevMonthTrans.filter(t => t.type === 'expense').reduce((acc, t) => acc + Number(t.amount), 0);
+
+      const incomeDiffPct = prevIncome > 0 ? (((monthIncome - prevIncome) / prevIncome) * 100).toFixed(0) : 0;
+      const expenseDiffPct = prevExpense > 0 ? (((monthExpense - prevExpense) / prevExpense) * 100).toFixed(0) : 0;
+
+      document.getElementById('kpi-income-comparison').innerText = `${incomeDiffPct >= 0 ? '+' : ''}${incomeDiffPct}% vs mês anterior`;
+      document.getElementById('kpi-expense-comparison').innerText = `${expenseDiffPct >= 0 ? '+' : ''}${expenseDiffPct}% vs mês anterior`;
+
+      // 4. Renderizar Gráfico de Categorias
+      renderCategoryChart(currentMonthTrans.filter(t => t.type === 'expense'));
+    }
+
+    function renderCategoryChart(expenseTrans) {
+      const catTotals = {};
+      expenseTrans.forEach(t => {
+        const catName = t.category?.name || 'Sem Categoria';
+        catTotals[catName] = (catTotals[catName] || 0) + Number(t.amount);
+      });
+
+      const labels = Object.keys(catTotals);
+      const data = Object.values(catTotals);
+
+      const ctx = document.getElementById('category-chart-canvas').getContext('2d');
+      if (state.chartInstance) state.chartInstance.destroy();
+
+      state.chartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: labels.length ? labels : ['Sem Lançamentos'],
+          datasets: [{
+            data: data.length ? data : [1],
+            backgroundColor: [
+              '#10b981', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#ef4444'
+            ],
+            borderWidth: 1,
+            borderColor: '#121214'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'right', labels: { color: '#a1a1aa', font: { size: 10 } } }
+          }
+        }
+      });
+    }
+
+    // ==== TRANSAÇÕES (LISTAR, CRIAR, EDITAR, SOFT DELETE) ====
+    function renderTransactionsList() {
+      const q = document.getElementById('search-trans-input').value.toLowerCase();
+      const tbody = document.getElementById('transactions-table-body');
+
+      let filtered = state.transactions.filter(t => t.date.startsWith(state.filterMonth));
+      if (q) {
+        filtered = filtered.filter(t => t.description.toLowerCase().includes(q) || (t.category?.name || '').toLowerCase().includes(q));
+      }
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-zinc-500">Nenhuma transação encontrada no período.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(t => `
+        <tr class="hover:bg-white/[0.01] transition-colors">
+          <td class="p-3 text-zinc-400 font-mono">${new Date(t.date + 'T00:00:00').toLocaleDateString()}</td>
+          <td class="p-3 font-semibold text-white">${t.description}</td>
+          <td class="p-3"><span class="px-2 py-0.5 rounded-md bg-white/[0.04] text-zinc-300 border border-matte-border">${t.category?.name || 'Geral'}</span></td>
+          <td class="p-3 text-zinc-400">${t.account?.name || 'Padrão'}</td>
+          <td class="p-3 text-zinc-500">${t.is_recurring ? 'Mensal' : 'Única'}</td>
+          <td class="p-3 text-right font-bold ${t.type === 'income' ? 'text-emerald-400' : 'text-red-400'}">
+            ${t.type === 'income' ? '+' : '-'} ${formatCurrency(t.amount)}
+          </td>
+          <td class="p-3 text-center">
+            <div class="flex items-center justify-center gap-1">
+              <button onclick="editTransaction('${t.id}')" class="p-1 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white" title="Editar"><i class="ph ph-pencil-simple"></i></button>
+              <button onclick="deleteTransaction('${t.id}')" class="p-1 rounded hover:bg-red-500/10 text-zinc-500 hover:text-red-400" title="Excluir"><i class="ph ph-trash"></i></button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function setTransType(type) {
+      state.activeTransType = type;
+      const bInc = document.getElementById('btn-type-income');
+      const bExp = document.getElementById('btn-type-expense');
+
+      bInc.className = type === 'income' ? 'py-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 font-bold text-xs' : 'py-2 rounded-xl border border-matte-border bg-white/[0.02] text-zinc-400 font-bold text-xs';
+      bExp.className = type === 'expense' ? 'py-2 rounded-xl border border-red-500/40 bg-red-500/10 text-red-400 font-bold text-xs' : 'py-2 rounded-xl border border-matte-border bg-white/[0.02] text-zinc-400 font-bold text-xs';
+
+      populateCategorySelect();
+    }
+
+    function openTransactionModal(editId = null) {
+      state.editingTransId = editId;
+      document.getElementById('modal-trans-title').innerText = editId ? 'Editar Transação' : 'Nova Transação';
+      populateAccountSelect();
+      populateCategorySelect();
+
+      if (editId) {
+        const t = state.transactions.find(x => x.id === editId);
+        if (t) {
+          setTransType(t.type);
+          document.getElementById('trans-desc').value = t.description;
+          document.getElementById('trans-amount').value = t.amount;
+          document.getElementById('trans-date').value = t.date;
+          document.getElementById('trans-account').value = t.account_id;
+          document.getElementById('trans-category').value = t.category_id;
+          document.getElementById('trans-recurring').checked = t.is_recurring;
+        }
+      } else {
+        document.getElementById('trans-form').reset();
+        document.getElementById('trans-date').valueAsDate = new Date();
+        setTransType('expense');
+      }
+
+      document.getElementById('modal-transaction').classList.remove('hidden');
+    }
+
+    function closeTransactionModal() { document.getElementById('modal-transaction').classList.add('hidden'); }
+
+    async function saveTransaction(e) {
+      e.preventDefault();
+      if (!state.userId) return;
+
+      const payload = {
+        user_id: state.userId,
+        type: state.activeTransType,
+        description: document.getElementById('trans-desc').value.trim(),
+        amount: parseFloat(document.getElementById('trans-amount').value),
+        date: document.getElementById('trans-date').value,
+        account_id: document.getElementById('trans-account').value,
+        category_id: document.getElementById('trans-category').value,
+        is_recurring: document.getElementById('trans-recurring').checked,
+        recurrence_period: document.getElementById('trans-recurring').checked ? 'monthly' : null
+      };
+
+      if (state.editingTransId) payload.id = state.editingTransId;
+
+      const { error } = await dbClient.from('financial_transactions').upsert(payload);
+      if (!error) {
+        closeTransactionModal();
+        await loadFinancialData();
+      }
+    }
+
+    async function deleteTransaction(id) {
+      if (!confirm("Deseja realmente remover este lançamento?")) return;
+      // Soft Delete: Define deleted_at
+      const { error } = await dbClient.from('financial_transactions').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+      if (!error) await loadFinancialData();
+    }
+
+    // ==== METAS ====
+    function renderGoalsList() {
+      const container = document.getElementById('goals-list-container');
+      if (state.goals.length === 0) {
+        container.innerHTML = `<p class="text-xs text-zinc-500 text-center py-4">Nenhuma meta configurada.</p>`;
+        return;
+      }
+
+      container.innerHTML = state.goals.map(g => {
+        const pct = Math.min(100, Math.round((g.current_amount / g.target_amount) * 100));
+        return `
+          <div class="p-3 rounded-xl border border-matte-border bg-white/[0.02] flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+              <h4 class="text-xs font-bold text-white truncate">${g.title}</h4>
+              <span class="text-[10px] text-purple-400 font-bold">${pct}%</span>
+            </div>
+            <div class="w-full h-1.5 bg-matte-border rounded-full overflow-hidden">
+              <div class="h-full bg-purple-500 rounded-full" style="width: ${pct}%"></div>
+            </div>
+            <div class="flex items-center justify-between text-[10px] text-zinc-500">
+              <span>${formatCurrency(g.current_amount)}</span>
+              <span>Alvo: ${formatCurrency(g.target_amount)}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openGoalModal() { document.getElementById('modal-goal').classList.remove('hidden'); }
+    function closeGoalModal() { document.getElementById('modal-goal').classList.add('hidden'); }
+
+    async function saveGoal(e) {
+      e.preventDefault();
+      if (!state.userId) return;
+
+      const payload = {
+        user_id: state.userId,
+        title: document.getElementById('goal-title').value.trim(),
+        target_amount: parseFloat(document.getElementById('goal-target').value),
+        current_amount: parseFloat(document.getElementById('goal-current').value || 0)
+      };
+
+      const { error } = await dbClient.from('financial_goals').insert(payload);
+      if (!error) {
+        closeGoalModal();
+        await loadFinancialData();
+      }
+    }
+
+    // ==== AÇÃO EXPLÍCITA COM IA (GEMINI REST COM RETRIES) ====
+    async function analyzeFinancesWithGemini() {
+      const btn = document.getElementById('btn-ai-analysis');
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = '<div class="w-3.5 h-3.5 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"></div> Analisando...';
+      btn.disabled = true;
+
+      try {
+        const currentMonthTrans = state.transactions.filter(t => t.date.startsWith(state.filterMonth));
+        const summary = {
+          mes: state.filterMonth,
+          totalReceitas: currentMonthTrans.filter(t => t.type === 'income').reduce((acc, t) => acc + Number(t.amount), 0),
+          totalDespesas: currentMonthTrans.filter(t => t.type === 'expense').reduce((acc, t) => acc + Number(t.amount), 0),
+          qtdLancamentos: currentMonthTrans.length
+        };
+
+        const prompt = `Analise o resumo financeiro mensal a seguir e forneça 3 recomendações práticas e curtas em português: ${JSON.stringify(summary)}`;
+        const resultText = await callGeminiAPI(prompt, "Você é um consultor financeiro pessoal experiente.");
+
+        document.getElementById('ai-insight-text').innerText = resultText;
+        document.getElementById('ai-insight-panel').classList.remove('hidden');
+
+      } catch (err) {
+        alert("Erro ao realizar análise financeira com IA.");
+      } finally {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+      }
+    }
+
+    async function callGeminiAPI(userQuery, systemPrompt) {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+      const delays = [1000, 2000, 4000, 8000, 16000];
+
+      const payload = {
+        contents: [{ parts: [{ text: userQuery }] }],
+        systemInstruction: { parts: [{ text: systemPrompt }] }
+      };
+
+      for (let attempt = 0; attempt <= delays.length; attempt++) {
+        try {
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (!res.ok) throw new Error(`Status ${res.status}`);
+          const result = await res.json();
+          return result.candidates?.[0]?.content?.parts?.[0]?.text;
+        } catch (e) {
+          if (attempt === delays.length) throw e;
+          await new Promise(resolve => setTimeout(resolve, delays[attempt]));
+        }
+      }
+    }
+
+    // ==== CONTAS E CATEGORIAS ====
+    function toggleAccountsModal(show) {
+      document.getElementById('modal-accounts').classList.toggle('hidden', !show);
+      if (show) renderAccountsListModal();
+    }
+
+    function toggleCategoriesModal(show) {
+      document.getElementById('modal-categories').classList.toggle('hidden', !show);
+      if (show) renderCategoriesListModal();
+    }
+
+    function renderAccountsListModal() {
+      const el = document.getElementById('accounts-list');
+      el.innerHTML = state.accounts.map(a => `
+        <div class="p-2.5 rounded-xl border border-matte-border bg-white/[0.02] flex items-center justify-between text-xs">
+          <span class="font-bold text-white">${a.name}</span>
+          <span class="font-mono text-zinc-400">R$ ${Number(a.initial_balance).toFixed(2)}</span>
+        </div>
+      `).join('');
+    }
+
+    function renderCategoriesListModal() {
+      const el = document.getElementById('categories-list');
+      el.innerHTML = state.categories.map(c => `
+        <div class="p-2.5 rounded-xl border border-matte-border bg-white/[0.02] flex items-center justify-between text-xs">
+          <span class="font-bold text-white">${c.name}</span>
+          <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase ${c.type === 'income' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}">${c.type}</span>
+        </div>
+      `).join('');
+    }
+
+    async function addAccount(e) {
+      e.preventDefault();
+      const name = document.getElementById('acc-name').value;
+      const bal = parseFloat(document.getElementById('acc-balance').value);
+      await addAccountDirect(name, bal);
+      document.getElementById('acc-name').value = '';
+      document.getElementById('acc-balance').value = '';
+      renderAccountsListModal();
+    }
+
+    async function addAccountDirect(name, balance) {
+      if (!state.userId) return;
+      await dbClient.from('financial_accounts').insert({ user_id: state.userId, name, initial_balance: balance });
+      await loadFinancialData();
+    }
+
+    async function addCategory(e) {
+      e.preventDefault();
+      if (!state.userId) return;
+      const name = document.getElementById('cat-name').value;
+      const type = document.getElementById('cat-type').value;
+
+      await dbClient.from('financial_categories').insert({ user_id: state.userId, name, type });
+      document.getElementById('cat-name').value = '';
+      renderCategoriesListModal();
+      await loadFinancialData();
+    }
+
+    async function seedDefaultCategories() {
+      if (!state.userId) return;
+      const defaults = [
+        { name: 'Salário', type: 'income' },
+        { name: 'Alimentação', type: 'expense' },
+        { name: 'Moradia', type: 'expense' },
+        { name: 'Transporte', type: 'expense' },
+        { name: 'Lazer', type: 'expense' }
+      ];
+      for (const cat of defaults) {
+        await dbClient.from('financial_categories').insert({ ...cat, user_id: state.userId });
+      }
+    }
+
+    function populateAccountSelect() {
+      const sel = document.getElementById('trans-account');
+      sel.innerHTML = state.accounts.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+    }
+
+    function populateCategorySelect() {
+      const sel = document.getElementById('trans-category');
+      const filtered = state.categories.filter(c => c.type === state.activeTransType);
+      sel.innerHTML = filtered.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    }
+
+    // ==== AUXILIARES ====
+    function formatCurrency(val) {
+      return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
+    }
+
+    function getPreviousMonthStr(currentMonthStr) {
+      const [y, m] = currentMonthStr.split('-').map(Number);
+      const date = new Date(y, m - 2, 1);
+      return date.toISOString().substring(0, 7);
+    }
+
+    function updateSyncStatus(msg) {
+      document.getElementById('sync-status').innerHTML = `<i class="ph-fill ph-check-circle text-emerald-400"></i> ${msg}`;
+    }
+  </script>
+</body>
+</html>

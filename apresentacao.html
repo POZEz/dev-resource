@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Criador de Apresentações</title>
+
+  <!-- CDNs Supabase, Chart.js, html2pdf.js, PptxGenJS, Tailwind & Ícones -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            matte: { bg: '#09090b', card: '#121214', border: '#27272a', text: '#fafafa', muted: '#a1a1aa' }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #09090b; color: #fafafa; -webkit-tap-highlight-color: transparent; }
+    .custom-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
+    .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #27272a; border-radius: 99px; }
+    .custom-scroll::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+
+    /* Estilo Proporcional da Tela do Slide (16:9) */
+    .slide-canvas {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background-color: #121214;
+      border: 1px solid #27272a;
+      border-radius: 16px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+      transition: all 0.2s ease;
+    }
+
+    /* Elementos dentro do Slide */
+    .slide-element {
+      position: absolute;
+      cursor: move;
+      user-select: none;
+      border: 1px dashed transparent;
+      padding: 4px;
+      border-radius: 4px;
+    }
+    .slide-element:hover, .slide-element.active {
+      border-color: #3b82f6;
+      background-color: rgba(59, 130, 246, 0.05);
+    }
+
+    .slide-element-controls {
+      display: none;
+      position: absolute;
+      top: -28px;
+      right: 0;
+      background: #121214;
+      border: 1px solid #27272a;
+      border-radius: 6px;
+      padding: 2px;
+      gap: 2px;
+      z-index: 50;
+    }
+    .slide-element:hover .slide-element-controls, .slide-element.active .slide-element-controls {
+      display: flex;
+    }
+
+    /* Miniatura do Slide */
+    .slide-thumb {
+      aspect-ratio: 16 / 9;
+      background: #121214;
+      border: 2px solid #27272a;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .slide-thumb.active {
+      border-color: #3b82f6;
+      box-shadow: 0 0 12px rgba(59, 130, 246, 0.3);
+    }
+
+    /* Temas dos Slides */
+    .theme-dark { background-color: #09090b !important; color: #fafafa !important; }
+    .theme-light { background-color: #ffffff !important; color: #09090b !important; }
+    .theme-corporate { background-color: #0f172a !important; color: #f8fafc !important; }
+    .theme-vibrant { background-color: #2e1065 !important; color: #fae8ff !important; }
+
+    /* Modo Apresentação Tela Cheia */
+    :fullscreen .presentation-fullscreen {
+      width: 100vw !important;
+      height: 100vh !important;
+      border-radius: 0 !important;
+      border: none !important;
+      margin: 0 !important;
+    }
+  </style>
+</head>
+<body class="antialiased flex flex-col h-screen font-sans bg-matte-bg select-none overflow-hidden">
+
+  <!-- CABEÇALHO DA APLICAÇÃO -->
+  <header class="h-16 shrink-0 bg-matte-card border-b border-matte-border px-4 sm:px-6 flex items-center justify-between z-30">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+        <i class="ph-bold ph-presentation text-xl"></i>
+      </div>
+      <div>
+        <input type="text" id="presentation-title" value="Apresentação Sem Título" onchange="state.title = this.value; triggerAutoSave();" class="bg-transparent font-bold text-sm text-white focus:outline-none focus:border-b border-blue-500 max-w-[180px] sm:max-w-xs truncate" placeholder="Título da Apresentação">
+        <div class="flex items-center gap-2 text-[10px] text-zinc-400">
+          <span id="sync-status"><i class="ph-fill ph-check-circle text-blue-400"></i> Pronto</span>
+          <span>•</span>
+          <span id="slides-count-badge">0 slides</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ações e Modais -->
+    <div class="flex items-center gap-2">
+      <button onclick="openAiGeneratorModal()" class="px-3 py-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 text-xs font-bold flex items-center gap-1.5 transition-colors">
+        <i class="ph-fill ph-sparkle text-sm"></i>
+        <span>Gerar com IA</span>
+      </button>
+      <button onclick="togglePresentationsModal(true)" class="p-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+        <i class="ph ph-folder text-base"></i>
+        <span class="hidden sm:inline">Minhas Apresentações</span>
+      </button>
+      <button id="btn-save-cloud" onclick="saveToCloud()" class="p-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+        <i class="ph ph-cloud-arrow-up text-base"></i>
+        <span class="hidden sm:inline">Salvar</span>
+      </button>
+      
+      <!-- Iniciar Apresentação em Tela Cheia -->
+      <button onclick="startPresentationMode()" class="px-3.5 py-2 rounded-xl bg-blue-500 text-white hover:bg-blue-600 font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-blue-500/10 transition-colors">
+        <i class="ph-bold ph-play text-sm"></i>
+        <span>Apresentar</span>
+      </button>
+
+      <!-- Menu Exportar -->
+      <div class="relative group">
+        <button class="px-3 py-2 rounded-xl bg-white text-black hover:bg-zinc-200 text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors">
+          <i class="ph-bold ph-download-simple text-sm"></i>
+          <span>Exportar</span>
+        </button>
+        <div class="absolute right-0 top-full mt-1 w-36 bg-matte-card border border-matte-border rounded-xl shadow-2xl hidden group-hover:flex flex-col p-1 z-50">
+          <button onclick="exportPDF()" class="px-3 py-2 text-left text-xs text-zinc-300 hover:text-white hover:bg-white/[0.05] rounded-lg flex items-center gap-2">
+            <i class="ph ph-file-pdf text-base text-red-400"></i> PDF
+          </button>
+          <button onclick="exportPPTX()" class="px-3 py-2 text-left text-xs text-zinc-300 hover:text-white hover:bg-white/[0.05] rounded-lg flex items-center gap-2">
+            <i class="ph ph-file-ppt text-base text-orange-400"></i> PowerPoint (PPTX)
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- BARRA DE FERRAMENTAS DO EDITOR -->
+  <nav class="bg-matte-bg border-b border-matte-border px-4 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-3 shrink-0 z-20">
+    <div class="flex items-center gap-1.5 overflow-x-auto custom-scroll max-w-full">
+      <button onclick="addTextElement()" class="px-2.5 py-1.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 text-xs font-medium flex items-center gap-1.5 transition-colors shrink-0">
+        <i class="ph ph-text-t text-sm"></i> Texto
+      </button>
+
+      <label class="px-2.5 py-1.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer shrink-0">
+        <i class="ph ph-image text-sm"></i> Imagem
+        <input type="file" id="image-upload-input" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+      </label>
+
+      <button onclick="addShapeElement('rect')" class="px-2.5 py-1.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 text-xs font-medium flex items-center gap-1.5 transition-colors shrink-0">
+        <i class="ph ph-square text-sm"></i> Retângulo
+      </button>
+
+      <button onclick="addShapeElement('circle')" class="px-2.5 py-1.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 text-xs font-medium flex items-center gap-1.5 transition-colors shrink-0">
+        <i class="ph ph-circle text-sm"></i> Círculo
+      </button>
+
+      <button onclick="addChartElement()" class="px-2.5 py-1.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 text-xs font-medium flex items-center gap-1.5 transition-colors shrink-0">
+        <i class="ph ph-chart-bar text-sm text-blue-400"></i> Gráfico
+      </button>
+
+      <div class="h-4 w-px bg-matte-border mx-1 shrink-0"></div>
+
+      <!-- Temas de Cores dos Slides -->
+      <span class="text-[10px] text-zinc-500 font-bold uppercase shrink-0">Tema:</span>
+      <select id="theme-selector" onchange="setTheme(this.value)" class="bg-white/[0.03] border border-matte-border rounded-xl px-2.5 py-1.5 text-xs text-white">
+        <option value="dark">Escuro (Dark)</option>
+        <option value="light">Claro (Light)</option>
+        <option value="corporate">Corporativo (Navy)</option>
+        <option value="vibrant">Vibrante (Purple)</option>
+      </select>
+    </div>
+
+    <!-- Gerenciamento do Slide Ativo -->
+    <div class="flex items-center gap-2 shrink-0">
+      <button onclick="duplicateCurrentSlide()" class="p-1.5 rounded-lg hover:bg-white/[0.05] text-zinc-300 text-xs flex items-center gap-1" title="Duplicar Slide">
+        <i class="ph ph-copy text-sm"></i> Duplicar
+      </button>
+      <button onclick="deleteCurrentSlide()" class="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400 text-xs flex items-center gap-1" title="Excluir Slide">
+        <i class="ph ph-trash text-sm"></i> Excluir
+      </button>
+    </div>
+  </nav>
+
+  <!-- ÁREA PRINCIPAL DO EDITOR DE SLIDES -->
+  <main class="flex-1 overflow-hidden p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+    <!-- COLUNA DA ESQUERDA: MINIATURAS E REORDENAÇÃO -->
+    <aside class="lg:col-span-3 bg-matte-card border border-matte-border rounded-2xl p-4 flex flex-col gap-3 shadow-2xl h-[calc(100vh-140px)]">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3">
+        <h3 class="text-xs font-bold text-white flex items-center gap-1.5">
+          <i class="ph-bold ph-squares-four text-blue-400"></i> Slides
+        </h3>
+        <button onclick="addNewSlide()" class="px-2.5 py-1 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs flex items-center gap-1 transition-colors">
+          <i class="ph-bold ph-plus"></i> Slide
+        </button>
+      </div>
+
+      <!-- Lista Reordenável de Miniaturas -->
+      <div id="slides-thumbs-container" class="flex-1 overflow-y-auto space-y-3 custom-scroll pr-1">
+        <!-- Injetado via JS -->
+      </div>
+    </aside>
+
+    <!-- COLUNA DA DIREITA: PALCO PRINCIPAL DO SLIDE ATIVO -->
+    <section class="lg:col-span-9 flex flex-col items-center justify-center h-[calc(100vh-140px)] relative">
+      <div id="slide-stage-wrapper" class="w-full max-w-4xl">
+        <!-- Canvas Proporcional do Slide Ativo -->
+        <div id="active-slide-canvas" class="slide-canvas theme-dark presentation-fullscreen">
+          <!-- Elementos do Slide Injetados via JS -->
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL GERAR COM IA (GEMINI REST COM JSON ESTRUTURADO) -->
+  <div id="modal-ai-generator" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-lg shadow-2xl flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="ph-fill ph-sparkle text-blue-400 text-lg"></i> Gerar Apresentação com IA
+        </h3>
+        <button onclick="closeAiGeneratorModal()" class="text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
+      </div>
+
+      <p class="text-xs text-zinc-400 leading-relaxed">
+        Digite o tema e a quantidade aproximada de slides desejada.<br>
+        <span class="text-zinc-300 italic">Exemplo: "Crie uma apresentação de 8 slides sobre energia solar."</span>
+      </p>
+
+      <textarea id="ai-prompt-input" placeholder="Digite o tema da apresentação..." class="w-full bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-blue-500 h-28 custom-scroll resize-none"></textarea>
+
+      <button id="btn-generate-ai" onclick="generatePresentationWithAI()" class="w-full py-3 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors shadow-lg shadow-blue-500/10">
+        <i class="ph-bold ph-magic-wand"></i> Gerar Estrutura de Slides
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL DE APRESENTAÇÕES SALVAS NA NUVEM -->
+  <div id="modal-presentations" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-lg shadow-2xl flex flex-col max-h-[80vh]">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3 mb-4">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="ph ph-folder text-blue-400 text-lg"></i> Minhas Apresentações
+        </h3>
+        <button onclick="togglePresentationsModal(false)" class="text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
+      </div>
+      <div id="presentations-list" class="flex-1 overflow-y-auto space-y-2 custom-scroll pr-1">
+        <p class="text-xs text-zinc-500 text-center py-6">Carregando apresentações salvas...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- LÓGICA COMPLETA DO CRIADOR DE APRESENTAÇÕES -->
+  <script>
+    // Inicialização do Supabase Client
+    const SUPABASE_URL = 'https://zlsdlcvtcsrykfacjvhf.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_JnDv-fxHXPTzNaFX9n3Z0w_4mqt47Js';
+    const dbClient = window.parent?.PortalDB?.supabase || window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // Chave padrão da API Gemini
+    const apiKey = "";
+
+    // Estado da Aplicação
+    let state = {
+      docId: null,
+      title: 'Apresentação Sem Título',
+      theme: 'dark', // 'dark', 'light', 'corporate', 'vibrant'
+      slides: [], // [{ id, title, elements: [{ id, type, content, x, y, width, height, color }] }]
+      activeSlideIndex: 0,
+      activeElementId: null,
+      userId: null,
+      autoSaveTimer: null
+    };
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      await initSession();
+      loadFromLocalStorageCache();
+      if (state.slides.length === 0) addNewSlide();
+      renderAll();
+    });
+
+    async function initSession() {
+      try {
+        const { data } = await dbClient.auth.getSession();
+        state.userId = data?.session?.user?.id || null;
+      } catch (e) {
+        state.userId = null;
+      }
+    }
+
+    // ==== GESTÃO DE SLIDES ====
+    function addNewSlide() {
+      const newSlide = {
+        id: crypto.randomUUID(),
+        title: `Slide ${state.slides.length + 1}`,
+        elements: [
+          {
+            id: crypto.randomUUID(),
+            type: 'text',
+            content: '<h1>Título do Slide</h1><p>Subtítulo ou descrição principal...</p>',
+            x: 10, y: 15, width: 80, height: 40
+          }
+        ]
+      };
+
+      state.slides.push(newSlide);
+      state.activeSlideIndex = state.slides.length - 1;
+      renderAll();
+      triggerAutoSave();
+    }
+
+    function duplicateCurrentSlide() {
+      if (state.slides.length === 0) return;
+      const current = state.slides[state.activeSlideIndex];
+      const clone = JSON.parse(JSON.stringify(current));
+      clone.id = crypto.randomUUID();
+      clone.title += ' (Cópia)';
+
+      state.slides.splice(state.activeSlideIndex + 1, 0, clone);
+      state.activeSlideIndex++;
+      renderAll();
+      triggerAutoSave();
+    }
+
+    function deleteCurrentSlide() {
+      if (state.slides.length <= 1) {
+        alert("A apresentação precisa ter pelo menos um slide.");
+        return;
+      }
+
+      state.slides.splice(state.activeSlideIndex, 1);
+      state.activeSlideIndex = Math.max(0, state.activeSlideIndex - 1);
+      renderAll();
+      triggerAutoSave();
+    }
+
+    function selectSlide(idx) {
+      state.activeSlideIndex = idx;
+      state.activeElementId = null;
+      renderAll();
+    }
+
+    function moveSlide(idx, delta) {
+      const target = idx + delta;
+      if (target < 0 || target >= state.slides.length) return;
+      const temp = state.slides[idx];
+      state.slides[idx] = state.slides[target];
+      state.slides[target] = temp;
+      selectSlide(target);
+      triggerAutoSave();
+    }
+
+    function setTheme(themeName) {
+      state.theme = themeName;
+      const canvas = document.getElementById('active-slide-canvas');
+      canvas.className = `slide-canvas theme-${themeName} presentation-fullscreen`;
+      triggerAutoSave();
+    }
+
+    // ==== ELEMENTOS DO SLIDE (TEXTO, FORMAS, IMAGENS, GRÁFICOS) ====
+    function addTextElement() {
+      const activeSlide = state.slides[state.activeSlideIndex];
+      if (!activeSlide) return;
+
+      activeSlide.elements.push({
+        id: crypto.randomUUID(),
+        type: 'text',
+        content: '<p>Novo caixa de texto</p>',
+        x: 20, y: 30, width: 50, height: 20
+      });
+      renderActiveSlide();
+      triggerAutoSave();
+    }
+
+    function addShapeElement(shapeType) {
+      const activeSlide = state.slides[state.activeSlideIndex];
+      if (!activeSlide) return;
+
+      activeSlide.elements.push({
+        id: crypto.randomUUID(),
+        type: 'shape',
+        shape: shapeType,
+        color: '#3b82f6',
+        x: 35, y: 35, width: 25, height: 25
+      });
+      renderActiveSlide();
+      triggerAutoSave();
+    }
+
+    async function handleImageUpload(e) {
+      const file = e.target.files[0];
+      if (!file || !file.type.startsWith('image/')) return;
+
+      const activeSlide = state.slides[state.activeSlideIndex];
+      if (!activeSlide) return;
+
+      if (!state.userId) {
+        // Fallback local via DataURL
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          activeSlide.elements.push({
+            id: crypto.randomUUID(),
+            type: 'image',
+            src: evt.target.result,
+            x: 25, y: 25, width: 40, height: 40
+          });
+          renderActiveSlide();
+          triggerAutoSave();
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+
+      updateSyncStatus("Enviando imagem...");
+      try {
+        const filePath = `${state.userId}/${crypto.randomUUID()}_${file.name}`;
+        const { error: uploadErr } = await dbClient.storage
+          .from('presentation-files')
+          .upload(filePath, file, { upsert: true });
+
+        if (uploadErr) throw uploadErr;
+
+        const { data: publicUrlData } = dbClient.storage
+          .from('presentation-files')
+          .getPublicUrl(filePath);
+
+        activeSlide.elements.push({
+          id: crypto.randomUUID(),
+          type: 'image',
+          src: publicUrlData.publicUrl,
+          x: 25, y: 25, width: 40, height: 40
+        });
+
+        renderActiveSlide();
+        updateSyncStatus("Sincronizado");
+        triggerAutoSave();
+
+      } catch (err) {
+        alert("Erro ao carregar imagem para o Storage: " + err.message);
+      }
+    }
+
+    function addChartElement() {
+      const activeSlide = state.slides[state.activeSlideIndex];
+      if (!activeSlide) return;
+
+      activeSlide.elements.push({
+        id: crypto.randomUUID(),
+        type: 'chart',
+        labels: ['Jan', 'Fev', 'Mar', 'Abr'],
+        data: [12, 19, 8, 15],
+        x: 20, y: 20, width: 55, height: 50
+      });
+      renderActiveSlide();
+      triggerAutoSave();
+    }
+
+    function deleteElement(elemId) {
+      const activeSlide = state.slides[state.activeSlideIndex];
+      if (!activeSlide) return;
+
+      activeSlide.elements = activeSlide.elements.filter(el => el.id !== elemId);
+      renderActiveSlide();
+      triggerAutoSave();
+    }
+
+    // ==== RENDERIZAÇÃO GERAL E DRAG & DROP ====
+    function renderAll() {
+      document.getElementById('theme-selector').value = state.theme;
+      setTheme(state.theme);
+      renderThumbnails();
+      renderActiveSlide();
+    }
+
+    function renderThumbnails() {
+      const container = document.getElementById('slides-thumbs-container');
+      document.getElementById('slides-count-badge').innerText = `${state.slides.length} slides`;
+
+      container.innerHTML = state.slides.map((s, idx) => `
+        <div onclick="selectSlide(${idx})" class="slide-thumb p-2 flex flex-col justify-between ${idx === state.activeSlideIndex ? 'active' : ''}">
+          <div class="flex items-center justify-between text-[10px] text-zinc-400 font-bold z-10">
+            <span>#${idx + 1}</span>
+            <div class="flex items-center gap-1" onclick="event.stopPropagation()">
+              <button onclick="moveSlide(${idx}, -1)" class="hover:text-white" title="Subir"><i class="ph ph-arrow-up"></i></button>
+              <button onclick="moveSlide(${idx}, 1)" class="hover:text-white" title="Descer"><i class="ph ph-arrow-down"></i></button>
+            </div>
+          </div>
+          <div class="text-[9px] font-bold truncate text-zinc-300 z-10">${s.title || 'Slide sem título'}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderActiveSlide() {
+      const canvas = document.getElementById('active-slide-canvas');
+      const activeSlide = state.slides[state.activeSlideIndex];
+      if (!activeSlide) return;
+
+      canvas.innerHTML = '';
+
+      activeSlide.elements.forEach(el => {
+        const wrapper = document.createElement('div');
+        wrapper.className = `slide-element ${el.id === state.activeElementId ? 'active' : ''}`;
+        wrapper.style.left = `${el.x}%`;
+        wrapper.style.top = `${el.y}%`;
+        wrapper.style.width = `${el.width}%`;
+        wrapper.style.height = `${el.height}%`;
+
+        // Renderização por Tipo de Elemento
+        if (el.type === 'text') {
+          wrapper.innerHTML = `
+            <div class="slide-element-controls">
+              <button onclick="deleteElement('${el.id}')" class="text-red-400 hover:text-red-300 p-0.5 text-xs"><i class="ph ph-trash"></i></button>
+            </div>
+            <div contenteditable="true" onblur="updateTextContent('${el.id}', this.innerHTML)" class="w-full h-full outline-none">${el.content}</div>
+          `;
+        } else if (el.type === 'shape') {
+          const shapeStyle = el.shape === 'circle' ? 'border-radius: 9999px;' : 'border-radius: 8px;';
+          wrapper.innerHTML = `
+            <div class="slide-element-controls">
+              <button onclick="deleteElement('${el.id}')" class="text-red-400 hover:text-red-300 p-0.5 text-xs"><i class="ph ph-trash"></i></button>
+            </div>
+            <div class="w-full h-full" style="background-color: ${el.color}; ${shapeStyle}"></div>
+          `;
+        } else if (el.type === 'image') {
+          wrapper.innerHTML = `
+            <div class="slide-element-controls">
+              <button onclick="deleteElement('${el.id}')" class="text-red-400 hover:text-red-300 p-0.5 text-xs"><i class="ph ph-trash"></i></button>
+            </div>
+            <img src="${el.src}" class="w-full h-full object-cover rounded-lg pointer-events-none">
+          `;
+        } else if (el.type === 'chart') {
+          const chartId = `chart-${el.id}`;
+          wrapper.innerHTML = `
+            <div class="slide-element-controls">
+              <button onclick="deleteElement('${el.id}')" class="text-red-400 hover:text-red-300 p-0.5 text-xs"><i class="ph ph-trash"></i></button>
+            </div>
+            <canvas id="${chartId}" class="w-full h-full block"></canvas>
+          `;
+
+          setTimeout(() => {
+            const chartCanvas = document.getElementById(chartId);
+            if (chartCanvas) {
+              new Chart(chartCanvas.getContext('2d'), {
+                type: 'bar',
+                data: {
+                  labels: el.labels,
+                  datasets: [{ label: 'Valores', data: el.data, backgroundColor: '#3b82f6' }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+              });
+            }
+          }, 50);
+        }
+
+        makeDraggable(wrapper, el);
+        canvas.appendChild(wrapper);
+      });
+    }
+
+    function updateTextContent(elemId, html) {
+      const activeSlide = state.slides[state.activeSlideIndex];
+      const el = activeSlide.elements.find(item => item.id === elemId);
+      if (el) { el.content = html; triggerAutoSave(); }
+    }
+
+    function makeDraggable(element, itemData) {
+      let initialX = 0, initialY = 0;
+      element.onmousedown = (e) => {
+        if (e.target.isContentEditable) return;
+        state.activeElementId = itemData.id;
+        initialX = e.clientX;
+        initialY = e.clientY;
+        document.onmousemove = drag;
+        document.onmouseup = stopDrag;
+      };
+
+      function drag(e) {
+        const canvas = document.getElementById('active-slide-canvas');
+        const rect = canvas.getBoundingClientRect();
+
+        const dx = ((e.clientX - initialX) / rect.width) * 100;
+        const dy = ((e.clientY - initialY) / rect.height) * 100;
+
+        initialX = e.clientX;
+        initialY = e.clientY;
+
+        itemData.x = Math.max(0, Math.min(90, itemData.x + dx));
+        itemData.y = Math.max(0, Math.min(90, itemData.y + dy));
+
+        element.style.left = `${itemData.x}%`;
+        element.style.top = `${itemData.y}%`;
+      }
+
+      function stopDrag() {
+        document.onmousemove = null;
+        document.onmouseup = null;
+        triggerAutoSave();
+      }
+    }
+
+    // ==== MODO APRESENTAÇÃO TELA CHEIA ====
+    function startPresentationMode() {
+      const stage = document.getElementById('active-slide-canvas');
+      if (stage.requestFullscreen) stage.requestFullscreen();
+      else if (stage.webkitRequestFullscreen) stage.webkitRequestFullscreen();
+    }
+
+    // NAVEGAÇÃO DE SLIDES COM O TECLADO
+    window.addEventListener('keydown', (e) => {
+      if (document.fullscreenElement) {
+        if (e.key === 'ArrowRight' || e.key === 'Space') {
+          if (state.activeSlideIndex < state.slides.length - 1) selectSlide(state.activeSlideIndex + 1);
+        } else if (e.key === 'ArrowLeft') {
+          if (state.activeSlideIndex > 0) selectSlide(state.activeSlideIndex - 1);
+        }
+      }
+    });
+
+    // ==== GERAÇÃO DE APRESENTAÇÃO VIA IA (GEMINI REST COM JSON ESTRUTURADO) ====
+    function openAiGeneratorModal() { document.getElementById('modal-ai-generator').classList.remove('hidden'); }
+    function closeAiGeneratorModal() { document.getElementById('modal-ai-generator').classList.add('hidden'); }
+
+    async function generatePresentationWithAI() {
+      const promptText = document.getElementById('ai-prompt-input').value.trim();
+      if (!promptText) return;
+
+      const btn = document.getElementById('btn-generate-ai');
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = '<div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Processando...';
+      btn.disabled = true;
+
+      try {
+        const systemPrompt = `Você é um designer especialista em apresentações visuais. Com base no tema enviado pelo usuário, retorne estritamente um JSON estruturado com o schema:
+        {
+          "title": "string",
+          "slides": [
+            {
+              "title": "string",
+              "content": "HTML seguro contendo h1 e parágrafos curtos"
+            }
+          ]
+        }. Nunca inclua markdown ou códigos fora do JSON.`;
+
+        const resultData = await callGeminiAPI(promptText, systemPrompt);
+
+        if (resultData && Array.isArray(resultData.slides)) {
+          state.title = resultData.title || state.title;
+          document.getElementById('presentation-title').value = state.title;
+
+          state.slides = resultData.slides.map((s, idx) => ({
+            id: crypto.randomUUID(),
+            title: s.title || `Slide ${idx + 1}`,
+            elements: [
+              {
+                id: crypto.randomUUID(),
+                type: 'text',
+                content: s.content || `<h1>${s.title}</h1><p>Conteúdo do slide...</p>`,
+                x: 10, y: 15, width: 80, height: 60
+              }
+            ]
+          }));
+
+          state.activeSlideIndex = 0;
+          closeAiGeneratorModal();
+          renderAll();
+          triggerAutoSave();
+        }
+
+      } catch (err) {
+        alert("Erro ao gerar apresentação com IA.");
+      } finally {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+      }
+    }
+
+    async function callGeminiAPI(userQuery, systemPrompt) {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+      const delays = [1000, 2000, 4000, 8000, 16000];
+
+      const payload = {
+        contents: [{ parts: [{ text: userQuery }] }],
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        generationConfig: { responseMimeType: "application/json" }
+      };
+
+      for (let attempt = 0; attempt <= delays.length; attempt++) {
+        try {
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (!res.ok) throw new Error(`Status ${res.status}`);
+          const result = await res.json();
+          return JSON.parse(result.candidates?.[0]?.content?.parts?.[0]?.text);
+        } catch (e) {
+          if (attempt === delays.length) throw e;
+          await new Promise(resolve => setTimeout(resolve, delays[attempt]));
+        }
+      }
+    }
+
+    // ==== EXPORTAÇÃO (PDF E PPTX) ====
+    function exportPDF() {
+      const element = document.getElementById('active-slide-canvas');
+      const opt = {
+        margin: 0,
+        filename: `${state.title}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+      };
+      html2pdf().set(opt).from(element).save();
+    }
+
+    function exportPPTX() {
+      const pptx = new PptxGenJS();
+      pptx.title = state.title;
+
+      state.slides.forEach(s => {
+        const slide = pptx.addSlide();
+        s.elements.forEach(el => {
+          if (el.type === 'text') {
+            const cleanText = el.content.replace(/<[^>]*>/g, '');
+            slide.addText(cleanText, { x: `${el.x}%`, y: `${el.y}%`, w: `${el.width}%`, h: `${el.height}%`, fontSize: 16 });
+          }
+        });
+      });
+
+      pptx.writeFile({ fileName: `${state.title}.pptx` });
+    }
+
+    // ==== PERSISTÊNCIA & SUPABASE STORAGE / DATABASE ====
+    function triggerAutoSave() {
+      updateSyncStatus("Digitando...");
+      clearTimeout(state.autoSaveTimer);
+      state.autoSaveTimer = setTimeout(() => {
+        saveToLocalStorageCache();
+        if (state.userId) saveToCloud();
+        else updateSyncStatus("Salvo localmente");
+      }, 1000);
+    }
+
+    function saveToLocalStorageCache() {
+      const payload = {
+        title: state.title,
+        theme: state.theme,
+        data_json: { slides: state.slides }
+      };
+      localStorage.setItem('presentation_active', JSON.stringify(payload));
+    }
+
+    function loadFromLocalStorageCache() {
+      const cached = localStorage.getItem('presentation_active');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        state.title = parsed.title || state.title;
+        state.theme = parsed.theme || 'dark';
+        state.slides = parsed.data_json?.slides || [];
+
+        document.getElementById('presentation-title').value = state.title;
+      }
+    }
+
+    async function saveToCloud() {
+      if (!state.userId) return;
+      updateSyncStatus("Salvando na nuvem...");
+
+      try {
+        const payload = {
+          user_id: state.userId,
+          title: state.title,
+          theme: state.theme,
+          data_json: { slides: state.slides }
+        };
+
+        if (state.docId) payload.id = state.docId;
+
+        const { data, error } = await dbClient.from('presentations').upsert(payload).select().single();
+        if (error) throw error;
+
+        state.docId = data.id;
+        updateSyncStatus("Sincronizado");
+      } catch (err) {
+        updateSyncStatus("Erro na nuvem");
+      }
+    }
+
+    async function togglePresentationsModal(show) {
+      const modal = document.getElementById('modal-presentations');
+      modal.classList.toggle('hidden', !show);
+
+      if (show && state.userId) {
+        const { data } = await dbClient.from('presentations').select('*').is('deleted_at', null).order('updated_at', { ascending: false });
+        const list = document.getElementById('presentations-list');
+
+        if (!data || data.length === 0) {
+          list.innerHTML = `<p class="text-xs text-zinc-500 text-center py-6">Nenhuma apresentação salva encontrada.</p>`;
+          return;
+        }
+
+        list.innerHTML = data.map(p => `
+          <div onclick="restorePresentation(${JSON.stringify(p).replace(/"/g, '&quot;')})" class="p-3 rounded-xl border border-matte-border bg-white/[0.02] hover:bg-white/[0.05] cursor-pointer flex items-center justify-between">
+            <div>
+              <h4 class="text-xs font-bold text-white truncate max-w-[200px]">${p.title}</h4>
+              <span class="text-[10px] text-zinc-500">${p.data_json?.slides?.length || 0} slides • ${new Date(p.updated_at).toLocaleDateString()}</span>
+            </div>
+            <i class="ph ph-presentation text-blue-400"></i>
+          </div>
+        `).join('');
+      }
+    }
+
+    function restorePresentation(p) {
+      state.docId = p.id;
+      state.title = p.title;
+      state.theme = p.theme || 'dark';
+      state.slides = p.data_json?.slides || [];
+      state.activeSlideIndex = 0;
+
+      document.getElementById('presentation-title').value = p.title;
+      renderAll();
+      togglePresentationsModal(false);
+    }
+
+    function updateSyncStatus(msg) {
+      document.getElementById('sync-status').innerHTML = `<i class="ph-fill ph-check-circle text-blue-400"></i> ${msg}`;
+    }
+  </script>
+</body>
+</html>

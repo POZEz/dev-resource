@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Modelos de Dados</title>
+
+  <!-- CDNs Supabase, Chart.js, SheetJS, Tailwind & Ícones -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            matte: { bg: '#09090b', card: '#121214', border: '#27272a', text: '#fafafa', muted: '#a1a1aa' }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #09090b; color: #fafafa; -webkit-tap-highlight-color: transparent; }
+    .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #27272a; border-radius: 99px; }
+    .custom-scroll::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+
+    .table-cell-input {
+      background: transparent;
+      border: 1px solid transparent;
+      width: 100%;
+      padding: 0.375rem 0.5rem;
+      color: #fafafa;
+      border-radius: 0.375rem;
+      transition: all 0.15s ease;
+    }
+    .table-cell-input:focus {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: #06b6d4;
+      outline: none;
+    }
+  </style>
+</head>
+<body class="antialiased flex flex-col h-screen font-sans bg-matte-bg select-none overflow-hidden">
+
+  <!-- CABEÇALHO DA APLICAÇÃO -->
+  <header class="h-16 shrink-0 bg-matte-card border-b border-matte-border px-4 sm:px-6 flex items-center justify-between z-30">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+        <i class="ph-bold ph-squares-four text-xl"></i>
+      </div>
+      <div>
+        <input type="text" id="model-name" value="Carga Horária Semanal" onchange="state.modelName = this.value; triggerAutoSave();" class="bg-transparent font-bold text-sm text-white focus:outline-none focus:border-b border-cyan-500 max-w-[180px] sm:max-w-xs truncate" placeholder="Nome do Modelo">
+        <div class="flex items-center gap-2 text-[10px] text-zinc-400">
+          <span id="sync-status"><i class="ph-fill ph-check-circle text-cyan-400"></i> Pronto</span>
+          <span>•</span>
+          <span id="template-badge" class="uppercase font-bold text-cyan-400">Modelo: Carga Horária</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Botões de Ação -->
+    <div class="flex items-center gap-2">
+      <button onclick="toggleTemplatesModal(true)" class="px-3 py-2 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 text-cyan-400 text-xs font-bold flex items-center gap-1.5 transition-colors">
+        <i class="ph-bold ph-squares-four text-base"></i>
+        <span class="hidden sm:inline">Modelos Prontos</span>
+      </button>
+      <button onclick="toggleSavedModelsModal(true)" class="p-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+        <i class="ph ph-folder text-base"></i>
+        <span class="hidden sm:inline">Meus Modelos</span>
+      </button>
+      <button id="btn-save-cloud" onclick="saveToCloud()" class="p-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+        <i class="ph ph-cloud-arrow-up text-base"></i>
+        <span class="hidden sm:inline">Salvar</span>
+      </button>
+
+      <!-- Menu Exportar -->
+      <div class="relative group">
+        <button class="px-3 py-2 rounded-xl bg-white text-black hover:bg-zinc-200 text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors">
+          <i class="ph-bold ph-download-simple text-sm"></i>
+          <span>Exportar</span>
+        </button>
+        <div class="absolute right-0 top-full mt-1 w-36 bg-matte-card border border-matte-border rounded-xl shadow-2xl hidden group-hover:flex flex-col p-1 z-50">
+          <button onclick="exportCSV()" class="px-3 py-2 text-left text-xs text-zinc-300 hover:text-white hover:bg-white/[0.05] rounded-lg flex items-center gap-2">
+            <i class="ph ph-file-csv text-base text-cyan-400"></i> CSV
+          </button>
+          <button onclick="exportXLSX()" class="px-3 py-2 text-left text-xs text-zinc-300 hover:text-white hover:bg-white/[0.05] rounded-lg flex items-center gap-2">
+            <i class="ph ph-file-xls text-base text-emerald-400"></i> Excel (XLSX)
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- BARRA DE FERRAMENTAS DA TABELA -->
+  <nav class="bg-matte-bg border-b border-matte-border px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0 z-20">
+    <div class="flex items-center gap-2 overflow-x-auto custom-scroll max-w-full">
+      <button onclick="addRow()" class="px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-matte-border text-zinc-200 font-semibold text-xs flex items-center gap-1.5 transition-colors shrink-0">
+        <i class="ph-bold ph-plus text-xs"></i> Nova Linha
+      </button>
+      <button onclick="addColumn()" class="px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-matte-border text-zinc-200 font-semibold text-xs flex items-center gap-1.5 transition-colors shrink-0">
+        <i class="ph-bold ph-plus text-xs"></i> Nova Coluna
+      </button>
+      <div class="h-4 w-px bg-matte-border mx-1 shrink-0"></div>
+      <button onclick="resetToBlank()" class="px-2.5 py-1.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.06] border border-matte-border text-zinc-400 hover:text-white text-xs font-medium transition-colors shrink-0">
+        Começar do Zero
+      </button>
+    </div>
+
+    <!-- Filtro/Busca -->
+    <div class="relative min-w-[200px] w-full sm:w-auto">
+      <i class="ph ph-magnifying-glass absolute left-3 top-2.5 text-zinc-500 text-xs"></i>
+      <input type="text" id="search-input" oninput="state.searchQuery = this.value; renderTable();" placeholder="Filtrar dados..." class="w-full bg-white/[0.03] border border-matte-border rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-cyan-500/50">
+    </div>
+  </nav>
+
+  <!-- CONTEÚDO PRINCIPAL (DASHBOARD + TABELA) -->
+  <main class="flex-1 overflow-auto p-4 sm:p-6 custom-scroll space-y-6">
+
+    <!-- PAINEL DE INDICADORES AUTOMÁTICOS (KPIS) -->
+    <section id="kpi-cards-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <!-- Injetado Dinamicamente -->
+    </section>
+
+    <!-- ÁREA DE GRÁFICO AUTOMÁTICO E TABELA -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      
+      <!-- TABELA INTERATIVA DE DADOS -->
+      <section class="lg:col-span-8 overflow-x-auto border border-matte-border rounded-2xl bg-matte-card shadow-2xl">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead class="bg-white/[0.02] border-b border-matte-border text-zinc-400 font-bold uppercase tracking-wider select-none" id="table-head">
+            <!-- Injetado via JS -->
+          </thead>
+          <tbody class="divide-y divide-matte-border" id="table-body">
+            <!-- Injetado via JS -->
+          </tbody>
+        </table>
+      </section>
+
+      <!-- GRÁFICO AUTOMÁTICO RELEVANTE DO MODELO -->
+      <section class="lg:col-span-4 bg-matte-card border border-matte-border rounded-2xl p-4 flex flex-col gap-3 shadow-2xl h-[380px]">
+        <div class="flex items-center justify-between border-b border-matte-border pb-2">
+          <h3 id="chart-title" class="text-xs font-bold text-white flex items-center gap-1.5">
+            <i class="ph-bold ph-chart-bar text-cyan-400"></i> Gráfico do Modelo
+          </h3>
+          <span class="text-[10px] text-zinc-500 font-mono">Auto-gerado</span>
+        </div>
+        <div class="flex-1 w-full relative flex items-center justify-center">
+          <canvas id="model-chart-canvas"></canvas>
+        </div>
+      </section>
+
+    </div>
+
+  </main>
+
+  <!-- MODAL DE MODELOS PRONTOS (10 OPÇÕES + DO ZERO) -->
+  <div id="modal-templates" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-3xl shadow-2xl flex flex-col max-h-[85vh]">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3 mb-4">
+        <div>
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <i class="ph-bold ph-squares-four text-cyan-400 text-lg"></i> Escolha um Modelo Pronto
+          </h3>
+          <p class="text-xs text-zinc-400">Selecione uma estrutura pronta para gerar automaticamente tabela, cálculos e gráficos.</p>
+        </div>
+        <button onclick="toggleTemplatesModal(false)" class="text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
+      </div>
+
+      <!-- GRID DOS MODELOS -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 overflow-y-auto custom-scroll pr-1 pb-2" id="templates-grid">
+        <!-- Injetado via JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL MEUS MODELOS SALVOS -->
+  <div id="modal-saved-models" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-lg shadow-2xl flex flex-col max-h-[80vh]">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3 mb-4">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="ph ph-cloud-check text-cyan-400 text-lg"></i> Meus Modelos Salvos
+        </h3>
+        <button onclick="toggleSavedModelsModal(false)" class="text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
+      </div>
+      <div id="saved-models-list" class="flex-1 overflow-y-auto space-y-2 custom-scroll pr-1">
+        <p class="text-xs text-zinc-500 text-center py-6">Carregando modelos salvos...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- LÓGICA DA APLICAÇÃO -->
+  <script>
+    // Configuração do Supabase Client
+    const SUPABASE_URL = 'https://zlsdlcvtcsrykfacjvhf.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_JnDv-fxHXPTzNaFX9n3Z0w_4mqt47Js';
+    const dbClient = window.parent?.PortalDB?.supabase || window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // Estado da Aplicação
+    let state = {
+      modelId: null,
+      modelName: 'Carga Horária Semanal',
+      templateType: 'carga_horaria',
+      columns: [],
+      rows: [],
+      searchQuery: '',
+      userId: null,
+      chartInstance: null,
+      autoSaveTimer: null
+    };
+
+    // DEFINIÇÃO DOS 10 MODELOS PRONTOS + DO ZERO
+    const TEMPLATES_DEFINITION = {
+      carga_horaria: {
+        id: 'carga_horaria',
+        name: 'Carga Horária',
+        desc: 'Controle de ponto, horas trabalhadas e saldo semanal.',
+        icon: 'ph-clock',
+        color: 'text-cyan-400',
+        columns: ['Data', 'Funcionário', 'Entrada', 'Saída', 'Almoço (h)', 'Total (h)'],
+        rows: [
+          { 'Data': '2026-08-17', 'Funcionário': 'Ana Silva', 'Entrada': '08:00', 'Saída': '17:00', 'Almoço (h)': '1', 'Total (h)': '8' },
+          { 'Data': '2026-08-17', 'Funcionário': 'Carlos Eduardo', 'Entrada': '08:30', 'Saída': '18:00', 'Almoço (h)': '1', 'Total (h)': '8.5' },
+          { 'Data': '2026-08-18', 'Funcionário': 'Ana Silva', 'Entrada': '08:00', 'Saída': '17:30', 'Almoço (h)': '1', 'Total (h)': '8.5' },
+          { 'Data': '2026-08-18', 'Funcionário': 'Carlos Eduardo', 'Entrada': '08:00', 'Saída': '17:00', 'Almoço (h)': '1', 'Total (h)': '8' }
+        ],
+        calculate: (rows) => {
+          let totalHoras = 0;
+          rows.forEach(r => totalHoras += num(r['Total (h)']));
+          const media = rows.length ? (totalHoras / rows.length).toFixed(1) : 0;
+          return {
+            kpis: [
+              { title: 'Total Horas', value: `${totalHoras} h`, icon: 'ph-clock-afternoon', color: 'text-cyan-400' },
+              { title: 'Média Diária', value: `${media} h`, icon: 'ph-chart-line', color: 'text-blue-400' },
+              { title: 'Registros', value: rows.length, icon: 'ph-list-checks', color: 'text-emerald-400' }
+            ],
+            chart: { xCol: 'Funcionário', yCol: 'Total (h)', type: 'bar', label: 'Horas por Funcionário' }
+          };
+        }
+      },
+
+      vendas: {
+        id: 'vendas',
+        name: 'Vendas',
+        desc: 'Registro de vendas, ticket médio e produtos populares.',
+        icon: 'ph-shopping-cart',
+        color: 'text-emerald-400',
+        columns: ['Data', 'Cliente', 'Produto', 'Qtd', 'Valor Unit. (R$)', 'Total (R$)'],
+        rows: [
+          { 'Data': '2026-08-15', 'Cliente': 'Empresa A', 'Produto': 'Licença Software', 'Qtd': '2', 'Valor Unit. (R$)': '1500', 'Total (R$)': '3000' },
+          { 'Data': '2026-08-16', 'Cliente': 'Empresa B', 'Produto': 'Consultoria', 'Qtd': '5', 'Valor Unit. (R$)': '400', 'Total (R$)': '2000' },
+          { 'Data': '2026-08-17', 'Cliente': 'Empresa C', 'Produto': 'Licença Software', 'Qtd': '1', 'Valor Unit. (R$)': '1500', 'Total (R$)': '1500' }
+        ],
+        calculate: (rows) => {
+          let totalFaturado = 0, totalItens = 0;
+          rows.forEach(r => {
+            const qty = num(r['Qtd']);
+            const unit = num(r['Valor Unit. (R$)']);
+            const tot = qty * unit || num(r['Total (R$)']);
+            r['Total (R$)'] = String(tot);
+            totalFaturado += tot;
+            totalItens += qty;
+          });
+          const ticketMedio = rows.length ? (totalFaturado / rows.length).toFixed(2) : '0.00';
+          return {
+            kpis: [
+              { title: 'Faturamento Total', value: `R$ ${totalFaturado.toLocaleString('pt-BR')}`, icon: 'ph-currency-dollar', color: 'text-emerald-400' },
+              { title: 'Ticket Médio', value: `R$ ${ticketMedio}`, icon: 'ph-trend-up', color: 'text-cyan-400' },
+              { title: 'Itens Vendidos', value: totalItens, icon: 'ph-package', color: 'text-purple-400' }
+            ],
+            chart: { xCol: 'Produto', yCol: 'Total (R$)', type: 'pie', label: 'Vendas por Produto' }
+          };
+        }
+      },
+
+      despesas: {
+        id: 'despesas',
+        name: 'Despesas',
+        desc: 'Gestão de contas a pagar, categorias e status.',
+        icon: 'ph-receipt',
+        color: 'text-red-400',
+        columns: ['Data', 'Categoria', 'Descrição', 'Valor (R$)', 'Status'],
+        rows: [
+          { 'Data': '2026-08-01', 'Categoria': 'Infraestrutura', 'Descrição': 'Servidor Nuvem', 'Valor (R$)': '450', 'Status': 'Pago' },
+          { 'Data': '2026-08-05', 'Categoria': 'Marketing', 'Descrição': 'Anúncios Online', 'Valor (R$)': '1200', 'Status': 'Pago' },
+          { 'Data': '2026-08-20', 'Categoria': 'Serviços', 'Descrição': 'Assinaturas Ferramentas', 'Valor (R$)': '350', 'Status': 'Pendente' }
+        ],
+        calculate: (rows) => {
+          let total = 0, pago = 0, pendente = 0;
+          rows.forEach(r => {
+            const v = num(r['Valor (R$)']);
+            total += v;
+            if (r['Status']?.toLowerCase() === 'pago') pago += v;
+            else pendente += v;
+          });
+          return {
+            kpis: [
+              { title: 'Total Despesas', value: `R$ ${total.toLocaleString('pt-BR')}`, icon: 'ph-money', color: 'text-red-400' },
+              { title: 'Total Pago', value: `R$ ${pago.toLocaleString('pt-BR')}`, icon: 'ph-check-circle', color: 'text-emerald-400' },
+              { title: 'Pendente', value: `R$ ${pendente.toLocaleString('pt-BR')}`, icon: 'ph-clock', color: 'text-amber-400' }
+            ],
+            chart: { xCol: 'Categoria', yCol: 'Valor (R$)', type: 'doughnut', label: 'Despesas por Categoria' }
+          };
+        }
+      },
+
+      receitas: {
+        id: 'receitas',
+        name: 'Receitas',
+        desc: 'Acompanhamento de entradas e fluxo de caixa.',
+        icon: 'ph-coins',
+        color: 'text-amber-400',
+        columns: ['Data', 'Fonte', 'Cliente', 'Valor (R$)', 'Status'],
+        rows: [
+          { 'Data': '2026-08-10', 'Fonte': 'Mensalidade', 'Cliente': 'Cliente X', 'Valor (R$)': '2500', 'Status': 'Recebido' },
+          { 'Data': '2026-08-12', 'Fonte': 'Projeto Avulso', 'Cliente': 'Cliente Y', 'Valor (R$)': '4000', 'Status': 'Recebido' },
+          { 'Data': '2026-08-25', 'Fonte': 'Mensalidade', 'Cliente': 'Cliente Z', 'Valor (R$)': '1800', 'Status': 'A Receber' }
+        ],
+        calculate: (rows) => {
+          let total = 0, recebido = 0;
+          rows.forEach(r => {
+            const v = num(r['Valor (R$)']);
+            total += v;
+            if (r['Status']?.toLowerCase() === 'recebido') recebido += v;
+          });
+          return {
+            kpis: [
+              { title: 'Receita Total', value: `R$ ${total.toLocaleString('pt-BR')}`, icon: 'ph-coins', color: 'text-amber-400' },
+              { title: 'Recebido', value: `R$ ${recebido.toLocaleString('pt-BR')}`, icon: 'ph-check', color: 'text-emerald-400' },
+              { title: 'A Receber', value: `R$ ${(total - recebido).toLocaleString('pt-BR')}`, icon: 'ph-hourglass-simple', color: 'text-blue-400' }
+            ],
+            chart: { xCol: 'Fonte', yCol: 'Valor (R$)', type: 'bar', label: 'Receitas por Fonte' }
+          };
+        }
+      },
+
+      estoque: {
+        id: 'estoque',
+        name: 'Estoque',
+        desc: 'Nível de produtos, valor acumulado e alertas de reposição.',
+        icon: 'ph-package',
+        color: 'text-purple-400',
+        columns: ['Código', 'Produto', 'Categoria', 'Qtd Atual', 'Mínimo', 'Custo Unit. (R$)'],
+        rows: [
+          { 'Código': 'PRD-01', 'Produto': 'Teclado Mecânico', 'Categoria': 'Periféricos', 'Qtd Atual': '25', 'Mínimo': '10', 'Custo Unit. (R$)': '180' },
+          { 'Código': 'PRD-02', 'Produto': 'Mouse Sem Fio', 'Categoria': 'Periféricos', 'Qtd Atual': '5', 'Mínimo': '12', 'Custo Unit. (R$)': '75' },
+          { 'Código': 'PRD-03', 'Produto': 'Monitor 27"', 'Categoria': 'Monitores', 'Qtd Atual': '8', 'Mínimo': '5', 'Custo Unit. (R$)': '950' }
+        ],
+        calculate: (rows) => {
+          let totalValor = 0, alertas = 0, unidades = 0;
+          rows.forEach(r => {
+            const q = num(r['Qtd Atual']);
+            const min = num(r['Mínimo']);
+            const custo = num(r['Custo Unit. (R$)']);
+            totalValor += q * custo;
+            unidades += q;
+            if (q < min) alertas++;
+          });
+          return {
+            kpis: [
+              { title: 'Valor em Estoque', value: `R$ ${totalValor.toLocaleString('pt-BR')}`, icon: 'ph-vault', color: 'text-purple-400' },
+              { title: 'Total Unidades', value: unidades, icon: 'ph-cubes', color: 'text-cyan-400' },
+              { title: 'Reposição Necessária', value: alertas, icon: 'ph-warning', color: alertas > 0 ? 'text-red-400' : 'text-emerald-400' }
+            ],
+            chart: { xCol: 'Produto', yCol: 'Qtd Atual', type: 'bar', label: 'Quantidade por Produto' }
+          };
+        }
+      },
+
+      produtividade: {
+        id: 'produtividade',
+        name: 'Produtividade',
+        desc: 'Execução de tarefas, estimativas vs tempo real gasto.',
+        icon: 'ph-chart-line-up',
+        color: 'text-blue-400',
+        columns: ['Membro', 'Tarefa', 'Horas Estimadas', 'Horas Gastas', 'Status'],
+        rows: [
+          { 'Membro': 'Lucas', 'Tarefa': 'Criar Landing Page', 'Horas Estimadas': '10', 'Horas Gastas': '8', 'Status': 'Concluído' },
+          { 'Membro': 'Juliana', 'Tarefa': 'Refatorar Banco de Dados', 'Horas Estimadas': '15', 'Horas Gastas': '18', 'Status': 'Concluído' },
+          { 'Membro': 'Lucas', 'Tarefa': 'Testes de Integração', 'Horas Estimadas': '6', 'Horas Gastas': '4', 'Status': 'Em Andamento' }
+        ],
+        calculate: (rows) => {
+          let estimadas = 0, gastas = 0, concluidas = 0;
+          rows.forEach(r => {
+            estimadas += num(r['Horas Estimadas']);
+            gastas += num(r['Horas Gastas']);
+            if (r['Status']?.toLowerCase() === 'concluído') concluidas++;
+          });
+          const taxa = rows.length ? Math.round((concluidas / rows.length) * 100) : 0;
+          return {
+            kpis: [
+              { title: 'Taxa Conclusão', value: `${taxa}%`, icon: 'ph-check-square', color: 'text-emerald-400' },
+              { title: 'Horas Gastas', value: `${gastas} h`, icon: 'ph-timer', color: 'text-blue-400' },
+              { title: 'Horas Estimadas', value: `${estimadas} h`, icon: 'ph-target', color: 'text-cyan-400' }
+            ],
+            chart: { xCol: 'Membro', yCol: 'Horas Gastas', type: 'bar', label: 'Horas Gastas por Membro' }
+          };
+        }
+      },
+
+      frequencia: {
+        id: 'frequencia',
+        name: 'Frequência',
+        desc: 'Presença de alunos ou colaboradores e controle de faltas.',
+        icon: 'ph-user-check',
+        color: 'text-teal-400',
+        columns: ['Data', 'Nome', 'Departamento', 'Status', 'Justificativa'],
+        rows: [
+          { 'Data': '2026-08-17', 'Nome': 'Roberto Lima', 'Departamento': 'Vendas', 'Status': 'Presente', 'Justificativa': '-' },
+          { 'Data': '2026-08-17', 'Nome': 'Mariana Souza', 'Departamento': 'TI', 'Status': 'Falta', 'Justificativa': 'Atestado Médico' },
+          { 'Data': '2026-08-17', 'Nome': 'Fernando Rocha', 'Departamento': 'Vendas', 'Status': 'Presente', 'Justificativa': '-' }
+        ],
+        calculate: (rows) => {
+          let presencas = 0, faltas = 0;
+          rows.forEach(r => {
+            if (r['Status']?.toLowerCase() === 'presente') presencas++;
+            else faltas++;
+          });
+          const taxa = rows.length ? Math.round((presencas / rows.length) * 100) : 0;
+          return {
+            kpis: [
+              { title: 'Taxa de Presença', value: `${taxa}%`, icon: 'ph-user-check', color: 'text-teal-400' },
+              { title: 'Total Presenças', value: presencas, icon: 'ph-thumbs-up', color: 'text-emerald-400' },
+              { title: 'Total Faltas', value: faltas, icon: 'ph-user-minus', color: 'text-red-400' }
+            ],
+            chart: { xCol: 'Status', yCol: 'Status', type: 'pie', label: 'Distribuição de Frequência' }
+          };
+        }
+      },
+
+      metas: {
+        id: 'metas',
+        name: 'Metas',
+        desc: 'Objetivos estratégicos, progresso acumulado e alvos.',
+        icon: 'ph-flag-banner',
+        color: 'text-indigo-400',
+        columns: ['Objetivo', 'Responsável', 'Meta', 'Atual', 'Prazo'],
+        rows: [
+          { 'Objetivo': 'Novos Clientes', 'Responsável': 'Equipe Comercial', 'Meta': '50', 'Atual': '38', 'Prazo': '2026-08-31' },
+          { 'Objetivo': 'NPS de Atendimento', 'Responsável': 'Suporte', 'Meta': '90', 'Atual': '92', 'Prazo': '2026-08-31' },
+          { 'Objetivo': 'Artigos no Blog', 'Responsável': 'Marketing', 'Meta': '12', 'Atual': '10', 'Prazo': '2026-08-31' }
+        ],
+        calculate: (rows) => {
+          let atingidas = 0;
+          let somaProgresso = 0;
+          rows.forEach(r => {
+            const m = num(r['Meta']);
+            const a = num(r['Atual']);
+            if (m > 0) {
+              const prog = Math.min(100, (a / m) * 100);
+              somaProgresso += prog;
+            }
+            if (a >= m && m > 0) atingidas++;
+          });
+          const media = rows.length ? Math.round(somaProgresso / rows.length) : 0;
+          return {
+            kpis: [
+              { title: 'Atingimento Médio', value: `${media}%`, icon: 'ph-gauge', color: 'text-indigo-400' },
+              { title: 'Metas Concluídas', value: `${atingidas} / ${rows.length}`, icon: 'ph-trophy', color: 'text-emerald-400' },
+              { title: 'Em Andamento', value: rows.length - atingidas, icon: 'ph-spinner', color: 'text-amber-400' }
+            ],
+            chart: { xCol: 'Objetivo', yCol: 'Atual', type: 'bar', label: 'Progresso Atual por Objetivo' }
+          };
+        }
+      },
+
+      ranking: {
+        id: 'ranking',
+        name: 'Ranking',
+        desc: 'Classificação de pontuação, vendas e performance.',
+        icon: 'ph-medal',
+        color: 'text-yellow-400',
+        columns: ['Posição', 'Participante', 'Pontuação', 'Categoria', 'Nível'],
+        rows: [
+          { 'Posição': '1', 'Participante': 'Beatriz Mendes', 'Pontuação': '980', 'Categoria': 'Vendas', 'Nível': 'Diamante' },
+          { 'Posição': '2', 'Participante': 'Gabriel Santos', 'Pontuação': '850', 'Categoria': 'Vendas', 'Nível': 'Ouro' },
+          { 'Posição': '3', 'Participante': 'Camila Alves', 'Pontuação': '790', 'Categoria': 'Vendas', 'Nível': 'Prata' }
+        ],
+        calculate: (rows) => {
+          let maxPontos = 0, soma = 0;
+          let lider = '-';
+          rows.forEach(r => {
+            const p = num(r['Pontuação']);
+            soma += p;
+            if (p > maxPontos) {
+              maxPontos = p;
+              lider = r['Participante'];
+            }
+          });
+          const media = rows.length ? Math.round(soma / rows.length) : 0;
+          return {
+            kpis: [
+              { title: 'Líder do Ranking', value: lider, icon: 'ph-crown', color: 'text-yellow-400' },
+              { title: 'Maior Pontuação', value: maxPontos, icon: 'ph-star', color: 'text-cyan-400' },
+              { title: 'Média de Pontos', value: media, icon: 'ph-chart-bar', color: 'text-blue-400' }
+            ],
+            chart: { xCol: 'Participante', yCol: 'Pontuação', type: 'bar', label: 'Pontuação por Participante' }
+          };
+        }
+      },
+
+      acompanhamento: {
+        id: 'acompanhamento',
+        name: 'Acompanhamento de Resultados',
+        desc: 'Comparativo mensal entre meta e resultado real.',
+        icon: 'ph-presentation-chart',
+        color: 'text-pink-400',
+        columns: ['Mês', 'KPI / Indicador', 'Meta', 'Realizado', 'Status'],
+        rows: [
+          { 'Mês': 'Janeiro', 'KPI / Indicador': 'MRR (Receita Recorrente)', 'Meta': '50000', 'Realizado': '52000', 'Status': 'Acima da Meta' },
+          { 'Mês': 'Fevereiro', 'KPI / Indicador': 'MRR (Receita Recorrente)', 'Meta': '55000', 'Realizado': '54000', 'Status': 'Dentro da Margem' },
+          { 'Mês': 'Março', 'KPI / Indicador': 'MRR (Receita Recorrente)', 'Meta': '60000', 'Realizado': '63500', 'Status': 'Acima da Meta' }
+        ],
+        calculate: (rows) => {
+          let somaMeta = 0, somaReal = 0;
+          rows.forEach(r => {
+            somaMeta += num(r['Meta']);
+            somaReal += num(r['Realizado']);
+          });
+          const varPct = somaMeta > 0 ? (((somaReal - somaMeta) / somaMeta) * 100).toFixed(1) : 0;
+          return {
+            kpis: [
+              { title: 'Realizado Acumulado', value: `R$ ${somaReal.toLocaleString('pt-BR')}`, icon: 'ph-chart-line-up', color: 'text-pink-400' },
+              { title: 'Meta Acumulada', value: `R$ ${somaMeta.toLocaleString('pt-BR')}`, icon: 'ph-target', color: 'text-cyan-400' },
+              { title: 'Variação %', value: `${varPct > 0 ? '+' : ''}${varPct}%`, icon: 'ph-arrows-down-up', color: varPct >= 0 ? 'text-emerald-400' : 'text-red-400' }
+            ],
+            chart: { xCol: 'Mês', yCol: 'Realizado', type: 'line', label: 'Realizado por Mês' }
+          };
+        }
+      },
+
+      custom: {
+        id: 'custom',
+        name: 'Começar do Zero',
+        desc: 'Tabela em branco sem pré-configurações.',
+        icon: 'ph-plus-circle',
+        color: 'text-zinc-400',
+        columns: ['Item', 'Quantidade', 'Valor'],
+        rows: [
+          { 'Item': 'Item Exemplo 1', 'Quantidade': '10', 'Valor': '100' }
+        ],
+        calculate: (rows) => {
+          let soma = 0;
+          rows.forEach(r => soma += num(r['Valor']));
+          return {
+            kpis: [
+              { title: 'Total Registros', value: rows.length, icon: 'ph-list', color: 'text-cyan-400' },
+              { title: 'Soma dos Valores', value: soma.toLocaleString('pt-BR'), icon: 'ph-calculator', color: 'text-emerald-400' }
+            ],
+            chart: { xCol: 'Item', yCol: 'Quantidade', type: 'bar', label: 'Quantidade por Item' }
+          };
+        }
+      }
+    };
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      await initSession();
+      renderTemplatesGrid();
+      loadFromLocalStorageCache();
+      renderTable();
+    });
+
+    async function initSession() {
+      try {
+        const { data } = await dbClient.auth.getSession();
+        state.userId = data?.session?.user?.id || null;
+      } catch (e) {
+        state.userId = null;
+      }
+    }
+
+    // ==== CARREGAR MODELO DE DADOS ====
+    function selectTemplate(templateId) {
+      const def = TEMPLATES_DEFINITION[templateId] || TEMPLATES_DEFINITION['custom'];
+      state.templateType = templateId;
+      state.modelName = def.name;
+      state.columns = [...def.columns];
+      state.rows = JSON.parse(JSON.stringify(def.rows));
+
+      document.getElementById('model-name').value = state.modelName;
+      document.getElementById('template-badge').innerText = `Modelo: ${def.name}`;
+
+      toggleTemplatesModal(false);
+      renderTable();
+      triggerAutoSave();
+    }
+
+    function resetToBlank() {
+      selectTemplate('custom');
+    }
+
+    // ==== RENDERIZAÇÃO DE TABELA E CÁLCULOS ====
+    function renderTable() {
+      const headEl = document.getElementById('table-head');
+      const bodyEl = document.getElementById('table-body');
+      const def = TEMPLATES_DEFINITION[state.templateType] || TEMPLATES_DEFINITION['custom'];
+
+      // 1. Renderizar Cabeçalho
+      headEl.innerHTML = `
+        <tr>
+          <th class="p-3 w-10 text-center border-r border-matte-border text-zinc-600">#</th>
+          ${state.columns.map((col, colIdx) => `
+            <th class="p-2 border-r border-matte-border min-w-[140px]">
+              <div class="flex items-center justify-between gap-1">
+                <input type="text" value="${escapeHtml(col)}" onchange="renameColumn(${colIdx}, this.value)" class="bg-transparent font-bold text-xs text-cyan-400 focus:outline-none focus:border-b border-cyan-500 w-full truncate">
+                <button onclick="removeColumn(${colIdx})" class="hover:text-red-400 text-zinc-600 p-0.5" title="Excluir Coluna">
+                  <i class="ph ph-x text-xs"></i>
+                </button>
+              </div>
+            </th>
+          `).join('')}
+          <th class="p-2 w-10 text-center">Ação</th>
+        </tr>
+      `;
+
+      // 2. Filtrar Registros
+      let filteredRows = [...state.rows];
+      if (state.searchQuery) {
+        const q = state.searchQuery.toLowerCase();
+        filteredRows = filteredRows.filter(r => Object.values(r).some(v => String(v).toLowerCase().includes(q)));
+      }
+
+      // 3. Renderizar Corpo
+      bodyEl.innerHTML = filteredRows.map((row, rowIdx) => `
+        <tr class="hover:bg-white/[0.01] transition-colors">
+          <td class="p-2 text-center border-r border-matte-border text-zinc-500 text-[11px] font-mono">${rowIdx + 1}</td>
+          ${state.columns.map(col => `
+            <td class="p-1 border-r border-matte-border">
+              <input type="text" value="${escapeHtml(row[col] ?? '')}" oninput="updateCellValue(${rowIdx}, '${col}', this.value)" class="table-cell-input">
+            </td>
+          `).join('')}
+          <td class="p-1 text-center">
+            <button onclick="removeRow(${rowIdx})" class="p-1 rounded hover:bg-red-500/10 text-zinc-500 hover:text-red-400 transition-colors">
+              <i class="ph ph-trash text-sm"></i>
+            </button>
+          </td>
+        </tr>
+      `).join('');
+
+      // 4. Executar Motor de Cálculos e Renderizar KPIs e Gráficos
+      const calcResult = def.calculate(state.rows);
+      renderKPIs(calcResult.kpis);
+      renderChart(calcResult.chart);
+    }
+
+    function renderKPIs(kpis) {
+      const grid = document.getElementById('kpi-cards-grid');
+      grid.innerHTML = kpis.map(kpi => `
+        <div class="bg-matte-card border border-matte-border rounded-2xl p-4 flex items-center justify-between shadow-xl">
+          <div>
+            <span class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">${kpi.title}</span>
+            <h4 class="text-lg font-bold text-white mt-0.5 truncate">${kpi.value}</h4>
+          </div>
+          <div class="w-10 h-10 rounded-xl bg-white/[0.02] border border-matte-border flex items-center justify-center ${kpi.color} text-xl">
+            <i class="ph-bold ${kpi.icon}"></i>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderChart(chartConfig) {
+      if (!chartConfig) return;
+      const ctx = document.getElementById('model-chart-canvas').getContext('2d');
+      document.getElementById('chart-title').innerHTML = `<i class="ph-bold ph-chart-bar text-cyan-400"></i> ${chartConfig.label}`;
+
+      const labels = state.rows.map(r => r[chartConfig.xCol] || 'N/A');
+      const data = state.rows.map(r => num(r[chartConfig.yCol]));
+
+      if (state.chartInstance) state.chartInstance.destroy();
+
+      state.chartInstance = new Chart(ctx, {
+        type: chartConfig.type || 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: chartConfig.label,
+            data: data,
+            backgroundColor: [
+              'rgba(6, 182, 212, 0.6)',
+              'rgba(59, 130, 246, 0.6)',
+              'rgba(16, 185, 129, 0.6)',
+              'rgba(168, 85, 247, 0.6)',
+              'rgba(244, 63, 94, 0.6)'
+            ],
+            borderColor: '#121214',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: ['pie', 'doughnut'].includes(chartConfig.type) ? {} : {
+            x: { ticks: { color: '#a1a1aa' }, grid: { color: '#27272a' } },
+            y: { ticks: { color: '#a1a1aa' }, grid: { color: '#27272a' } }
+          }
+        }
+      });
+    }
+
+    // ==== ESTRUTURA E MANIPULAÇÃO ====
+    function updateCellValue(rowIdx, colName, val) {
+      state.rows[rowIdx][colName] = val;
+      renderTable();
+      triggerAutoSave();
+    }
+
+    function addRow() {
+      const newRow = {};
+      state.columns.forEach(c => newRow[c] = '');
+      state.rows.push(newRow);
+      renderTable();
+      triggerAutoSave();
+    }
+
+    function removeRow(idx) {
+      state.rows.splice(idx, 1);
+      renderTable();
+      triggerAutoSave();
+    }
+
+    function addColumn() {
+      const name = prompt("Nome da nova coluna:", `Coluna ${state.columns.length + 1}`);
+      if (!name) return;
+
+      state.columns.push(name);
+      state.rows.forEach(r => r[name] = '');
+      renderTable();
+      triggerAutoSave();
+    }
+
+    function renameColumn(idx, newName) {
+      const oldName = state.columns[idx];
+      if (!newName || oldName === newName) return;
+
+      state.columns[idx] = newName;
+      state.rows.forEach(r => {
+        r[newName] = r[oldName];
+        delete r[oldName];
+      });
+      renderTable();
+      triggerAutoSave();
+    }
+
+    function removeColumn(idx) {
+      const name = state.columns[idx];
+      state.columns.splice(idx, 1);
+      state.rows.forEach(r => delete r[name]);
+      renderTable();
+      triggerAutoSave();
+    }
+
+    // ==== EXPORTAÇÃO ====
+    function exportCSV() {
+      const ws = XLSX.utils.json_to_sheet(state.rows, { header: state.columns });
+      const csv = XLSX.utils.sheet_to_csv(ws);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `${state.modelName}.csv`;
+      link.click();
+    }
+
+    function exportXLSX() {
+      const ws = XLSX.utils.json_to_sheet(state.rows, { header: state.columns });
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Modelo");
+      XLSX.writeFile(wb, `${state.modelName}.xlsx`);
+    }
+
+    // ==== PERSISTÊNCIA & SUPABASE ====
+    function triggerAutoSave() {
+      updateSyncStatus("Digitando...");
+      clearTimeout(state.autoSaveTimer);
+      state.autoSaveTimer = setTimeout(() => {
+        saveToLocalStorageCache();
+        if (state.userId) saveToCloud();
+        else updateSyncStatus("Salvo localmente");
+      }, 1000);
+    }
+
+    function saveToLocalStorageCache() {
+      const payload = {
+        name: state.modelName,
+        template_type: state.templateType,
+        data_json: { columns: state.columns, rows: state.rows, template_id: state.templateType }
+      };
+      localStorage.setItem('model_active', JSON.stringify(payload));
+    }
+
+    function loadFromLocalStorageCache() {
+      const cached = localStorage.getItem('model_active');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        state.modelName = parsed.name || state.modelName;
+        state.templateType = parsed.template_type || 'carga_horaria';
+        state.columns = parsed.data_json?.columns || [];
+        state.rows = parsed.data_json?.rows || [];
+
+        document.getElementById('model-name').value = state.modelName;
+        const def = TEMPLATES_DEFINITION[state.templateType] || TEMPLATES_DEFINITION['custom'];
+        document.getElementById('template-badge').innerText = `Modelo: ${def.name}`;
+      } else {
+        selectTemplate('carga_horaria');
+      }
+    }
+
+    async function saveToCloud() {
+      if (!state.userId) return;
+      updateSyncStatus("Salvando na nuvem...");
+
+      try {
+        const payload = {
+          user_id: state.userId,
+          name: state.modelName,
+          tool_type: 'data_model',
+          template_type: state.templateType,
+          data_json: { columns: state.columns, rows: state.rows, template_id: state.templateType }
+        };
+
+        if (state.modelId) payload.id = state.modelId;
+
+        const { data, error } = await dbClient.from('user_models').upsert(payload).select().single();
+        if (error) throw error;
+
+        state.modelId = data.id;
+        updateSyncStatus("Sincronizado");
+      } catch (err) {
+        updateSyncStatus("Erro na nuvem");
+      }
+    }
+
+    async function toggleSavedModelsModal(show) {
+      const modal = document.getElementById('modal-saved-models');
+      modal.classList.toggle('hidden', !show);
+
+      if (show && state.userId) {
+        const { data } = await dbClient.from('user_models').select('*').eq('tool_type', 'data_model').order('updated_at', { ascending: false });
+        const list = document.getElementById('saved-models-list');
+
+        if (!data || data.length === 0) {
+          list.innerHTML = `<p class="text-xs text-zinc-500 text-center py-6">Nenhum modelo salvo encontrado.</p>`;
+          return;
+        }
+
+        list.innerHTML = data.map(item => `
+          <div onclick="restoreModel(${JSON.stringify(item).replace(/"/g, '&quot;')})" class="p-3 rounded-xl border border-matte-border bg-white/[0.02] hover:bg-white/[0.05] cursor-pointer flex items-center justify-between">
+            <div>
+              <h4 class="text-xs font-bold text-white truncate max-w-[200px]">${item.name}</h4>
+              <span class="text-[10px] text-zinc-500 uppercase font-bold">${item.template_type} • ${new Date(item.updated_at).toLocaleDateString()}</span>
+            </div>
+            <i class="ph ph-squares-four text-cyan-400"></i>
+          </div>
+        `).join('');
+      }
+    }
+
+    function restoreModel(item) {
+      state.modelId = item.id;
+      state.modelName = item.name;
+      state.templateType = item.template_type || 'custom';
+      state.columns = item.data_json?.columns || [];
+      state.rows = item.data_json?.rows || [];
+
+      document.getElementById('model-name').value = item.name;
+      const def = TEMPLATES_DEFINITION[state.templateType] || TEMPLATES_DEFINITION['custom'];
+      document.getElementById('template-badge').innerText = `Modelo: ${def.name}`;
+
+      renderTable();
+      toggleSavedModelsModal(false);
+    }
+
+    // ==== MODAL DE SELEÇÃO DE TEMPLATES ====
+    function toggleTemplatesModal(show) { document.getElementById('modal-templates').classList.toggle('hidden', !show); }
+
+    function renderTemplatesGrid() {
+      const grid = document.getElementById('templates-grid');
+      grid.innerHTML = Object.values(TEMPLATES_DEFINITION).map(t => `
+        <div onclick="selectTemplate('${t.id}')" class="p-4 rounded-xl border border-matte-border bg-white/[0.02] hover:bg-white/[0.06] hover:border-cyan-500/40 cursor-pointer transition-all flex flex-col justify-between h-36 group">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <i class="ph-fill ${t.icon} ${t.color} text-2xl"></i>
+              <i class="ph-bold ph-arrow-up-right text-zinc-600 group-hover:text-white text-xs"></i>
+            </div>
+            <h4 class="text-xs font-bold text-white mb-1">${t.name}</h4>
+            <p class="text-[10px] text-zinc-400 line-clamp-2">${t.desc}</p>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // ==== AUXILIARES ====
+    function num(str) { return parseFloat(String(str || 0).replace(/[^0-9.-]/g, '')) || 0; }
+    function updateSyncStatus(msg) { document.getElementById('sync-status').innerHTML = `<i class="ph-fill ph-check-circle text-cyan-400"></i> ${msg}`; }
+    function escapeHtml(str) { return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+  </script>
+</body>
+</html>

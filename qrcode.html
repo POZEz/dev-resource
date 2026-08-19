@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Gerador e Leitor de QR Code</title>
+
+  <!-- CDNs Supabase, Gerador de QR Code, Leitor jsQR / html5-qrcode e Estilização -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            matte: { bg: '#09090b', card: '#121214', border: '#27272a', text: '#fafafa', muted: '#a1a1aa' }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #09090b; color: #fafafa; -webkit-tap-highlight-color: transparent; }
+    .custom-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
+    .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #27272a; border-radius: 99px; }
+    .custom-scroll::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+  </style>
+</head>
+<body class="antialiased flex flex-col min-h-screen font-sans bg-matte-bg custom-scroll">
+
+  <!-- CABEÇALHO PRINCIPAL -->
+  <header class="h-16 shrink-0 bg-matte-card border-b border-matte-border px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+        <i class="ph-bold ph-qr-code text-xl"></i>
+      </div>
+      <div>
+        <h1 class="text-base font-bold text-white leading-tight">QR Code Hub</h1>
+        <p class="text-[11px] text-zinc-400 font-medium">Gere, escaneie e personalize QR Codes em alta definição</p>
+      </div>
+    </div>
+
+    <!-- Ações e Modais -->
+    <div class="flex items-center gap-2">
+      <button onclick="toggleHistoryModal(true)" class="px-3 py-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 text-xs font-semibold flex items-center gap-2 transition-colors">
+        <i class="ph ph-folder-star text-base"></i>
+        <span class="hidden sm:inline">Meus QR Codes</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- NAVEGAÇÃO DE MODO: GERAR / ESCANEAR -->
+  <nav class="bg-matte-bg border-b border-matte-border px-4 sm:px-8 py-2.5 flex items-center gap-2 z-20">
+    <button onclick="setMainMode('generate')" id="mode-btn-generate" class="px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 bg-white/[0.08] text-white transition-all">
+      <i class="ph-bold ph-plus-circle text-base"></i> Gerar QR Code
+    </button>
+    <button onclick="setMainMode('scan')" id="mode-btn-scan" class="px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 text-zinc-400 hover:text-white hover:bg-white/[0.04] transition-all">
+      <i class="ph-bold ph-camera text-base"></i> Ler / Escaneador
+    </button>
+  </nav>
+
+  <!-- ÁREA DE GERADOR DE QR CODE -->
+  <main id="view-generate" class="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-8 grid grid-cols-1 md:grid-cols-12 gap-8">
+    
+    <!-- COLUNA DA ESQUERDA: FORMULÁRIOS DE CONTEÚDO E CONFIGURAÇÃO -->
+    <section class="md:col-span-7 flex flex-col gap-6">
+      
+      <!-- Nome do Projeto -->
+      <div class="flex flex-col gap-1.5">
+        <label class="text-xs font-semibold text-zinc-400">Nome do Registro</label>
+        <input type="text" id="qr-name" value="Meu QR Code" oninput="state.name = this.value" class="bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500/50 transition-colors">
+      </div>
+
+      <!-- Abas de Tipos de Conteúdo -->
+      <div class="flex flex-col gap-2">
+        <label class="text-xs font-semibold text-zinc-400">Selecione o Tipo de Conteúdo</label>
+        <div class="grid grid-cols-4 sm:grid-cols-8 gap-1.5 bg-white/[0.02] p-1.5 border border-matte-border rounded-xl" id="type-tabs">
+          <button onclick="setType('url')" id="tab-type-url" class="type-btn p-2 rounded-lg text-xs font-bold flex flex-col items-center gap-1 bg-white/[0.08] text-emerald-400" title="URL / Link">
+            <i class="ph-bold ph-link text-lg"></i>
+            <span class="text-[9px]">URL</span>
+          </button>
+          <button onclick="setType('text')" id="tab-type-text" class="type-btn p-2 rounded-lg text-xs font-bold flex flex-col items-center gap-1 text-zinc-400 hover:text-white" title="Texto Puro">
+            <i class="ph-bold ph-text-t text-lg"></i>
+            <span class="text-[9px]">Texto</span>
+          </button>
+          <button onclick="setType('wifi')" id="tab-type-wifi" class="type-btn p-2 rounded-lg text-xs font-bold flex flex-col items-center gap-1 text-zinc-400 hover:text-white" title="Rede Wi-Fi">
+            <i class="ph-bold ph-wifi-high text-lg"></i>
+            <span class="text-[9px]">Wi-Fi</span>
+          </button>
+          <button onclick="setType('phone')" id="tab-type-phone" class="type-btn p-2 rounded-lg text-xs font-bold flex flex-col items-center gap-1 text-zinc-400 hover:text-white" title="Telefone / WhatsApp">
+            <i class="ph-bold ph-phone text-lg"></i>
+            <span class="text-[9px]">Telefone</span>
+          </button>
+          <button onclick="setType('email')" id="tab-type-email" class="type-btn p-2 rounded-lg text-xs font-bold flex flex-col items-center gap-1 text-zinc-400 hover:text-white" title="E-mail">
+            <i class="ph-bold ph-envelope-simple text-lg"></i>
+            <span class="text-[9px]">E-mail</span>
+          </button>
+          <button onclick="setType('vcard')" id="tab-type-vcard" class="type-btn p-2 rounded-lg text-xs font-bold flex flex-col items-center gap-1 text-zinc-400 hover:text-white" title="Cartão de Contato vCard">
+            <i class="ph-bold ph-user-address text-lg"></i>
+            <span class="text-[9px]">Contato</span>
+          </button>
+          <button onclick="setType('geo')" id="tab-type-geo" class="type-btn p-2 rounded-lg text-xs font-bold flex flex-col items-center gap-1 text-zinc-400 hover:text-white" title="Localização GPS">
+            <i class="ph-bold ph-map-pin text-lg"></i>
+            <span class="text-[9px]">Local</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- CAMPOS DINÂMICOS DO CONTEÚDO -->
+      <div id="type-form-container" class="bg-matte-card border border-matte-border rounded-2xl p-5 flex flex-col gap-4">
+        <!-- Injetado Dinamicamente -->
+      </div>
+
+      <!-- PAINEL DE PERSONALIZAÇÃO VISUAL DO QR CODE -->
+      <div class="bg-matte-card border border-matte-border rounded-2xl p-5 flex flex-col gap-4">
+        <h3 class="text-xs font-bold text-white uppercase tracking-wider text-zinc-400">Personalização Visual</h3>
+        
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <!-- Tamanho em Pixels -->
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs font-semibold text-zinc-300 flex justify-between">
+              <span>Resolução</span>
+              <span id="label-size" class="text-emerald-400 font-bold">300 px</span>
+            </label>
+            <input type="range" id="input-size" min="150" max="1000" step="50" value="300" oninput="state.settings.size = parseInt(this.value); document.getElementById('label-size').innerText = this.value + ' px'; updateQRCode();" class="accent-emerald-500 bg-white/[0.05]">
+          </div>
+
+          <!-- Nível de Correção de Erros -->
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs font-semibold text-zinc-300">Correção de Erro</label>
+            <select id="input-ecl" onchange="state.settings.errorCorrectionLevel = this.value; updateQRCode();" class="bg-white/[0.03] border border-matte-border rounded-xl p-2 text-xs text-white">
+              <option value="L">L (7% de recuperação)</option>
+              <option value="M" selected>M (15% de recuperação)</option>
+              <option value="Q">Q (25% de recuperação)</option>
+              <option value="H">H (30% de recuperação)</option>
+            </select>
+          </div>
+
+          <!-- Cor dos Módulos (Frente) -->
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs font-semibold text-zinc-300">Cor do Código</label>
+            <div class="flex items-center gap-2">
+              <input type="color" id="input-fgcolor" value="#000000" oninput="state.settings.fgColor = this.value; updateQRCode();" class="w-8 h-8 rounded bg-transparent border-0 cursor-pointer">
+              <input type="text" id="input-fgcolor-text" value="#000000" onchange="state.settings.fgColor = this.value; updateQRCode();" class="w-full bg-white/[0.03] border border-matte-border rounded-xl p-2 text-xs text-white">
+            </div>
+          </div>
+
+          <!-- Cor do Fundo -->
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs font-semibold text-zinc-300">Cor de Fundo</label>
+            <div class="flex items-center gap-2">
+              <input type="color" id="input-bgcolor" value="#ffffff" oninput="state.settings.bgColor = this.value; updateQRCode();" class="w-8 h-8 rounded bg-transparent border-0 cursor-pointer">
+              <input type="text" id="input-bgcolor-text" value="#ffffff" onchange="state.settings.bgColor = this.value; updateQRCode();" class="w-full bg-white/[0.03] border border-matte-border rounded-xl p-2 text-xs text-white">
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- COLUNA DA DIREITA: PRÉ-VISUALIZAÇÃO E DOWNLOADS -->
+    <section class="md:col-span-5 flex flex-col items-center justify-start gap-6">
+      
+      <div class="w-full bg-matte-card border border-matte-border rounded-2xl p-6 flex flex-col items-center text-center shadow-xl">
+        <h3 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4">Pré-Visualização do QR Code</h3>
+        
+        <!-- Canvas do QR Code -->
+        <div id="qr-container" class="p-4 rounded-2xl bg-white border border-matte-border flex items-center justify-center shadow-inner my-2">
+          <canvas id="qr-canvas" class="max-w-full block"></canvas>
+        </div>
+
+        <p id="payload-preview" class="text-[10px] text-zinc-400 font-mono break-all max-w-xs mt-3 bg-white/[0.02] p-2 rounded-lg border border-matte-border">Carregando...</p>
+
+        <!-- Ações de Download e Salvamento -->
+        <div class="w-full grid grid-cols-2 gap-2 mt-6">
+          <button onclick="downloadPNG()" class="py-2.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-xs font-bold text-white flex items-center justify-center gap-2 border border-matte-border transition-colors">
+            <i class="ph-bold ph-download-simple"></i> Baixar PNG
+          </button>
+          <button onclick="downloadSVG()" class="py-2.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-xs font-bold text-white flex items-center justify-center gap-2 border border-matte-border transition-colors">
+            <i class="ph-bold ph-file-code"></i> Baixar SVG
+          </button>
+        </div>
+
+        <button id="btn-save-cloud" onclick="saveToCloud()" class="w-full mt-2 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-xs flex items-center justify-center gap-2 transition-colors shadow-lg shadow-emerald-500/10">
+          <i class="ph-bold ph-cloud-arrow-up text-base"></i> Salvar na Nuvem
+        </button>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- ÁREA DO LEITOR / ESCANEADOR DE QR CODE -->
+  <main id="view-scan" class="hidden flex-1 max-w-3xl w-full mx-auto p-4 sm:p-8 flex flex-col gap-6">
+    
+    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 flex flex-col items-center text-center gap-4">
+      <h3 class="text-sm font-bold text-white">Escaneador de QR Code</h3>
+      <p class="text-xs text-zinc-400 max-w-md">Utilize a sua câmera em tempo real ou envie um arquivo de imagem com o código para efetuar a leitura.</p>
+
+      <!-- Opções de Leitura: Câmera x Imagem -->
+      <div class="flex gap-2">
+        <button id="btn-toggle-camera" onclick="startCameraScan()" class="px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold text-xs flex items-center gap-2">
+          <i class="ph-bold ph-camera"></i> Ativar Câmera
+        </button>
+        <label class="px-4 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-matte-border text-white font-bold text-xs flex items-center gap-2 cursor-pointer">
+          <i class="ph-bold ph-image"></i> Carregar Imagem
+          <input type="file" id="scan-image-file" accept="image/*" class="hidden" onchange="handleImageScan(event)">
+        </label>
+      </div>
+
+      <!-- Video Feed para Leitura de Câmera -->
+      <div id="camera-container" class="hidden w-full max-w-md aspect-square bg-black rounded-2xl overflow-hidden relative border border-matte-border">
+        <video id="scan-video" class="w-full h-full object-cover"></video>
+        <div class="absolute inset-8 border-2 border-dashed border-emerald-400 rounded-xl pointer-events-none animate-pulse"></div>
+      </div>
+
+      <!-- Canvas Oculto para Análise da Leitura -->
+      <canvas id="scan-canvas" class="hidden"></canvas>
+
+      <!-- Cartão de Resultado da Leitura -->
+      <div id="scan-result-card" class="hidden w-full bg-white/[0.02] border border-emerald-500/30 rounded-xl p-4 text-left flex flex-col gap-3">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1">
+            <i class="ph-fill ph-check-circle"></i> Conteúdo Lido
+          </span>
+          <button onclick="copyScanResult()" class="text-xs text-zinc-400 hover:text-white flex items-center gap-1">
+            <i class="ph ph-copy"></i> Copiar
+          </button>
+        </div>
+        <p id="scan-result-text" class="text-xs font-mono text-white break-all bg-black/40 p-3 rounded-lg border border-matte-border"></p>
+        
+        <div class="flex justify-end gap-2">
+          <button id="btn-open-scanned-link" onclick="openScannedUrl()" class="hidden px-3 py-1.5 rounded-lg bg-emerald-500 text-black text-xs font-bold flex items-center gap-1">
+            <i class="ph-bold ph-arrow-square-out"></i> Abrir Link
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- MODAL DE QR CODES SALVOS -->
+  <div id="modal-history" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-lg shadow-2xl flex flex-col max-h-[80vh]">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3 mb-4">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="ph ph-cloud-check text-emerald-400 text-lg"></i> Meus QR Codes Salvos
+        </h3>
+        <button onclick="toggleHistoryModal(false)" class="text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
+      </div>
+      <div id="saved-qrs-list" class="flex-1 overflow-y-auto space-y-2 custom-scroll pr-1">
+        <p class="text-xs text-zinc-500 text-center py-6">Carregando registros salvos...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- LÓGICA DE GERENCIAMENTO DE QR CODE -->
+  <script>
+    // Configuração do Supabase Client
+    const SUPABASE_URL = 'https://zlsdlcvtcsrykfacjvhf.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_JnDv-fxHXPTzNaFX9n3Z0w_4mqt47Js';
+    const dbClient = window.parent?.PortalDB?.supabase || window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // Estado da Aplicação
+    let state = {
+      name: 'Meu QR Code',
+      type: 'url',
+      content: {},
+      formattedPayload: '',
+      settings: {
+        size: 300,
+        fgColor: '#000000',
+        bgColor: '#ffffff',
+        errorCorrectionLevel: 'M',
+        margin: 2
+      },
+      userId: null,
+      scannedResult: '',
+      cameraStream: null,
+      isScanning: false
+    };
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      await initSession();
+      renderTypeForm('url');
+    });
+
+    async function initSession() {
+      try {
+        const { data } = await dbClient.auth.getSession();
+        state.userId = data?.session?.user?.id || null;
+      } catch (e) {
+        state.userId = null;
+      }
+    }
+
+    // ==== MUDANÇA DE MODO (GERAR X ESCANEAR) ====
+    function setMainMode(mode) {
+      document.getElementById('view-generate').classList.toggle('hidden', mode !== 'generate');
+      document.getElementById('view-scan').classList.toggle('hidden', mode !== 'scan');
+
+      document.getElementById('mode-btn-generate').className = mode === 'generate' ? 'px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 bg-white/[0.08] text-white transition-all' : 'px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 text-zinc-400 hover:text-white hover:bg-white/[0.04] transition-all';
+      document.getElementById('mode-btn-scan').className = mode === 'scan' ? 'px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 bg-white/[0.08] text-white transition-all' : 'px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 text-zinc-400 hover:text-white hover:bg-white/[0.04] transition-all';
+
+      if (mode !== 'scan') stopCameraScan();
+    }
+
+    // ==== TIPO DE CONTEÚDO E CONSTRUÇÃO DO PAYLOAD ====
+    function setType(type) {
+      state.type = type;
+      document.querySelectorAll('.type-btn').forEach(btn => {
+        btn.className = 'type-btn p-2 rounded-lg text-xs font-bold flex flex-col items-center gap-1 text-zinc-400 hover:text-white';
+      });
+      document.getElementById(`tab-type-${type}`).className = 'type-btn p-2 rounded-lg text-xs font-bold flex flex-col items-center gap-1 bg-white/[0.08] text-emerald-400';
+
+      renderTypeForm(type);
+    }
+
+    function renderTypeForm(type) {
+      const container = document.getElementById('type-form-container');
+      let html = '';
+
+      switch (type) {
+        case 'url':
+          html = `
+            <div class="flex flex-col gap-1.5">
+              <label class="text-xs font-semibold text-zinc-300">URL / Endereço Web</label>
+              <input type="url" id="field-url" placeholder="https://exemplo.com" value="${state.content.url || ''}" oninput="updateContentPayload()" class="bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500/50">
+            </div>`;
+          break;
+        case 'text':
+          html = `
+            <div class="flex flex-col gap-1.5">
+              <label class="text-xs font-semibold text-zinc-300">Texto Livre</label>
+              <textarea id="field-text" placeholder="Digite a sua mensagem aqui..." oninput="updateContentPayload()" class="bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500/50 h-24 custom-scroll">${state.content.text || ''}</textarea>
+            </div>`;
+          break;
+        case 'wifi':
+          html = `
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div class="flex flex-col gap-1.5">
+                <label class="text-xs font-semibold text-zinc-300">Nome da Rede (SSID)</label>
+                <input type="text" id="field-wifi-ssid" placeholder="MinhaRede_5G" value="${state.content.ssid || ''}" oninput="updateContentPayload()" class="bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500/50">
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <label class="text-xs font-semibold text-zinc-300">Senha</label>
+                <input type="password" id="field-wifi-pass" placeholder="Senha do Wi-Fi" value="${state.content.password || ''}" oninput="updateContentPayload()" class="bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500/50">
+              </div>
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-xs font-semibold text-zinc-300">Segurança</label>
+              <select id="field-wifi-type" onchange="updateContentPayload()" class="bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white">
+                <option value="WPA">WPA/WPA2/WPA3</option>
+                <option value="WEP">WEP</option>
+                <option value="nopass">Sem Senha (Aberta)</option>
+              </select>
+            </div>`;
+          break;
+        case 'phone':
+          html = `
+            <div class="flex flex-col gap-1.5">
+              <label class="text-xs font-semibold text-zinc-300">Número de Telefone (Com DDI/DDD)</label>
+              <input type="tel" id="field-phone" placeholder="+5511999999999" value="${state.content.phone || ''}" oninput="updateContentPayload()" class="bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500/50">
+            </div>`;
+          break;
+        case 'email':
+          html = `
+            <div class="flex flex-col gap-1.5">
+              <label class="text-xs font-semibold text-zinc-300">E-mail de Destino</label>
+              <input type="email" id="field-email-to" placeholder="contato@exemplo.com" value="${state.content.email || ''}" oninput="updateContentPayload()" class="bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500/50">
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-xs font-semibold text-zinc-300">Assunto (Opcional)</label>
+              <input type="text" id="field-email-subject" placeholder="Assunto da mensagem" value="${state.content.subject || ''}" oninput="updateContentPayload()" class="bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500/50">
+            </div>`;
+          break;
+        case 'vcard':
+          html = `
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div class="flex flex-col gap-1.5">
+                <label class="text-xs font-semibold text-zinc-300">Nome</label>
+                <input type="text" id="field-vcard-fn" placeholder="João Silva" value="${state.content.name || ''}" oninput="updateContentPayload()" class="bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500/50">
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <label class="text-xs font-semibold text-zinc-300">Telefone</label>
+                <input type="tel" id="field-vcard-tel" placeholder="+55 11 99999-9999" value="${state.content.phone || ''}" oninput="updateContentPayload()" class="bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500/50">
+              </div>
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-xs font-semibold text-zinc-300">E-mail</label>
+              <input type="email" id="field-vcard-email" placeholder="joao@empresa.com" value="${state.content.email || ''}" oninput="updateContentPayload()" class="bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500/50">
+            </div>`;
+          break;
+        case 'geo':
+          html = `
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div class="flex flex-col gap-1.5">
+                <label class="text-xs font-semibold text-zinc-300">Latitude</label>
+                <input type="number" step="any" id="field-geo-lat" placeholder="-23.55052" value="${state.content.lat || ''}" oninput="updateContentPayload()" class="bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500/50">
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <label class="text-xs font-semibold text-zinc-300">Longitude</label>
+                <input type="number" step="any" id="field-geo-lng" placeholder="-46.633308" value="${state.content.lng || ''}" oninput="updateContentPayload()" class="bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500/50">
+              </div>
+            </div>`;
+          break;
+      }
+
+      container.innerHTML = html;
+      updateContentPayload();
+    }
+
+    function updateContentPayload() {
+      let payload = '';
+      state.content = {};
+
+      switch (state.type) {
+        case 'url':
+          const url = document.getElementById('field-url')?.value.trim() || 'https://exemplo.com';
+          state.content = { url };
+          payload = url;
+          break;
+        case 'text':
+          const text = document.getElementById('field-text')?.value || 'Sua mensagem aqui';
+          state.content = { text };
+          payload = text;
+          break;
+        case 'wifi':
+          const ssid = document.getElementById('field-wifi-ssid')?.value || '';
+          const pass = document.getElementById('field-wifi-pass')?.value || '';
+          const t = document.getElementById('field-wifi-type')?.value || 'WPA';
+          state.content = { ssid, password: pass, encryption: t };
+          payload = `WIFI:S:${ssid};T:${t};P:${pass};;`;
+          break;
+        case 'phone':
+          const phone = document.getElementById('field-phone')?.value.trim() || '';
+          state.content = { phone };
+          payload = `tel:${phone}`;
+          break;
+        case 'email':
+          const email = document.getElementById('field-email-to')?.value.trim() || '';
+          const sub = document.getElementById('field-email-subject')?.value.trim() || '';
+          state.content = { email, subject: sub };
+          payload = `mailto:${email}?subject=${encodeURIComponent(sub)}`;
+          break;
+        case 'vcard':
+          const fn = document.getElementById('field-vcard-fn')?.value || '';
+          const tel = document.getElementById('field-vcard-tel')?.value || '';
+          const eml = document.getElementById('field-vcard-email')?.value || '';
+          state.content = { name: fn, phone: tel, email: eml };
+          payload = `BEGIN:VCARD\nVERSION:3.0\nN:${fn}\nFN:${fn}\nTEL:${tel}\nEMAIL:${eml}\nEND:VCARD`;
+          break;
+        case 'geo':
+          const lat = document.getElementById('field-geo-lat')?.value || '0';
+          const lng = document.getElementById('field-geo-lng')?.value || '0';
+          state.content = { lat, lng };
+          payload = `geo:${lat},${lng}`;
+          break;
+      }
+
+      state.formattedPayload = payload;
+      document.getElementById('payload-preview').innerText = payload || 'Payload vazio';
+      updateQRCode();
+    }
+
+    // ==== GERAÇÃO EM CANVAS VIA LIBRARY ====
+    function updateQRCode() {
+      const canvas = document.getElementById('qr-canvas');
+      if (!state.formattedPayload) return;
+
+      // Sincronizar inputs de cor
+      document.getElementById('input-fgcolor-text').value = state.settings.fgColor;
+      document.getElementById('input-bgcolor-text').value = state.settings.bgColor;
+
+      QRCode.toCanvas(canvas, state.formattedPayload, {
+        width: state.settings.size,
+        margin: state.settings.margin,
+        color: {
+          dark: state.settings.fgColor,
+          light: state.settings.bgColor
+        },
+        errorCorrectionLevel: state.settings.errorCorrectionLevel
+      }, (error) => {
+        if (error) console.error("Erro ao gerar QR Code:", error);
+      });
+    }
+
+    // ==== DOWNLOADS LOCAIS (PNG / SVG) ====
+    function downloadPNG() {
+      const canvas = document.getElementById('qr-canvas');
+      const link = document.createElement('a');
+      link.href = canvas.toDataURL('image/png');
+      link.download = `${state.name.replace(/\s+/g, '_')}.png`;
+      link.click();
+    }
+
+    function downloadSVG() {
+      QRCode.toString(state.formattedPayload, {
+        type: 'svg',
+        width: state.settings.size,
+        margin: state.settings.margin,
+        color: {
+          dark: state.settings.fgColor,
+          light: state.settings.bgColor
+        },
+        errorCorrectionLevel: state.settings.errorCorrectionLevel
+      }, (err, string) => {
+        if (err) return;
+        const blob = new Blob([string], { type: 'image/svg+xml;charset=utf-8' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${state.name.replace(/\s+/g, '_')}.svg`;
+        link.click();
+      });
+    }
+
+    // ==== PERSISTÊNCIA EM NUVEM (SEM ARMAZENAR A IMAGEM) ====
+    async function saveToCloud() {
+      if (!state.userId) {
+        alert("Conecte a sua conta de usuário para salvar QR Codes na nuvem.");
+        return;
+      }
+
+      const btn = document.getElementById('btn-save-cloud');
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = '<div class="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div> Salvando...';
+      btn.disabled = true;
+
+      try {
+        const payload = {
+          user_id: state.userId,
+          name: state.name,
+          type: state.type,
+          content: state.content,
+          formatted_payload: state.formattedPayload,
+          settings: state.settings
+        };
+
+        const { error } = await dbClient.from('qrcode_items').insert(payload);
+        if (error) throw error;
+
+        btn.innerHTML = '<i class="ph-bold ph-check text-black"></i> Salvo na Nuvem!';
+        setTimeout(() => { btn.innerHTML = originalHtml; btn.disabled = false; }, 2000);
+
+      } catch (err) {
+        alert("Erro ao salvar no banco de dados: " + err.message);
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+      }
+    }
+
+    async function toggleHistoryModal(show) {
+      const modal = document.getElementById('modal-history');
+      modal.classList.toggle('hidden', !show);
+
+      if (show && state.userId) {
+        const { data } = await dbClient.from('qrcode_items').select('*').order('created_at', { ascending: false });
+        const list = document.getElementById('saved-qrs-list');
+
+        if (!data || data.length === 0) {
+          list.innerHTML = `<p class="text-xs text-zinc-500 text-center py-6">Nenhum QR Code salvo encontrado.</p>`;
+          return;
+        }
+
+        list.innerHTML = data.map(item => `
+          <div onclick="restoreSavedQR(${JSON.stringify(item).replace(/"/g, '&quot;')})" class="p-3 rounded-xl border border-matte-border bg-white/[0.02] hover:bg-white/[0.05] cursor-pointer flex items-center justify-between">
+            <div>
+              <h4 class="text-xs font-bold text-white truncate max-w-[200px]">${item.name}</h4>
+              <span class="text-[10px] text-zinc-500 uppercase font-bold">${item.type} • ${new Date(item.created_at).toLocaleDateString()}</span>
+            </div>
+            <i class="ph ph-qr-code text-emerald-400"></i>
+          </div>
+        `).join('');
+      }
+    }
+
+    function restoreSavedQR(item) {
+      state.name = item.name;
+      state.type = item.type;
+      state.content = item.content || {};
+      state.settings = item.settings || state.settings;
+
+      document.getElementById('qr-name').value = item.name;
+      setType(item.type);
+      toggleHistoryModal(false);
+    }
+
+    // ==== ESCANEADOR DE CAMÊRA / IMAGEM ====
+    function startCameraScan() {
+      const container = document.getElementById('camera-container');
+      const video = document.getElementById('scan-video');
+      container.classList.remove('hidden');
+
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+        .then((stream) => {
+          state.cameraStream = stream;
+          video.srcObject = stream;
+          video.setAttribute('playsinline', true);
+          video.play();
+          state.isScanning = true;
+          requestAnimationFrame(tickScan);
+        })
+        .catch((err) => {
+          alert("Não foi possível acessar a câmera do dispositivo.");
+        });
+    }
+
+    function stopCameraScan() {
+      state.isScanning = false;
+      if (state.cameraStream) {
+        state.cameraStream.getTracks().forEach(track => track.stop());
+        state.cameraStream = null;
+      }
+      document.getElementById('camera-container').classList.add('hidden');
+    }
+
+    function tickScan() {
+      if (!state.isScanning) return;
+      const video = document.getElementById('scan-video');
+      const canvas = document.getElementById('scan-canvas');
+      const ctx = canvas.getContext('2d');
+
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvas.height = video.videoHeight;
+        canvas.width = video.videoWidth;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: "dontInvert",
+        });
+
+        if (code) {
+          handleScanSuccess(code.data);
+          stopCameraScan();
+          return;
+        }
+      }
+      requestAnimationFrame(tickScan);
+    }
+
+    function handleImageScan(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.getElementById('scan-canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+          if (code) {
+            handleScanSuccess(code.data);
+          } else {
+            alert("Nenhum QR Code legível foi encontrado nesta imagem.");
+          }
+        };
+        img.src = evt.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function handleScanSuccess(dataText) {
+      state.scannedResult = dataText;
+      document.getElementById('scan-result-text').innerText = dataText;
+      document.getElementById('scan-result-card').classList.remove('hidden');
+
+      const btnLink = document.getElementById('btn-open-scanned-link');
+      if (dataText.startsWith('http://') || dataText.startsWith('https://')) {
+        btnLink.classList.remove('hidden');
+      } else {
+        btnLink.classList.add('hidden');
+      }
+    }
+
+    function copyScanResult() {
+      if (!state.scannedResult) return;
+      navigator.clipboard.writeText(state.scannedResult);
+      alert("Conteúdo copiado para a área de transferência!");
+    }
+
+    function openScannedUrl() {
+      if (state.scannedResult.startsWith('http')) {
+        window.open(state.scannedResult, '_blank');
+      }
+    }
+  </script>
+</body>
+</html>

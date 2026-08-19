@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Editor de Áudio</title>
+
+  <!-- CDNs Supabase, Tailwind, Phosphor Icons -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            matte: { bg: '#09090b', card: '#121214', border: '#27272a', text: '#fafafa', muted: '#a1a1aa' }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #09090b; color: #fafafa; -webkit-tap-highlight-color: transparent; }
+    .custom-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
+    .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #27272a; border-radius: 99px; }
+    .custom-scroll::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+
+    /* Canvas de Forma de Onda (Waveform) */
+    .waveform-container {
+      position: relative;
+      background: #121214;
+      border: 1px solid #27272a;
+      border-radius: 12px;
+      height: 180px;
+      overflow: hidden;
+      width: 100%;
+    }
+
+    #waveform-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: crosshair;
+    }
+
+    .selection-overlay {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      background: rgba(168, 85, 247, 0.2);
+      border-left: 2px solid #a855f7;
+      border-right: 2px solid #a855f7;
+      pointer-events: none;
+    }
+
+    .playhead {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: #ec4899;
+      pointer-events: none;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body class="antialiased flex flex-col h-screen font-sans bg-matte-bg select-none overflow-hidden">
+
+  <!-- CABEÇALHO PRINCIPAL DA APLICAÇÃO -->
+  <header class="h-16 shrink-0 bg-matte-card border-b border-matte-border px-4 sm:px-6 flex items-center justify-between z-30">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+        <i class="ph-bold ph-waveform text-xl"></i>
+      </div>
+      <div>
+        <input type="text" id="project-title" value="Novo Projeto de Áudio" onchange="state.projectName = this.value; triggerAutoSave();" class="bg-transparent font-bold text-sm text-white focus:outline-none focus:border-b border-purple-500 max-w-[180px] sm:max-w-xs truncate" placeholder="Nome do Projeto">
+        <div class="flex items-center gap-2 text-[10px] text-zinc-400">
+          <span id="sync-status"><i class="ph-fill ph-check-circle text-purple-400"></i> Pronto</span>
+          <span>•</span>
+          <span id="total-duration-badge">00:00.0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Botões Globais de Ação -->
+    <div class="flex items-center gap-2">
+      <button onclick="toggleProjectsModal(true)" class="p-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+        <i class="ph ph-folder text-base"></i>
+        <span class="hidden sm:inline">Projetos</span>
+      </button>
+      <button id="btn-save-cloud" onclick="saveToCloud()" class="p-2 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 text-purple-400 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+        <i class="ph ph-cloud-arrow-up text-base"></i>
+        <span class="hidden sm:inline">Salvar</span>
+      </button>
+      <button onclick="exportAudioModal()" class="px-3.5 py-2 rounded-xl bg-white text-black hover:bg-zinc-200 text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors">
+        <i class="ph-bold ph-export text-sm"></i>
+        <span>Exportar Áudio</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- BARRA DE FERRAMENTAS DE ÁUDIO -->
+  <nav class="bg-matte-bg border-b border-matte-border px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0 z-20">
+    <!-- Operações de Edição e Processamento -->
+    <div class="flex items-center gap-2 overflow-x-auto custom-scroll max-w-full">
+      <label class="px-3 py-1.5 rounded-xl bg-purple-500 hover:bg-purple-600 text-black font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-lg shadow-purple-500/10 shrink-0">
+        <i class="ph-bold ph-plus"></i> Importar Áudio
+        <input type="file" id="audio-file-input" accept="audio/*,video/*" multiple class="hidden" onchange="handleAudioUpload(event)">
+      </label>
+
+      <div class="h-4 w-px bg-matte-border mx-1 shrink-0"></div>
+
+      <button onclick="cutSelection()" class="px-2.5 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-matte-border text-zinc-200 text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0" title="Cortar/Excluir seleção ativa">
+        <i class="ph-bold ph-scissors text-purple-400"></i> Cortar Seleção
+      </button>
+
+      <button onclick="keepOnlySelection()" class="px-2.5 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-matte-border text-zinc-200 text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0" title="Manter apenas a seleção (Extrair trecho)">
+        <i class="ph-bold ph-crop text-purple-400"></i> Extrair Trecho
+      </button>
+
+      <button onclick="normalizeVolume()" class="px-2.5 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-matte-border text-zinc-200 text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0" title="Normalizar volume ao nível máximo sem distorção">
+        <i class="ph-bold ph-faders text-purple-400"></i> Normalizar Volume
+      </button>
+
+      <button onclick="removeSilence()" class="px-2.5 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-matte-border text-zinc-200 text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0" title="Remover trechos silenciosos">
+        <i class="ph-bold ph-speaker-slash text-purple-400"></i> Remover Silêncio
+      </button>
+    </div>
+
+    <!-- Formato de Saída -->
+    <div class="flex items-center gap-2 shrink-0">
+      <span class="text-[10px] text-zinc-500 font-bold uppercase">Formato:</span>
+      <select id="select-output-format" onchange="state.outputFormat = this.value; triggerAutoSave();" class="bg-white/[0.03] border border-matte-border rounded-xl px-2.5 py-1.5 text-xs text-white">
+        <option value="wav">WAV (Sem Perdas)</option>
+        <option value="mp3">MP3 (Comprimido)</option>
+        <option value="webm">WebM Áudio</option>
+      </select>
+    </div>
+  </nav>
+
+  <!-- ÁREA PRINCIPAL DO EDITOR (WAVEFORM E CONTROLES) -->
+  <main class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 custom-scroll">
+
+    <!-- DISPLAY DO WAVEFORM -->
+    <section class="bg-matte-card border border-matte-border rounded-2xl p-5 flex flex-col gap-4 shadow-2xl relative">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3">
+        <div class="flex items-center gap-2">
+          <i class="ph-bold ph-waveform text-purple-400"></i>
+          <h3 class="text-xs font-bold text-white">Forma de Onda (Waveform)</h3>
+        </div>
+        <span class="text-[10px] text-zinc-500">Clique e arraste com o mouse para selecionar um trecho</span>
+      </div>
+
+      <!-- Container Visual do Waveform -->
+      <div class="waveform-container relative">
+        <canvas id="waveform-canvas"></canvas>
+
+        <!-- Indicador de Posição (Playhead) -->
+        <div id="playhead" class="playhead" style="left: 0%;"></div>
+
+        <!-- Camada Visual de Seleção -->
+        <div id="selection-overlay" class="selection-overlay hidden"></div>
+      </div>
+
+      <!-- PAINEL DE TRANSPORT & TEMPO -->
+      <div class="flex items-center justify-between pt-2">
+        <div class="flex items-center gap-3">
+          <button id="btn-play-pause" onclick="togglePlayPause()" class="w-10 h-10 rounded-xl bg-purple-500 text-black hover:bg-purple-400 flex items-center justify-center text-lg font-bold transition-colors shadow-lg shadow-purple-500/10">
+            <i class="ph-bold ph-play"></i>
+          </button>
+          <button onclick="stopPlayback()" class="w-10 h-10 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-matte-border text-zinc-300 flex items-center justify-center text-lg">
+            <i class="ph-bold ph-stop"></i>
+          </button>
+
+          <span id="timecode-display" class="text-xs font-mono font-bold text-purple-400 pl-2">00:00.0 / 00:00.0</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button onclick="clearSelection()" class="px-2.5 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-xs text-zinc-400 hover:text-white font-medium">
+            Limpar Seleção
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- LISTA DE FAIXAS / ARQUIVOS JUNTADOS -->
+    <section class="bg-matte-card border border-matte-border rounded-2xl p-5 flex flex-col gap-4 shadow-xl">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3">
+        <div>
+          <h3 class="text-sm font-bold text-white">Faixas Importadas</h3>
+          <p class="text-xs text-zinc-400">Áudios adicionados para junção sequencial.</p>
+        </div>
+        <span id="tracks-count" class="text-xs font-bold text-purple-400">0 faixas</span>
+      </div>
+
+      <div id="tracks-list" class="space-y-2">
+        <!-- Injetado via JS -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL DE EXPORTAÇÃO / DOWNLOAD -->
+  <div id="modal-export" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-md shadow-2xl flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="ph-bold ph-export text-purple-400 text-lg"></i> Exportar Arquivo de Áudio
+        </h3>
+        <button onclick="closeExportModal()" class="text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
+      </div>
+
+      <div class="space-y-3">
+        <p class="text-xs text-zinc-400">
+          O áudio editado será processado no seu navegador e disponibilizado para download imediato.
+        </p>
+
+        <div class="p-3 rounded-xl bg-white/[0.02] border border-matte-border space-y-1 text-xs">
+          <div class="flex justify-between"><span class="text-zinc-500">Formato Escolhido:</span><span id="exp-fmt-label" class="font-bold text-white uppercase">WAV</span></div>
+          <div class="flex justify-between"><span class="text-zinc-500">Duração Final:</span><span id="exp-dur-label" class="font-bold text-purple-400">00:00.0</span></div>
+        </div>
+      </div>
+
+      <button id="btn-process-export" onclick="processAndDownloadAudio()" class="w-full py-3 rounded-xl bg-purple-500 hover:bg-purple-600 text-black font-bold text-xs transition-colors shadow-lg shadow-purple-500/10 flex items-center justify-center gap-2">
+        <i class="ph-bold ph-download-simple"></i> Processar e Baixar
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL DE PROJETOS SALVOS NA NUVEM -->
+  <div id="modal-projects" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-lg shadow-2xl flex flex-col max-h-[80vh]">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3 mb-4">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="ph ph-folder text-purple-400 text-lg"></i> Meus Projetos de Áudio
+        </h3>
+        <button onclick="toggleProjectsModal(false)" class="text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
+      </div>
+      <div id="projects-list" class="flex-1 overflow-y-auto space-y-2 custom-scroll pr-1">
+        <p class="text-xs text-zinc-500 text-center py-6">Carregando projetos salvos...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- LÓGICA COMPLETA DO EDITOR DE ÁUDIO -->
+  <script>
+    // Inicialização do Supabase Client
+    const SUPABASE_URL = 'https://zlsdlcvtcsrykfacjvhf.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_JnDv-fxHXPTzNaFX9n3Z0w_4mqt47Js';
+    const dbClient = window.parent?.PortalDB?.supabase || window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // Estado Geral da Aplicação
+    let state = {
+      projectId: null,
+      projectName: 'Novo Projeto de Áudio',
+      outputFormat: 'wav',
+      audioBuffer: null, // AudioBuffer principal em memória
+      tracks: [], // [{ id, name, buffer }]
+      selection: { start: 0, end: 0 }, // Em segundos
+      isSelecting: false,
+      isPlaying: false,
+      currentTime: 0,
+      userId: null,
+      autoSaveTimer: null
+    };
+
+    let audioCtx, sourceNode, canvas, canvasCtx, animationFrameId;
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      canvas = document.getElementById('waveform-canvas');
+      canvasCtx = canvas.getContext('2d');
+      
+      resizeCanvas();
+      window.addEventListener('resize', resizeCanvas);
+      setupSelectionEvents();
+
+      await initSession();
+      loadFromLocalStorageCache();
+    });
+
+    async function initSession() {
+      try {
+        const { data } = await dbClient.auth.getSession();
+        state.userId = data?.session?.user?.id || null;
+      } catch (e) {
+        state.userId = null;
+      }
+    }
+
+    function getAudioContext() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      return audioCtx;
+    }
+
+    function resizeCanvas() {
+      canvas.width = canvas.parentElement.clientWidth;
+      canvas.height = canvas.parentElement.clientHeight;
+      drawWaveform();
+    }
+
+    // ==== IMPORTAÇÃO E JUNÇÃO DE ÁUDIOS ====
+    async function handleAudioUpload(e) {
+      const files = Array.from(e.target.files);
+      if (files.length === 0) return;
+
+      const ctx = getAudioContext();
+
+      for (const file of files) {
+        const arrayBuffer = await file.arrayBuffer();
+        const decodedBuffer = await ctx.decodeAudioData(arrayBuffer);
+
+        state.tracks.push({
+          id: crypto.randomUUID(),
+          name: file.name,
+          buffer: decodedBuffer
+        });
+      }
+
+      mergeAllTracks();
+      renderTracksList();
+      triggerAutoSave();
+    }
+
+    function mergeAllTracks() {
+      if (state.tracks.length === 0) {
+        state.audioBuffer = null;
+        drawWaveform();
+        return;
+      }
+
+      const ctx = getAudioContext();
+      let totalLength = state.tracks.reduce((acc, t) => acc + t.buffer.length, 0);
+      let numberOfChannels = state.tracks[0].buffer.numberOfChannels;
+      let sampleRate = state.tracks[0].buffer.sampleRate;
+
+      let mergedBuffer = ctx.createBuffer(numberOfChannels, totalLength, sampleRate);
+
+      for (let channel = 0; channel < numberOfChannels; channel++) {
+        let channelData = mergedBuffer.getChannelData(channel);
+        let offset = 0;
+
+        for (const track of state.tracks) {
+          const trackData = track.buffer.getChannelData(Math.min(channel, track.buffer.numberOfChannels - 1));
+          channelData.set(trackData, offset);
+          offset += track.buffer.length;
+        }
+      }
+
+      state.audioBuffer = mergedBuffer;
+      state.selection = { start: 0, end: 0 };
+      updateDurationUI();
+      drawWaveform();
+    }
+
+    function renderTracksList() {
+      const container = document.getElementById('tracks-list');
+      document.getElementById('tracks-count').innerText = `${state.tracks.length} faixas`;
+
+      if (state.tracks.length === 0) {
+        container.innerHTML = `<p class="text-xs text-zinc-500 text-center py-4">Nenhuma faixa importada.</p>`;
+        return;
+      }
+
+      container.innerHTML = state.tracks.map((t, idx) => `
+        <div class="p-2.5 rounded-xl border border-matte-border bg-white/[0.02] flex items-center justify-between text-xs">
+          <div class="flex items-center gap-2 overflow-hidden">
+            <i class="ph ph-music-note text-purple-400"></i>
+            <span class="font-bold text-white truncate max-w-[200px]">${idx + 1}. ${t.name}</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] text-zinc-500 font-mono">${t.buffer.duration.toFixed(1)}s</span>
+            <button onclick="removeTrack(${idx})" class="p-1 rounded hover:bg-red-500/10 text-zinc-500 hover:text-red-400">
+              <i class="ph ph-trash"></i>
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function removeTrack(idx) {
+      state.tracks.splice(idx, 1);
+      mergeAllTracks();
+      renderTracksList();
+      triggerAutoSave();
+    }
+
+    // ==== CORTE E EXTRAÇÃO DE SELEÇÃO ====
+    function cutSelection() {
+      if (!state.audioBuffer || state.selection.start >= state.selection.end) {
+        alert("Selecione um trecho na forma de onda para cortar.");
+        return;
+      }
+
+      const ctx = getAudioContext();
+      const buffer = state.audioBuffer;
+      const sr = buffer.sampleRate;
+      const startSample = Math.floor(state.selection.start * sr);
+      const endSample = Math.floor(state.selection.end * sr);
+      const cutLength = endSample - startSample;
+      const newLength = buffer.length - cutLength;
+
+      if (newLength <= 0) return;
+
+      let newBuffer = ctx.createBuffer(buffer.numberOfChannels, newLength, sr);
+
+      for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+        let oldData = buffer.getChannelData(ch);
+        let newData = newBuffer.getChannelData(ch);
+
+        newData.set(oldData.subarray(0, startSample), 0);
+        newData.set(oldData.subarray(endSample), startSample);
+      }
+
+      state.audioBuffer = newBuffer;
+      state.selection = { start: 0, end: 0 };
+      updateDurationUI();
+      drawWaveform();
+      triggerAutoSave();
+    }
+
+    function keepOnlySelection() {
+      if (!state.audioBuffer || state.selection.start >= state.selection.end) {
+        alert("Selecione um trecho na forma de onda para extrair.");
+        return;
+      }
+
+      const ctx = getAudioContext();
+      const buffer = state.audioBuffer;
+      const sr = buffer.sampleRate;
+      const startSample = Math.floor(state.selection.start * sr);
+      const endSample = Math.floor(state.selection.end * sr);
+      const newLength = endSample - startSample;
+
+      let newBuffer = ctx.createBuffer(buffer.numberOfChannels, newLength, sr);
+
+      for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+        let oldData = buffer.getChannelData(ch);
+        let newData = newBuffer.getChannelData(ch);
+        newData.set(oldData.subarray(startSample, endSample), 0);
+      }
+
+      state.audioBuffer = newBuffer;
+      state.selection = { start: 0, end: 0 };
+      updateDurationUI();
+      drawWaveform();
+      triggerAutoSave();
+    }
+
+    // ==== NORMALIZAÇÃO DE VOLUME ====
+    function normalizeVolume() {
+      if (!state.audioBuffer) return;
+
+      const buffer = state.audioBuffer;
+      let maxPeak = 0;
+
+      for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+        const data = buffer.getChannelData(ch);
+        for (let i = 0; i < data.length; i++) {
+          const abs = Math.abs(data[i]);
+          if (abs > maxPeak) maxPeak = abs;
+        }
+      }
+
+      if (maxPeak > 0 && maxPeak < 1.0) {
+        const gain = 1.0 / maxPeak;
+        for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+          const data = buffer.getChannelData(ch);
+          for (let i = 0; i < data.length; i++) {
+            data[i] *= gain;
+          }
+        }
+        drawWaveform();
+        alert("Volume normalizado para 0 dB!");
+        triggerAutoSave();
+      }
+    }
+
+    // ==== REMOÇÃO DE SILÊNCIO ====
+    function removeSilence() {
+      if (!state.audioBuffer) return;
+
+      const ctx = getAudioContext();
+      const buffer = state.audioBuffer;
+      const sr = buffer.sampleRate;
+      const threshold = 0.01; // ~ -40dB
+      const minSilenceSamples = sr * 0.3; // Mínimo 300ms de silêncio
+
+      const chData = buffer.getChannelData(0);
+      const keepIndices = [];
+
+      let silenceCount = 0;
+      for (let i = 0; i < chData.length; i++) {
+        if (Math.abs(chData[i]) < threshold) {
+          silenceCount++;
+        } else {
+          if (silenceCount > minSilenceSamples) {
+            // Remove o silêncio acumulado
+          } else {
+            // Mantém silêncio curto
+            for (let s = i - silenceCount; s < i; s++) {
+              if (s >= 0) keepIndices.push(s);
+            }
+          }
+          silenceCount = 0;
+          keepIndices.push(i);
+        }
+      }
+
+      if (keepIndices.length === 0) return;
+
+      let newBuffer = ctx.createBuffer(buffer.numberOfChannels, keepIndices.length, sr);
+
+      for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+        let oldData = buffer.getChannelData(ch);
+        let newData = newBuffer.getChannelData(ch);
+        for (let idx = 0; idx < keepIndices.length; idx++) {
+          newData[idx] = oldData[keepIndices[idx]];
+        }
+      }
+
+      state.audioBuffer = newBuffer;
+      updateDurationUI();
+      drawWaveform();
+      triggerAutoSave();
+    }
+
+    // ==== DESENHO DA FORMA DE ONDA (CANVAS) ====
+    function drawWaveform() {
+      canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (!state.audioBuffer) {
+        canvasCtx.fillStyle = '#27272a';
+        canvasCtx.font = '12px Inter, sans-serif';
+        canvasCtx.textAlign = 'center';
+        canvasCtx.fillText('Nenhum áudio carregado. Importe uma faixa acima.', canvas.width / 2, canvas.height / 2);
+        return;
+      }
+
+      const buffer = state.audioBuffer;
+      const data = buffer.getChannelData(0);
+      const step = Math.ceil(data.length / canvas.width);
+      const amp = canvas.height / 2;
+
+      canvasCtx.fillStyle = '#a855f7';
+      canvasCtx.beginPath();
+
+      for (let i = 0; i < canvas.width; i++) {
+        let min = 1.0, max = -1.0;
+        for (let j = 0; j < step; j++) {
+          const datum = data[i * step + j];
+          if (datum < min) min = datum;
+          if (datum > max) max = datum;
+        }
+
+        const y1 = (1 + min) * amp;
+        const y2 = (1 + max) * amp;
+        canvasCtx.fillRect(i, y1, 1, Math.max(1, y2 - y1));
+      }
+
+      updateOverlayUI();
+    }
+
+    // ==== SELEÇÃO INTERATIVA COM O MOUSE ====
+    function setupSelectionEvents() {
+      canvas.addEventListener('mousedown', (e) => {
+        if (!state.audioBuffer) return;
+        const rect = canvas.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const pct = clickX / canvas.width;
+
+        state.isSelecting = true;
+        state.selection.start = pct * state.audioBuffer.duration;
+        state.selection.end = state.selection.start;
+
+        updateOverlayUI();
+      });
+
+      canvas.addEventListener('mousemove', (e) => {
+        if (!state.isSelecting || !state.audioBuffer) return;
+        const rect = canvas.getBoundingClientRect();
+        const currentX = e.clientX - rect.left;
+        const pct = Math.max(0, Math.min(1, currentX / canvas.width));
+
+        state.selection.end = pct * state.audioBuffer.duration;
+        updateOverlayUI();
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (state.isSelecting) {
+          state.isSelecting = false;
+          if (state.selection.start > state.selection.end) {
+            const temp = state.selection.start;
+            state.selection.start = state.selection.end;
+            state.selection.end = temp;
+          }
+        }
+      });
+    }
+
+    function updateOverlayUI() {
+      const overlay = document.getElementById('selection-overlay');
+      if (!state.audioBuffer || state.selection.start === state.selection.end) {
+        overlay.classList.add('hidden');
+        return;
+      }
+
+      const dur = state.audioBuffer.duration;
+      const leftPct = (state.selection.start / dur) * 100;
+      const widthPct = ((state.selection.end - state.selection.start) / dur) * 100;
+
+      overlay.style.left = `${leftPct}%`;
+      overlay.style.width = `${widthPct}%`;
+      overlay.classList.remove('hidden');
+    }
+
+    function clearSelection() {
+      state.selection = { start: 0, end: 0 };
+      updateOverlayUI();
+    }
+
+    // ==== CONTROLES DE REPRODUÇÃO (PLAY/PAUSE) ====
+    function togglePlayPause() {
+      if (!state.audioBuffer) return;
+      if (state.isPlaying) stopPlayback();
+      else startPlayback();
+    }
+
+    function startPlayback() {
+      const ctx = getAudioContext();
+      if (sourceNode) sourceNode.stop();
+
+      sourceNode = ctx.createBufferSource();
+      sourceNode.buffer = state.audioBuffer;
+      sourceNode.connect(ctx.destination);
+
+      let startOffset = state.selection.start > 0 ? state.selection.start : 0;
+      sourceNode.start(0, startOffset);
+      state.isPlaying = true;
+
+      const startTime = ctx.currentTime - startOffset;
+
+      function updatePlayhead() {
+        if (!state.isPlaying) return;
+        const current = ctx.currentTime - startTime;
+        state.currentTime = current;
+
+        if (current >= state.audioBuffer.duration) {
+          stopPlayback();
+          return;
+        }
+
+        const pct = (current / state.audioBuffer.duration) * 100;
+        document.getElementById('playhead').style.left = `${pct}%`;
+        document.getElementById('timecode-display').innerText = `${formatTimecode(current)} / ${formatTimecode(state.audioBuffer.duration)}`;
+
+        animationFrameId = requestAnimationFrame(updatePlayhead);
+      }
+
+      animationFrameId = requestAnimationFrame(updatePlayhead);
+      document.getElementById('btn-play-pause').innerHTML = '<i class="ph-bold ph-pause"></i>';
+    }
+
+    function stopPlayback() {
+      if (sourceNode) {
+        sourceNode.stop();
+        sourceNode = null;
+      }
+      state.isPlaying = false;
+      cancelAnimationFrame(animationFrameId);
+      document.getElementById('btn-play-pause').innerHTML = '<i class="ph-bold ph-play"></i>';
+    }
+
+    function updateDurationUI() {
+      const dur = state.audioBuffer ? state.audioBuffer.duration : 0;
+      document.getElementById('total-duration-badge').innerText = formatTimecode(dur);
+      document.getElementById('timecode-display').innerText = `00:00.0 / ${formatTimecode(dur)}`;
+    }
+
+    // ==== EXPORTAÇÃO & DOWNLOAD (WAV / WEBM) ====
+    function exportAudioModal() {
+      if (!state.audioBuffer) {
+        alert("Nenhum áudio carregado para exportar.");
+        return;
+      }
+      document.getElementById('exp-fmt-label').innerText = state.outputFormat;
+      document.getElementById('exp-dur-label').innerText = formatTimecode(state.audioBuffer.duration);
+      document.getElementById('modal-export').classList.remove('hidden');
+    }
+
+    function closeExportModal() { document.getElementById('modal-export').classList.add('hidden'); }
+
+    function processAndDownloadAudio() {
+      if (!state.audioBuffer) return;
+
+      const wavBlob = audioBufferToWavBlob(state.audioBuffer);
+      const link = document.createElement('a');
+      link.download = `${state.projectName}.${state.outputFormat}`;
+      link.href = URL.createObjectURL(wavBlob);
+      link.click();
+
+      closeExportModal();
+    }
+
+    // Converte AudioBuffer para Blob WAV nativo
+    function audioBufferToWavBlob(buffer) {
+      const numOfChan = buffer.numberOfChannels;
+      const length = buffer.length * numOfChan * 2 + 44;
+      const out = new DataView(new ArrayBuffer(length));
+      let channels = [], sampleRate = buffer.sampleRate, offset = 0, pos = 0;
+
+      function setUint16(data) { out.setUint16(pos, data, true); pos += 2; }
+      function setUint32(data) { out.setUint32(pos, data, true); pos += 4; }
+
+      setUint32(0x46464952); // "RIFF"
+      setUint32(length - 8); // file length - 8
+      setUint32(0x45564157); // "WAVE"
+      setUint32(0x20746d66); // "fmt " chunk
+      setUint32(16); // length = 16
+      setUint16(1); // PCM (uncompressed)
+      setUint16(numOfChan);
+      setUint32(sampleRate);
+      setUint32(sampleRate * 2 * numOfChan); // avg. bytes/sec
+      setUint16(numOfChan * 2); // block-align
+      setUint16(16); // 16-bit
+      setUint32(0x61746164); // "data" chunk
+      setUint32(length - pos - 4);
+
+      for (let i = 0; i < buffer.numberOfChannels; i++) channels.push(buffer.getChannelData(i));
+
+      while (offset < buffer.length) {
+        for (let i = 0; i < numOfChan; i++) {
+          let sample = Math.max(-1, Math.min(1, channels[i][offset]));
+          sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
+          out.setInt16(pos, sample, true);
+          pos += 2;
+        }
+        offset++;
+      }
+
+      return new Blob([out], { type: 'audio/wav' });
+    }
+
+    // ==== PERSISTÊNCIA & SUPABASE STORAGE ====
+    function triggerAutoSave() {
+      updateSyncStatus("Digitando...");
+      clearTimeout(state.autoSaveTimer);
+      state.autoSaveTimer = setTimeout(() => {
+        saveToLocalStorageCache();
+        if (state.userId) saveToCloud();
+        else updateSyncStatus("Salvo localmente");
+      }, 1200);
+    }
+
+    function saveToLocalStorageCache() {
+      const serializableTracks = state.tracks.map(t => ({ id: t.id, name: t.name }));
+      const payload = {
+        name: state.projectName,
+        outputFormat: state.outputFormat,
+        tracks: serializableTracks
+      };
+      localStorage.setItem('audio_project_active', JSON.stringify(payload));
+    }
+
+    function loadFromLocalStorageCache() {
+      const cached = localStorage.getItem('audio_project_active');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        state.projectName = parsed.name || state.projectName;
+        state.outputFormat = parsed.outputFormat || 'wav';
+
+        document.getElementById('project-title').value = state.projectName;
+        document.getElementById('select-output-format').value = state.outputFormat;
+      }
+    }
+
+    async function saveToCloud() {
+      if (!state.userId) return;
+      updateSyncStatus("Salvando na nuvem...");
+
+      try {
+        const serializableTracks = state.tracks.map(t => ({ id: t.id, name: t.name }));
+
+        // Caso haja um áudio editado, envia o arquivo WAV final para o Supabase Storage
+        let filePath = null;
+        if (state.audioBuffer) {
+          const wavBlob = audioBufferToWavBlob(state.audioBuffer);
+          filePath = `${state.userId}/${crypto.randomUUID()}_${state.projectName}.wav`;
+
+          const { error: uploadErr } = await dbClient.storage
+            .from('audio-files')
+            .upload(filePath, wavBlob, { upsert: true });
+
+          if (uploadErr) console.warn("Aviso de upload:", uploadErr.message);
+        }
+
+        const payload = {
+          user_id: state.userId,
+          name: state.projectName,
+          output_format: state.outputFormat,
+          file_path: filePath,
+          settings: { tracks: serializableTracks }
+        };
+
+        if (state.projectId) payload.id = state.projectId;
+
+        const { data, error } = await dbClient.from('audio_projects').upsert(payload).select().single();
+        if (error) throw error;
+
+        state.projectId = data.id;
+        updateSyncStatus("Sincronizado");
+      } catch (err) {
+        updateSyncStatus("Erro na nuvem");
+      }
+    }
+
+    async function toggleProjectsModal(show) {
+      const modal = document.getElementById('modal-projects');
+      modal.classList.toggle('hidden', !show);
+
+      if (show && state.userId) {
+        const { data } = await dbClient.from('audio_projects').select('*').is('deleted_at', null).order('updated_at', { ascending: false });
+        const list = document.getElementById('projects-list');
+
+        if (!data || data.length === 0) {
+          list.innerHTML = `<p class="text-xs text-zinc-500 text-center py-6">Nenhum projeto salvo encontrado.</p>`;
+          return;
+        }
+
+        list.innerHTML = data.map(p => `
+          <div onclick="restoreProject(${JSON.stringify(p).replace(/"/g, '&quot;')})" class="p-3 rounded-xl border border-matte-border bg-white/[0.02] hover:bg-white/[0.05] cursor-pointer flex items-center justify-between">
+            <div>
+              <h4 class="text-xs font-bold text-white truncate max-w-[200px]">${p.name}</h4>
+              <span class="text-[10px] text-zinc-500 uppercase font-bold">${p.output_format} • ${new Date(p.updated_at).toLocaleDateString()}</span>
+            </div>
+            <i class="ph ph-waveform text-purple-400"></i>
+          </div>
+        `).join('');
+      }
+    }
+
+    function restoreProject(p) {
+      state.projectId = p.id;
+      state.projectName = p.name;
+      state.outputFormat = p.output_format || 'wav';
+
+      document.getElementById('project-title').value = p.name;
+      document.getElementById('select-output-format').value = state.outputFormat;
+
+      toggleProjectsModal(false);
+    }
+
+    // Auxiliares
+    function formatTimecode(secs) {
+      const m = Math.floor(secs / 60).toString().padStart(2, '0');
+      const s = (secs % 60).toFixed(1).padStart(4, '0');
+      return `${m}:${s}`;
+    }
+
+    function updateSyncStatus(msg) {
+      document.getElementById('sync-status').innerHTML = `<i class="ph-fill ph-check-circle text-purple-400"></i> ${msg}`;
+    }
+  </script>
+</body>
+</html>

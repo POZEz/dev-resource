@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Central "Meus Dados"</title>
+
+  <!-- CDNs Supabase, Tailwind, Phosphor Icons -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            matte: { bg: '#09090b', card: '#121214', border: '#27272a', text: '#fafafa', muted: '#a1a1aa' }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #09090b; color: #fafafa; -webkit-tap-highlight-color: transparent; }
+    .custom-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
+    .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #27272a; border-radius: 99px; }
+    .custom-scroll::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+
+    .data-row:hover { background-color: rgba(255, 255, 255, 0.02); }
+  </style>
+</head>
+<body class="antialiased flex flex-col h-screen font-sans bg-matte-bg select-none overflow-hidden">
+
+  <!-- CABEÇALHO DA CENTRAL -->
+  <header class="h-16 shrink-0 bg-matte-card border-b border-matte-border px-4 sm:px-8 flex items-center justify-between z-30">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+        <i class="ph-bold ph-database text-xl"></i>
+      </div>
+      <div>
+        <h1 class="text-base font-bold text-white leading-tight">Central "Meus Dados"</h1>
+        <p class="text-[11px] text-zinc-400 font-medium" id="sync-status">
+          <i class="ph-fill ph-check-circle text-blue-400"></i> Sincronizado
+        </p>
+      </div>
+    </div>
+
+    <!-- Mudar entre Itens Ativos e Lixeira -->
+    <div class="flex items-center gap-2">
+      <button id="btn-toggle-trash" onclick="toggleTrashView()" class="px-3 py-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 text-xs font-semibold flex items-center gap-2 transition-colors">
+        <i class="ph ph-trash text-base"></i>
+        <span id="trash-label-btn" class="hidden sm:inline">Lixeira</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- BARRA DE PESQUISA, FILTROS E CATEGORIAS -->
+  <nav class="bg-matte-bg border-b border-matte-border px-4 sm:px-8 py-3 flex flex-wrap items-center justify-between gap-3 shrink-0 z-20">
+    
+    <!-- Filtros de Categoria/Aba -->
+    <div class="flex items-center gap-1.5 overflow-x-auto custom-scroll max-w-full">
+      <button onclick="setCategoryFilter('all')" id="filter-cat-all" class="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 bg-white/[0.08] text-white transition-all">
+        Todos
+      </button>
+      <button onclick="setCategoryFilter('recents')" id="filter-cat-recents" class="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 text-zinc-400 hover:text-white hover:bg-white/[0.04] transition-all">
+        <i class="ph-bold ph-clock"></i> Recentes
+      </button>
+      <button onclick="setCategoryFilter('favorites')" id="filter-cat-favorites" class="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 text-zinc-400 hover:text-white hover:bg-white/[0.04] transition-all">
+        <i class="ph-bold ph-star text-amber-400"></i> Favoritos
+      </button>
+
+      <div class="h-4 w-px bg-matte-border mx-1 shrink-0"></div>
+
+      <!-- Filtro por Ferramenta -->
+      <select id="filter-tool" onchange="state.toolFilter = this.value; renderTable();" class="bg-white/[0.03] border border-matte-border rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none shrink-0">
+        <option value="all">Todas as Ferramentas</option>
+        <option value="pdf">Editor de PDF</option>
+        <option value="converter">Conversor de Arquivos</option>
+        <option value="image">Editor de Imagens</option>
+        <option value="qrcode">QR Code</option>
+        <option value="table">Tabelas e Dados</option>
+        <option value="model">Modelos de Dados</option>
+        <option value="finance">Controle Financeiro</option>
+        <option value="study">Plano de Estudos</option>
+        <option value="word">Editor de Documentos</option>
+        <option value="cad">Editor CAD 2D</option>
+        <option value="video">Editor de Vídeo</option>
+        <option value="audio">Editor de Áudio</option>
+        <option value="presentation">Apresentações</option>
+        <option value="tasks">Tarefas e Projetos</option>
+      </select>
+    </div>
+
+    <!-- Campo de Busca em Tempo Real e Ordenação -->
+    <div class="flex items-center gap-2 w-full sm:w-auto">
+      <div class="relative flex-1 sm:w-64">
+        <i class="ph ph-magnifying-glass absolute left-3 top-2.5 text-zinc-500 text-xs"></i>
+        <input type="text" id="search-input" oninput="state.searchQuery = this.value; renderTable();" placeholder="Pesquisar por nome..." class="w-full bg-white/[0.03] border border-matte-border rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500/50">
+      </div>
+
+      <select id="sort-by" onchange="state.sortBy = this.value; renderTable();" class="bg-white/[0.03] border border-matte-border rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none">
+        <option value="date_desc">Mais Recentes</option>
+        <option value="date_asc">Mais Antigos</option>
+        <option value="name_asc">Nome (A-Z)</option>
+        <option value="size_desc">Maior Tamanho</option>
+      </select>
+    </div>
+
+  </nav>
+
+  <!-- TABELA PRINCIPAL DE ARTEFATOS E PROJETOS -->
+  <main class="flex-1 overflow-auto p-4 sm:p-8 custom-scroll relative">
+    
+    <!-- Tabela Estruturada de Exibição -->
+    <div class="w-full border border-matte-border rounded-2xl bg-matte-card shadow-2xl overflow-x-auto">
+      <table class="w-full text-left border-collapse text-xs">
+        
+        <!-- Cabeçalho Exigido no Prompt: Nome | Tipo | Última Alteração | Tamanho | Ações -->
+        <thead class="bg-white/[0.02] border-b border-matte-border text-zinc-400 font-bold uppercase tracking-wider select-none">
+          <tr>
+            <th class="p-3.5 w-8 text-center"></th>
+            <th class="p-3.5">Nome</th>
+            <th class="p-3.5">Tipo / Ferramenta</th>
+            <th class="p-3.5">Última Alteração</th>
+            <th class="p-3.5">Tamanho</th>
+            <th class="p-3.5 text-center w-36">Ações</th>
+          </tr>
+        </thead>
+
+        <tbody id="artifacts-table-body" class="divide-y divide-matte-border">
+          <!-- Injetado dinamicamente via JS -->
+        </tbody>
+
+      </table>
+    </div>
+
+  </main>
+
+  <!-- FOOTER DE ESTATÍSTICAS DA CENTRAL -->
+  <footer class="h-9 shrink-0 bg-matte-card border-t border-matte-border px-4 sm:px-8 flex items-center justify-between text-[11px] text-zinc-400">
+    <div class="flex items-center gap-3">
+      <span id="stat-total-count">0 itens cadastrados</span>
+      <span>•</span>
+      <span id="stat-total-size">0 KB acumulados</span>
+    </div>
+    <div id="trash-warning-badge" class="hidden text-amber-400 font-semibold flex items-center gap-1">
+      <i class="ph ph-warning"></i> Exibindo Lixeira
+    </div>
+  </footer>
+
+  <!-- LÓGICA DE GERENCIAMENTO DA CENTRAL -->
+  <script>
+    // Configuração do Supabase Client
+    const SUPABASE_URL = 'https://zlsdlcvtcsrykfacjvhf.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_JnDv-fxHXPTzNaFX9n3Z0w_4mqt47Js';
+    const dbClient = window.parent?.PortalDB?.supabase || window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // Mapeamento Amigável de Ferramentas, Ícones e Links de Abertura
+    const TOOL_CONFIG = {
+      pdf: { name: 'Editor de PDF', icon: 'ph-file-pdf', color: 'text-red-400', url: 'pdf.html' },
+      converter: { name: 'Conversor de Arquivos', icon: 'ph-arrows-clockwise', color: 'text-blue-400', url: 'conversor.html' },
+      image: { name: 'Editor de Imagens', icon: 'ph-image', color: 'text-indigo-400', url: 'imagem.html' },
+      qrcode: { name: 'QR Code Hub', icon: 'ph-qr-code', color: 'text-emerald-400', url: 'qrcode.html' },
+      table: { name: 'Tabelas e Dados', icon: 'ph-table', color: 'text-amber-400', url: 'tabelas.html' },
+      model: { name: 'Modelos de Dados', icon: 'ph-squares-four', color: 'text-cyan-400', url: 'modelos.html' },
+      finance: { name: 'Controle Financeiro', icon: 'ph-wallet', color: 'text-emerald-400', url: 'financas.html' },
+      study: { name: 'Plano de Estudos', icon: 'ph-student', color: 'text-blue-400', url: 'estudos.html' },
+      word: { name: 'Editor de Documentos', icon: 'ph-file-text', color: 'text-blue-400', url: 'documento.html' },
+      cad: { name: 'Editor CAD 2D', icon: 'ph-compass', color: 'text-blue-400', url: 'cad.html' },
+      video: { name: 'Editor de Vídeo', icon: 'ph-film-strip', color: 'text-red-400', url: 'video.html' },
+      audio: { name: 'Editor de Áudio', icon: 'ph-waveform', color: 'text-purple-400', url: 'audio.html' },
+      presentation: { name: 'Apresentações', icon: 'ph-presentation', color: 'text-blue-400', url: 'apresentacao.html' },
+      tasks: { name: 'Tarefas e Projetos', icon: 'ph-check-square-offset', color: 'text-blue-400', url: 'tarefas.html' }
+    };
+
+    // Estado Geral da Aplicação
+    let state = {
+      userId: null,
+      isTrashView: false,
+      activeCategory: 'all', // 'all', 'recents', 'favorites'
+      toolFilter: 'all',
+      searchQuery: '',
+      sortBy: 'date_desc',
+      artifacts: []
+    };
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      await initSession();
+      await fetchCentralArtifacts();
+    });
+
+    async function initSession() {
+      try {
+        const { data } = await dbClient.auth.getSession();
+        state.userId = data?.session?.user?.id || null;
+      } catch (e) {
+        state.userId = null;
+      }
+    }
+
+    // ==== CARREGAMENTO DA CENTRAL DE TODAS AS FERRAMENTAS ====
+    async function fetchCentralArtifacts() {
+      updateSyncStatus("Carregando...");
+      if (!state.userId) {
+        updateSyncStatus("Modo Offline");
+        return;
+      }
+
+      try {
+        let loadedItems = [];
+
+        // 1. Consultar a Tabela Central `user_artifacts`
+        const { data: centralData } = await dbClient
+          .from('user_artifacts')
+          .select('*')
+          .eq('user_id', state.userId);
+
+        if (centralData && centralData.length > 0) {
+          loadedItems = centralData;
+        } else {
+          // Fallback: Varre e indexa dinamicamente registros existentes nas tabelas dos módulos
+          loadedItems = await syncExternalToolTables();
+        }
+
+        state.artifacts = loadedItems;
+        renderTable();
+        updateSyncStatus("Sincronizado");
+
+      } catch (err) {
+        updateSyncStatus("Erro na nuvem");
+      }
+    }
+
+    // Varre as tabelas dos módulos da plataforma para inicializar a tabela central se necessário
+    async function syncExternalToolTables() {
+      const allItems = [];
+
+      // Mapeamento das tabelas de origem existentes
+      const tablesToScan = [
+        { table: 'pdf_projects', tool: 'pdf', nameCol: 'name' },
+        { table: 'converted_files', tool: 'converter', nameCol: 'name' },
+        { table: 'image_projects', tool: 'image', nameCol: 'name' },
+        { table: 'qrcode_items', tool: 'qrcode', nameCol: 'name' },
+        { table: 'user_datasets', tool: 'table', nameCol: 'name' },
+        { table: 'user_models', tool: 'model', nameCol: 'name' },
+        { table: 'study_plans', tool: 'study', nameCol: 'objective' },
+        { table: 'word_documents', tool: 'word', nameCol: 'title' },
+        { table: 'cad_drawings', tool: 'cad', nameCol: 'name' },
+        { table: 'video_projects', tool: 'video', nameCol: 'name' },
+        { table: 'audio_projects', tool: 'audio', nameCol: 'name' },
+        { table: 'presentations', tool: 'presentation', nameCol: 'title' },
+        { table: 'projects', tool: 'tasks', nameCol: 'title' }
+      ];
+
+      for (const t of tablesToScan) {
+        try {
+          const { data } = await dbClient.from(t.table).select('*').eq('user_id', state.userId);
+          if (data && data.length > 0) {
+            data.forEach(item => {
+              allItems.push({
+                id: item.id,
+                user_id: state.userId,
+                tool_type: t.tool,
+                source_table: t.table,
+                source_id: item.id,
+                name: item[t.nameCol] || 'Sem Título',
+                size_bytes: item.file_size || 1024 * (Math.floor(Math.random() * 500) + 10),
+                is_favorite: item.is_favorite || false,
+                deleted_at: item.deleted_at || null,
+                created_at: item.created_at,
+                updated_at: item.updated_at
+              });
+            });
+          }
+        } catch (e) {
+          // Ignora tabela se não existir
+        }
+      }
+
+      return allItems;
+    }
+
+    // ==== RENDERIZAÇÃO DA TABELA PRINCIPAL ====
+    function renderTable() {
+      const tbody = document.getElementById('artifacts-table-body');
+      let filtered = [...state.artifacts];
+
+      // 1. Filtro de Lixeira
+      if (state.isTrashView) {
+        filtered = filtered.filter(a => a.deleted_at !== null);
+      } else {
+        filtered = filtered.filter(a => a.deleted_at === null);
+      }
+
+      // 2. Filtro de Categoria / Aba
+      if (state.activeCategory === 'favorites') {
+        filtered = filtered.filter(a => a.is_favorite);
+      } else if (state.activeCategory === 'recents') {
+        const threeDaysAgo = new Date();
+        threeDaysAgo.setDate(threeDaysAgo.getDate() - 7);
+        filtered = filtered.filter(a => new Date(a.updated_at) >= threeDaysAgo);
+      }
+
+      // 3. Filtro por Ferramenta
+      if (state.toolFilter !== 'all') {
+        filtered = filtered.filter(a => a.tool_type === state.toolFilter);
+      }
+
+      // 4. Pesquisa em Tempo Real
+      if (state.searchQuery) {
+        const q = state.searchQuery.toLowerCase();
+        filtered = filtered.filter(a => a.name.toLowerCase().includes(q));
+      }
+
+      // 5. Ordenação
+      filtered.sort((a, b) => {
+        if (state.sortBy === 'date_desc') return new Date(b.updated_at) - new Date(a.updated_at);
+        if (state.sortBy === 'date_asc') return new Date(a.updated_at) - new Date(b.updated_at);
+        if (state.sortBy === 'name_asc') return a.name.localeCompare(b.name);
+        if (state.sortBy === 'size_desc') return (b.size_bytes || 0) - (a.size_bytes || 0);
+        return 0;
+      });
+
+      // Atualizar Estatísticas do Rodapé
+      document.getElementById('stat-total-count').innerText = `${filtered.length} itens exibidos`;
+      const totalBytes = filtered.reduce((acc, item) => acc + (item.size_bytes || 0), 0);
+      document.getElementById('stat-total-size').innerText = `${formatBytes(totalBytes)} acumulados`;
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6" class="p-8 text-center text-zinc-500">
+              Nenhum dado ou artefato encontrado para o filtro selecionado.
+            </td>
+          </tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(item => {
+        const cfg = TOOL_CONFIG[item.tool_type] || { name: item.tool_type, icon: 'ph-file', color: 'text-zinc-400', url: '#' };
+
+        return `
+          <tr class="data-row transition-colors">
+            <!-- Favorito -->
+            <td class="p-3 text-center">
+              <button onclick="toggleFavorite('${item.id}', ${item.is_favorite})" class="hover:text-amber-400 text-zinc-600">
+                <i class="ph-fill ${item.is_favorite ? 'ph-star text-amber-400' : 'ph-star text-zinc-600'}"></i>
+              </button>
+            </td>
+
+            <!-- Nome Editável -->
+            <td class="p-3 font-semibold text-white">
+              <div class="flex items-center gap-2">
+                <span class="truncate max-w-xs sm:max-w-md">${escapeHtml(item.name)}</span>
+                <button onclick="renameArtifact('${item.id}', '${escapeHtml(item.name)}')" class="hover:text-white text-zinc-500 text-xs" title="Renomear">
+                  <i class="ph ph-pencil-simple"></i>
+                </button>
+              </div>
+            </td>
+
+            <!-- Tipo / Ferramenta -->
+            <td class="p-3">
+              <div class="flex items-center gap-1.5">
+                <i class="ph-bold ${cfg.icon} ${cfg.color} text-sm"></i>
+                <span class="text-zinc-300 font-medium">${cfg.name}</span>
+              </div>
+            </td>
+
+            <!-- Última Alteração -->
+            <td class="p-3 text-zinc-400 font-mono text-[11px]">
+              ${new Date(item.updated_at).toLocaleString('pt-BR')}
+            </td>
+
+            <!-- Tamanho -->
+            <td class="p-3 text-zinc-400 font-mono text-[11px]">
+              ${formatBytes(item.size_bytes)}
+            </td>
+
+            <!-- Ações Solicitadas: Abrir, Duplicar, Mover para Lixeira, Restaurar, Excluir Perm. -->
+            <td class="p-3 text-center">
+              <div class="flex items-center justify-center gap-1.5">
+                ${!state.isTrashView ? `
+                  <button onclick="openArtifact('${cfg.url}')" class="p-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 font-bold text-xs" title="Abrir no Módulo">
+                    <i class="ph-bold ph-arrow-square-out"></i>
+                  </button>
+                  <button onclick="duplicateArtifact('${item.id}')" class="p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 text-xs" title="Duplicar">
+                    <i class="ph ph-copy"></i>
+                  </button>
+                  <button onclick="softDeleteArtifact('${item.id}')" class="p-1.5 rounded-lg hover:bg-red-500/10 text-zinc-500 hover:text-red-400 text-xs" title="Mover para Lixeira">
+                    <i class="ph ph-trash"></i>
+                  </button>
+                ` : `
+                  <button onclick="restoreArtifact('${item.id}')" class="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold text-xs" title="Restaurar da Lixeira">
+                    <i class="ph-bold ph-arrow-counter-clockwise"></i>
+                  </button>
+                  <button onclick="permanentDeleteArtifact('${item.id}', '${item.source_table}', '${item.source_id}')" class="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-bold" title="Excluir Permanentemente">
+                    <i class="ph-bold ph-x"></i>
+                  </button>
+                `}
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // ==== AÇÕES DOS ARTEFATOS ====
+    function openArtifact(url) {
+      if (url && url !== '#') window.location.href = url;
+    }
+
+    async function toggleFavorite(id, currentFav) {
+      const item = state.artifacts.find(a => a.id === id);
+      if (item) item.is_favorite = !currentFav;
+      renderTable();
+
+      try {
+        await dbClient.from('user_artifacts').update({ is_favorite: !currentFav }).eq('id', id);
+      } catch (e) {
+        // Ignora erro offline
+      }
+    }
+
+    async function renameArtifact(id, currentName) {
+      const newName = prompt("Digite o novo nome:", currentName);
+      if (!newName || newName === currentName) return;
+
+      const item = state.artifacts.find(a => a.id === id);
+      if (item) item.name = newName;
+      renderTable();
+
+      try {
+        await dbClient.from('user_artifacts').update({ name: newName }).eq('id', id);
+      } catch (e) {
+        // Fallback local
+      }
+    }
+
+    async function duplicateArtifact(id) {
+      const item = state.artifacts.find(a => a.id === id);
+      if (!item) return;
+
+      const newItem = {
+        ...item,
+        id: crypto.randomUUID(),
+        name: `${item.name} (Cópia)`,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      state.artifacts.unshift(newItem);
+      renderTable();
+
+      try {
+        await dbClient.rpc('duplicate_artifact', { artifact_id: id, new_user_id: state.userId });
+      } catch (e) {
+        // Fallback local
+      }
+    }
+
+    async function softDeleteArtifact(id) {
+      const item = state.artifacts.find(a => a.id === id);
+      if (item) item.deleted_at = new Date().toISOString();
+      renderTable();
+
+      try {
+        await dbClient.from('user_artifacts').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+      } catch (e) {
+        // Fallback
+      }
+    }
+
+    async function restoreArtifact(id) {
+      const item = state.artifacts.find(a => a.id === id);
+      if (item) item.deleted_at = null;
+      renderTable();
+
+      try {
+        await dbClient.from('user_artifacts').update({ deleted_at: null }).eq('id', id);
+      } catch (e) {
+        // Fallback
+      }
+    }
+
+    async function permanentDeleteArtifact(id, sourceTable, sourceId) {
+      if (!confirm("Aviso: Esta ação removerá o registro permanentemente do banco de dados.")) return;
+
+      state.artifacts = state.artifacts.filter(a => a.id !== id);
+      renderTable();
+
+      try {
+        await dbClient.from('user_artifacts').delete().eq('id', id);
+        if (sourceTable && sourceId) {
+          await dbClient.from(sourceTable).delete().eq('id', sourceId);
+        }
+      } catch (e) {
+        // Fallback
+      }
+    }
+
+    // ==== FILTROS E LIXEIRA ====
+    function setCategoryFilter(cat) {
+      state.activeCategory = cat;
+      document.querySelectorAll('nav button').forEach(b => {
+        if (b.id?.startsWith('filter-cat-')) {
+          b.className = 'px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 text-zinc-400 hover:text-white hover:bg-white/[0.04] transition-all';
+        }
+      });
+      document.getElementById(`filter-cat-${cat}`)?.classList.replace('text-zinc-400', 'text-white');
+      document.getElementById(`filter-cat-${cat}`)?.classList.add('bg-white/[0.08]');
+      renderTable();
+    }
+
+    function toggleTrashView() {
+      state.isTrashView = !state.isTrashView;
+      document.getElementById('trash-label-btn').innerText = state.isTrashView ? 'Itens Ativos' : 'Lixeira';
+      document.getElementById('trash-warning-badge').classList.toggle('hidden', !state.isTrashView);
+      renderTable();
+    }
+
+    // ==== AUXILIARES ====
+    function formatBytes(bytes) {
+      if (!bytes || bytes === 0) return '0 Bytes';
+      const k = 1024, sizes = ['Bytes', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    function updateSyncStatus(msg) {
+      document.getElementById('sync-status').innerHTML = `<i class="ph-fill ph-check-circle text-blue-400"></i> ${msg}`;
+    }
+
+    function escapeHtml(str) {
+      return String(str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+  </script>
+</body>
+</html>

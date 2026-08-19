@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Editor CAD 2D</title>
+
+  <!-- CDNs Supabase, html2pdf.js, Tailwind & Phosphor Icons -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            matte: { bg: '#09090b', card: '#121214', border: '#27272a', text: '#fafafa', muted: '#a1a1aa' }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #09090b; color: #fafafa; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+    .custom-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
+    .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #27272a; border-radius: 99px; }
+    .custom-scroll::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+    
+    #cad-canvas { cursor: crosshair; background-color: #09090b; display: block; width: 100%; height: 100%; }
+    .tool-active { background-color: rgba(59, 130, 246, 0.15) !important; border-color: rgba(59, 130, 246, 0.4) !important; color: #60a5fa !important; }
+  </style>
+</head>
+<body class="antialiased flex flex-col h-screen font-sans bg-matte-bg select-none">
+
+  <!-- CABEÇALHO PRINCIPAL DA APLICAÇÃO -->
+  <header class="h-14 shrink-0 bg-matte-card border-b border-matte-border px-4 flex items-center justify-between z-30">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+        <i class="ph-bold ph-compass text-lg"></i>
+      </div>
+      <div>
+        <input type="text" id="project-title" value="Desenho Técnico Sem Título" onchange="state.name = this.value; triggerAutoSave();" class="bg-transparent font-bold text-sm text-white focus:outline-none focus:border-b border-blue-500 max-w-[180px] sm:max-w-xs truncate" placeholder="Nome do Desenho CAD">
+        <div class="flex items-center gap-2 text-[10px] text-zinc-400">
+          <span id="sync-status"><i class="ph-fill ph-check-circle text-blue-400"></i> Pronto</span>
+          <span>•</span>
+          <span id="coords-info">X: 0 | Y: 0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ações e Modais -->
+    <div class="flex items-center gap-2">
+      <button onclick="toggleDrawingsModal(true)" class="p-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+        <i class="ph ph-folder text-sm"></i>
+        <span class="hidden sm:inline">Desenhos</span>
+      </button>
+      <button id="btn-save-cloud" onclick="saveToCloud()" class="p-2 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+        <i class="ph ph-cloud-arrow-up text-sm"></i>
+        <span class="hidden sm:inline">Salvar</span>
+      </button>
+
+      <!-- Menu Exportar -->
+      <div class="relative group">
+        <button class="px-3 py-1.5 rounded-lg bg-white text-black hover:bg-zinc-200 text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors">
+          <i class="ph-bold ph-download-simple text-sm"></i>
+          <span>Exportar</span>
+        </button>
+        <div class="absolute right-0 top-full mt-1 w-36 bg-matte-card border border-matte-border rounded-xl shadow-2xl hidden group-hover:flex flex-col p-1 z-50">
+          <button onclick="exportPNG()" class="px-3 py-2 text-left text-xs text-zinc-300 hover:text-white hover:bg-white/[0.05] rounded-lg flex items-center gap-2">
+            <i class="ph ph-image text-base text-cyan-400"></i> PNG
+          </button>
+          <button onclick="exportSVG()" class="px-3 py-2 text-left text-xs text-zinc-300 hover:text-white hover:bg-white/[0.05] rounded-lg flex items-center gap-2">
+            <i class="ph ph-file-code text-base text-emerald-400"></i> Vetor SVG
+          </button>
+          <button onclick="exportPDF()" class="px-3 py-2 text-left text-xs text-zinc-300 hover:text-white hover:bg-white/[0.05] rounded-lg flex items-center gap-2">
+            <i class="ph ph-file-pdf text-base text-red-400"></i> PDF
+          </button>
+          <button onclick="exportDXF()" class="px-3 py-2 text-left text-xs text-zinc-300 hover:text-white hover:bg-white/[0.05] rounded-lg flex items-center gap-2">
+            <i class="ph ph-bounding-box text-base text-purple-400"></i> DXF (CAD)
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- BARRA DE FERRAMENTAS CAD -->
+  <nav class="bg-matte-bg border-b border-matte-border px-4 py-2 flex items-center justify-between gap-2 overflow-x-auto custom-scroll z-20">
+    <div class="flex items-center gap-1 shrink-0">
+      <!-- Modos de Desenho -->
+      <button onclick="setTool('select')" id="btn-tool-select" class="tool-btn px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 tool-active border border-transparent">
+        <i class="ph ph-cursor-text text-sm"></i> Selecionar
+      </button>
+      <button onclick="setTool('line')" id="btn-tool-line" class="tool-btn px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 text-zinc-400 hover:text-white border border-transparent">
+        <i class="ph ph-line-segment text-sm"></i> Linha
+      </button>
+      <button onclick="setTool('polyline')" id="btn-tool-polyline" class="tool-btn px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 text-zinc-400 hover:text-white border border-transparent">
+        <i class="ph ph-polyline text-sm"></i> Polilinha
+      </button>
+      <button onclick="setTool('rect')" id="btn-tool-rect" class="tool-btn px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 text-zinc-400 hover:text-white border border-transparent">
+        <i class="ph ph-square text-sm"></i> Retângulo
+      </button>
+      <button onclick="setTool('circle')" id="btn-tool-circle" class="tool-btn px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 text-zinc-400 hover:text-white border border-transparent">
+        <i class="ph ph-circle text-sm"></i> Círculo
+      </button>
+      <button onclick="setTool('arc')" id="btn-tool-arc" class="tool-btn px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 text-zinc-400 hover:text-white border border-transparent">
+        <i class="ph ph-vector-three text-sm"></i> Arco
+      </button>
+      <button onclick="setTool('text')" id="btn-tool-text" class="tool-btn px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 text-zinc-400 hover:text-white border border-transparent">
+        <i class="ph ph-text-t text-sm"></i> Texto
+      </button>
+      <button onclick="setTool('dimension')" id="btn-tool-dimension" class="tool-btn px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 text-zinc-400 hover:text-white border border-transparent">
+        <i class="ph ph-ruler text-sm"></i> Cota
+      </button>
+    </div>
+
+    <!-- Ajustes de Precisão e Modificação -->
+    <div class="flex items-center gap-2 shrink-0 border-l border-matte-border pl-3">
+      <button onclick="toggleGrid()" id="btn-toggle-grid" class="p-1.5 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs font-bold flex items-center gap-1" title="Alternar Grade">
+        <i class="ph ph-grid-four text-sm"></i> Grade
+      </button>
+      <button onclick="toggleSnap()" id="btn-toggle-snap" class="p-1.5 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs font-bold flex items-center gap-1" title="Atração Snap">
+        <i class="ph ph-magnet text-sm"></i> Snap
+      </button>
+      <button onclick="toggleOrtho()" id="btn-toggle-ortho" class="p-1.5 rounded-lg bg-white/[0.04] border border-matte-border text-zinc-400 hover:text-white text-xs font-bold flex items-center gap-1" title="Ortogonal (90°)">
+        <i class="ph ph-angle text-sm"></i> Orto
+      </button>
+
+      <div class="h-4 w-px bg-matte-border mx-1"></div>
+
+      <!-- Desfazer / Refazer / Excluir -->
+      <button onclick="undo()" class="p-1.5 rounded hover:bg-white/[0.05] text-zinc-300" title="Desfazer (Ctrl+Z)"><i class="ph ph-arrow-u-up-left"></i></button>
+      <button onclick="redo()" class="p-1.5 rounded hover:bg-white/[0.05] text-zinc-300" title="Refazer (Ctrl+Y)"><i class="ph ph-arrow-u-up-right"></i></button>
+      <button onclick="deleteSelected()" class="p-1.5 rounded hover:bg-red-500/10 text-red-400" title="Excluir Selecionado (Delete)"><i class="ph ph-trash"></i></button>
+      <button onclick="copySelected()" class="p-1.5 rounded hover:bg-white/[0.05] text-zinc-300" title="Duplicar Objeto"><i class="ph ph-copy"></i></button>
+    </div>
+  </nav>
+
+  <!-- ÁREA DE CANVAS CAD PRINCIPAL -->
+  <main class="flex-1 relative overflow-hidden bg-matte-bg">
+    <canvas id="cad-canvas"></canvas>
+
+    <!-- Controls Overlay Zoom e Fit -->
+    <div class="absolute bottom-4 right-4 bg-matte-card/80 border border-matte-border rounded-xl p-1.5 flex items-center gap-1 shadow-2xl backdrop-blur-sm z-10">
+      <button onclick="zoomCanvas(1.2)" class="p-1.5 rounded hover:bg-white/[0.08] text-zinc-300"><i class="ph ph-magnifying-glass-plus"></i></button>
+      <span id="zoom-level-text" class="text-[11px] font-mono font-bold text-zinc-300 w-12 text-center">100%</span>
+      <button onclick="zoomCanvas(0.8)" class="p-1.5 rounded hover:bg-white/[0.08] text-zinc-300"><i class="ph ph-magnifying-glass-minus"></i></button>
+      <button onclick="resetZoomPan()" class="p-1.5 rounded hover:bg-white/[0.08] text-blue-400 text-xs font-bold" title="Enquadrar Desenho">Centralizar</button>
+    </div>
+  </main>
+
+  <!-- MODAL DE DESENHOS SALVOS NA NUVEM -->
+  <div id="modal-drawings" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-lg shadow-2xl flex flex-col max-h-[80vh]">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3 mb-4">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="ph ph-compass text-blue-400 text-lg"></i> Meus Desenhos CAD
+        </h3>
+        <button onclick="toggleDrawingsModal(false)" class="text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
+      </div>
+      <div id="drawings-list" class="flex-1 overflow-y-auto space-y-2 custom-scroll pr-1">
+        <p class="text-xs text-zinc-500 text-center py-6">Carregando desenhos salvos...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- MOTOR VETORIAL CAD 2D -->
+  <script>
+    // Inicialização do Supabase Client
+    const SUPABASE_URL = 'https://zlsdlcvtcsrykfacjvhf.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_JnDv-fxHXPTzNaFX9n3Z0w_4mqt47Js';
+    const dbClient = window.parent?.PortalDB?.supabase || window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // Estado da Aplicação CAD
+    let state = {
+      docId: null,
+      name: 'Desenho Técnico Sem Título',
+      version: 1,
+      userId: null,
+      objects: [], // Lista estruturada vetorial de objetos
+      undoStack: [],
+      redoStack: [],
+      activeTool: 'select', // 'select', 'line', 'polyline', 'rect', 'circle', 'arc', 'text', 'dimension'
+      selectedObjectIndex: -1,
+      
+      // Transformações de Visualização (Pan e Zoom)
+      zoom: 1.0,
+      panX: 0,
+      panY: 0,
+      isPanning: false,
+      panStartX: 0,
+      panStartY: 0,
+
+      // Configurações CAD
+      gridSize: 20,
+      showGrid: true,
+      snapToGrid: true,
+      orthoMode: false,
+
+      // Estado do Traçado de Desenho
+      isDrawing: false,
+      points: [], // Pontos temporários durante o desenho do objeto ativo
+      autoSaveTimer: null
+    };
+
+    let canvas, ctx;
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      canvas = document.getElementById('cad-canvas');
+      ctx = canvas.getContext('2d');
+      resizeCanvas();
+      
+      window.addEventListener('resize', resizeCanvas);
+      setupCanvasEvents();
+
+      await initSession();
+      loadFromLocalStorageCache();
+      redraw();
+    });
+
+    async function initSession() {
+      try {
+        const { data } = await dbClient.auth.getSession();
+        state.userId = data?.session?.user?.id || null;
+      } catch (e) {
+        state.userId = null;
+      }
+    }
+
+    function resizeCanvas() {
+      canvas.width = canvas.parentElement.clientWidth;
+      canvas.height = canvas.parentElement.clientHeight;
+      redraw();
+    }
+
+    // ==== MUDANÇA DE FERRAMENTAS E GRID ====
+    function setTool(toolName) {
+      state.activeTool = toolName;
+      state.points = [];
+      state.isDrawing = false;
+      document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('tool-active'));
+      document.getElementById(`btn-tool-${toolName}`)?.classList.add('tool-active');
+      redraw();
+    }
+
+    function toggleGrid() {
+      state.showGrid = !state.showGrid;
+      document.getElementById('btn-toggle-grid').classList.toggle('bg-blue-500/10', state.showGrid);
+      redraw();
+    }
+
+    function toggleSnap() {
+      state.snapToGrid = !state.snapToGrid;
+      document.getElementById('btn-toggle-snap').classList.toggle('bg-blue-500/10', state.snapToGrid);
+    }
+
+    function toggleOrtho() {
+      state.orthoMode = !state.orthoMode;
+      document.getElementById('btn-toggle-ortho').classList.toggle('bg-blue-500/10', state.orthoMode);
+    }
+
+    // ==== TRANSFORMAÇÃO DE COORDENADAS (TELA X MUNDO CAD) ====
+    function screenToWorld(sx, sy) {
+      let wx = (sx - state.panX) / state.zoom;
+      let wy = (sy - state.panY) / state.zoom;
+
+      if (state.snapToGrid) {
+        wx = Math.round(wx / state.gridSize) * state.gridSize;
+        wy = Math.round(wy / state.gridSize) * state.gridSize;
+      }
+
+      return { x: wx, y: wy };
+    }
+
+    function worldToScreen(wx, wy) {
+      return {
+        x: wx * state.zoom + state.panX,
+        y: wy * state.zoom + state.panY
+      };
+    }
+
+    // ==== EVENTOS DE MOUSE & MOUSE DRAG ====
+    function setupCanvasEvents() {
+      canvas.addEventListener('mousedown', (e) => {
+        if (e.button === 1 || e.shiftKey) { // Pan com Botão do Meio ou Shift + Click
+          state.isPanning = true;
+          state.panStartX = e.clientX - state.panX;
+          state.panStartY = e.clientY - state.panY;
+          return;
+        }
+
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        let pt = screenToWorld(mouseX, mouseY);
+
+        // Aplicação de Modo Orto (linhas estritamente em 0, 90, 180, 270 deg)
+        if (state.orthoMode && state.points.length > 0) {
+          const last = state.points[state.points.length - 1];
+          if (Math.abs(pt.x - last.x) > Math.abs(pt.y - last.y)) {
+            pt.y = last.y;
+          } else {
+            pt.x = last.x;
+          }
+        }
+
+        if (state.activeTool === 'select') {
+          selectObjectAt(pt.x, pt.y);
+          return;
+        }
+
+        // Lógica de Criação de Formas
+        saveStateForUndo();
+        state.isDrawing = true;
+        state.points.push(pt);
+
+        if (['line', 'rect', 'circle', 'dimension'].includes(state.activeTool)) {
+          if (state.points.length === 2) {
+            commitObject();
+          }
+        } else if (state.activeTool === 'arc') {
+          if (state.points.length === 3) {
+            commitObject();
+          }
+        } else if (state.activeTool === 'text') {
+          const str = prompt("Texto do elemento CAD:");
+          if (str) {
+            state.objects.push({ type: 'text', x: pt.x, y: pt.y, text: str });
+            triggerAutoSave();
+          }
+          state.points = [];
+          state.isDrawing = false;
+        }
+
+        redraw();
+      });
+
+      canvas.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        if (state.isPanning) {
+          state.panX = e.clientX - state.panStartX;
+          state.panY = e.clientY - state.panStartY;
+          redraw();
+          return;
+        }
+
+        const wpt = screenToWorld(mouseX, mouseY);
+        document.getElementById('coords-info').innerText = `X: ${Math.round(wpt.x)} | Y: ${Math.round(wpt.y)}`;
+
+        if (state.isDrawing) {
+          redraw();
+          drawPreview(wpt);
+        }
+      });
+
+      canvas.addEventListener('mouseup', () => { state.isPanning = false; });
+      
+      canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
+        zoomCanvas(zoomFactor);
+      }, { passive: false });
+
+      // Clique Duplo para finalizar Polilinhas
+      canvas.addEventListener('dblclick', () => {
+        if (state.activeTool === 'polyline' && state.points.length > 1) {
+          commitObject();
+        }
+      });
+    }
+
+    // ==== CRIAÇÃO E SALVAMENTO DE OBJETOS CAD ====
+    function commitObject() {
+      const p = state.points;
+      let obj = null;
+
+      if (state.activeTool === 'line') {
+        obj = { type: 'line', x1: p[0].x, y1: p[0].y, x2: p[1].x, y2: p[1].y };
+      } else if (state.activeTool === 'polyline') {
+        obj = { type: 'polyline', points: [...p] };
+      } else if (state.activeTool === 'rect') {
+        obj = { type: 'rect', x: Math.min(p[0].x, p[1].x), y: Math.min(p[0].y, p[1].y), width: Math.abs(p[1].x - p[0].x), height: Math.abs(p[1].y - p[0].y) };
+      } else if (state.activeTool === 'circle') {
+        const r = Math.hypot(p[1].x - p[0].x, p[1].y - p[0].y);
+        obj = { type: 'circle', cx: p[0].x, cy: p[0].y, r: r };
+      } else if (state.activeTool === 'arc') {
+        obj = { type: 'arc', x1: p[0].x, y1: p[0].y, x2: p[1].x, y2: p[1].y, x3: p[2].x, y3: p[2].y };
+      } else if (state.activeTool === 'dimension') {
+        const dist = Math.hypot(p[1].x - p[0].x, p[1].y - p[0].y);
+        obj = { type: 'dimension', x1: p[0].x, y1: p[0].y, x2: p[1].x, y2: p[1].y, text: `${dist.toFixed(1)} mm` };
+      }
+
+      if (obj) {
+        state.objects.push(obj);
+        triggerAutoSave();
+      }
+
+      state.points = [];
+      state.isDrawing = false;
+      redraw();
+    }
+
+    // ==== RENDERIZADOR CANVAS (REDRAW) ====
+    function redraw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.save();
+      ctx.translate(state.panX, state.panY);
+      ctx.scale(state.zoom, state.zoom);
+
+      if (state.showGrid) drawGrid();
+
+      // Renderizar Objetos Vetoriais Salvos
+      state.objects.forEach((obj, idx) => {
+        const isSelected = idx === state.selectedObjectIndex;
+        drawObject(obj, isSelected);
+      });
+
+      ctx.restore();
+    }
+
+    function drawGrid() {
+      const startX = Math.floor((-state.panX / state.zoom) / state.gridSize) * state.gridSize - state.gridSize;
+      const startY = Math.floor((-state.panY / state.zoom) / state.gridSize) * state.gridSize - state.gridSize;
+      const endX = startX + (canvas.width / state.zoom) + state.gridSize * 2;
+      const endY = startY + (canvas.height / state.zoom) + state.gridSize * 2;
+
+      ctx.strokeStyle = '#27272a';
+      ctx.lineWidth = 1 / state.zoom;
+
+      ctx.beginPath();
+      for (let x = startX; x < endX; x += state.gridSize) {
+        ctx.moveTo(x, startY);
+        ctx.lineTo(x, endY);
+      }
+      for (let y = startY; y < endY; y += state.gridSize) {
+        ctx.moveTo(startX, y);
+        ctx.lineTo(endX, y);
+      }
+      ctx.stroke();
+    }
+
+    function drawObject(obj, isSelected = false) {
+      ctx.strokeStyle = isSelected ? '#3b82f6' : '#fafafa';
+      ctx.fillStyle = isSelected ? '#3b82f6' : '#fafafa';
+      ctx.lineWidth = (isSelected ? 2.5 : 1.5) / state.zoom;
+
+      if (obj.type === 'line') {
+        ctx.beginPath();
+        ctx.moveTo(obj.x1, obj.y1);
+        ctx.lineTo(obj.x2, obj.y2);
+        ctx.stroke();
+      } else if (obj.type === 'polyline') {
+        if (!obj.points || obj.points.length < 2) return;
+        ctx.beginPath();
+        ctx.moveTo(obj.points[0].x, obj.points[0].y);
+        for (let i = 1; i < obj.points.length; i++) ctx.lineTo(obj.points[i].x, obj.points[i].y);
+        ctx.stroke();
+      } else if (obj.type === 'rect') {
+        ctx.strokeRect(obj.x, obj.y, obj.width, obj.height);
+      } else if (obj.type === 'circle') {
+        ctx.beginPath();
+        ctx.arc(obj.cx, obj.cy, obj.r, 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (obj.type === 'arc') {
+        ctx.beginPath();
+        ctx.moveTo(obj.x1, obj.y1);
+        ctx.quadraticCurveTo(obj.x2, obj.y2, obj.x3, obj.y3);
+        ctx.stroke();
+      } else if (obj.type === 'text') {
+        ctx.font = `${14 / state.zoom}px Inter, sans-serif`;
+        ctx.fillText(obj.text, obj.x, obj.y);
+      } else if (obj.type === 'dimension') {
+        // Linha de Cota
+        ctx.beginPath();
+        ctx.moveTo(obj.x1, obj.y1);
+        ctx.lineTo(obj.x2, obj.y2);
+        ctx.stroke();
+
+        // Texto da Cota
+        const mx = (obj.x1 + obj.x2) / 2;
+        const my = (obj.y1 + obj.y2) / 2;
+        ctx.font = `${11 / state.zoom}px Inter, sans-serif`;
+        ctx.fillStyle = '#60a5fa';
+        ctx.fillText(obj.text, mx, my - 5 / state.zoom);
+      }
+    }
+
+    function drawPreview(currentPt) {
+      if (state.points.length === 0) return;
+      ctx.save();
+      ctx.translate(state.panX, state.panY);
+      ctx.scale(state.zoom, state.zoom);
+
+      ctx.strokeStyle = '#60a5fa';
+      ctx.setLineDash([4 / state.zoom, 4 / state.zoom]);
+      ctx.lineWidth = 1 / state.zoom;
+
+      const first = state.points[0];
+      if (['line', 'rect', 'circle', 'dimension'].includes(state.activeTool)) {
+        ctx.beginPath();
+        ctx.moveTo(first.x, first.y);
+        ctx.lineTo(currentPt.x, currentPt.y);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    }
+
+    // ==== SELEÇÃO E MANIPULAÇÃO ====
+    function selectObjectAt(x, y) {
+      let foundIdx = -1;
+      const tol = 10 / state.zoom;
+
+      state.objects.forEach((obj, idx) => {
+        if (obj.type === 'line' || obj.type === 'dimension') {
+          if (distToSegment({ x, y }, { x: obj.x1, y: obj.y1 }, { x: obj.x2, y: obj.y2 }) < tol) foundIdx = idx;
+        } else if (obj.type === 'rect') {
+          if (x >= obj.x && x <= obj.x + obj.width && y >= obj.y && y <= obj.y + obj.height) foundIdx = idx;
+        } else if (obj.type === 'circle') {
+          if (Math.abs(Math.hypot(x - obj.cx, y - obj.cy) - obj.r) < tol) foundIdx = idx;
+        } else if (obj.type === 'text') {
+          if (Math.hypot(x - obj.x, y - obj.y) < tol * 2) foundIdx = idx;
+        }
+      });
+
+      state.selectedObjectIndex = foundIdx;
+      redraw();
+    }
+
+    function deleteSelected() {
+      if (state.selectedObjectIndex >= 0) {
+        saveStateForUndo();
+        state.objects.splice(state.selectedObjectIndex, 1);
+        state.selectedObjectIndex = -1;
+        redraw();
+        triggerAutoSave();
+      }
+    }
+
+    function copySelected() {
+      if (state.selectedObjectIndex >= 0) {
+        saveStateForUndo();
+        const orig = state.objects[state.selectedObjectIndex];
+        const copy = JSON.parse(JSON.stringify(orig));
+        
+        // Deslocar levemente a cópia
+        if (copy.x1 !== undefined) { copy.x1 += 20; copy.x2 += 20; copy.y1 += 20; copy.y2 += 20; }
+        if (copy.x !== undefined) { copy.x += 20; copy.y += 20; }
+        if (copy.cx !== undefined) { copy.cx += 20; copy.cy += 20; }
+
+        state.objects.push(copy);
+        state.selectedObjectIndex = state.objects.length - 1;
+        redraw();
+        triggerAutoSave();
+      }
+    }
+
+    // ==== DESFAZER E REFAZER ====
+    function saveStateForUndo() {
+      state.undoStack.push(JSON.stringify(state.objects));
+      state.redoStack = [];
+    }
+
+    function undo() {
+      if (state.undoStack.length > 0) {
+        state.redoStack.push(JSON.stringify(state.objects));
+        state.objects = JSON.parse(state.undoStack.pop());
+        redraw();
+        triggerAutoSave();
+      }
+    }
+
+    function redo() {
+      if (state.redoStack.length > 0) {
+        state.undoStack.push(JSON.stringify(state.objects));
+        state.objects = JSON.parse(state.redoStack.pop());
+        redraw();
+        triggerAutoSave();
+      }
+    }
+
+    function zoomCanvas(factor) {
+      state.zoom *= factor;
+      document.getElementById('zoom-level-text').innerText = `${Math.round(state.zoom * 100)}%`;
+      redraw();
+    }
+
+    function resetZoomPan() {
+      state.zoom = 1.0;
+      state.panX = 0;
+      state.panY = 0;
+      document.getElementById('zoom-level-text').innerText = "100%";
+      redraw();
+    }
+
+    // ==== EXPORTAÇÕES (PNG, SVG, PDF, DXF) ====
+    function exportPNG() {
+      const link = document.createElement('a');
+      link.download = `${state.name}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    function exportSVG() {
+      let svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}">\n`;
+      svgStr += `<rect width="100%" height="100%" fill="#09090b"/>\n`;
+
+      state.objects.forEach(obj => {
+        if (obj.type === 'line') {
+          svgStr += `<line x1="${obj.x1}" y1="${obj.y1}" x2="${obj.x2}" y2="${obj.y2}" stroke="#fafafa" stroke-width="2"/>\n`;
+        } else if (obj.type === 'rect') {
+          svgStr += `<rect x="${obj.x}" y="${obj.y}" width="${obj.width}" height="${obj.height}" fill="none" stroke="#fafafa" stroke-width="2"/>\n`;
+        } else if (obj.type === 'circle') {
+          svgStr += `<circle cx="${obj.cx}" cy="${obj.cy}" r="${obj.r}" fill="none" stroke="#fafafa" stroke-width="2"/>\n`;
+        } else if (obj.type === 'text') {
+          svgStr += `<text x="${obj.x}" y="${obj.y}" fill="#fafafa" font-size="14">${obj.text}</text>\n`;
+        }
+      });
+
+      svgStr += `</svg>`;
+      const blob = new Blob([svgStr], { type: 'image/svg+xml' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `${state.name}.svg`;
+      link.click();
+    }
+
+    function exportPDF() {
+      const opt = {
+        margin: 0,
+        filename: `${state.name}.pdf`,
+        image: { type: 'png', quality: 1 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+      };
+      html2pdf().set(opt).from(canvas).save();
+    }
+
+    function exportDXF() {
+      let dxf = "0\nSECTION\n2\nENTITIES\n";
+
+      state.objects.forEach(obj => {
+        if (obj.type === 'line') {
+          dxf += `0\nLINE\n8\n0\n10\n${obj.x1}\n20\n${obj.y1}\n11\n${obj.x2}\n21\n${obj.y2}\n`;
+        } else if (obj.type === 'circle') {
+          dxf += `0\nCIRCLE\n8\n0\n10\n${obj.cx}\n20\n${obj.cy}\n40\n${obj.r}\n`;
+        }
+      });
+
+      dxf += "0\nENDSEC\n0\nEOF\n";
+
+      const blob = new Blob([dxf], { type: 'application/dxf' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `${state.name}.dxf`;
+      link.click();
+    }
+
+    // ==== PERSISTÊNCIA & SUPABASE STORAGE / DATABASE ====
+    function triggerAutoSave() {
+      updateSyncStatus("Digitando...");
+      clearTimeout(state.autoSaveTimer);
+      state.autoSaveTimer = setTimeout(() => {
+        saveToLocalStorageCache();
+        if (state.userId) saveToCloud();
+        else updateSyncStatus("Salvo localmente");
+      }, 1000);
+    }
+
+    function saveToLocalStorageCache() {
+      const payload = {
+        name: state.name,
+        version: state.version,
+        data_json: { objects: state.objects, settings: { gridSize: state.gridSize } }
+      };
+      localStorage.setItem('cad_active', JSON.stringify(payload));
+    }
+
+    function loadFromLocalStorageCache() {
+      const cached = localStorage.getItem('cad_active');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        state.name = parsed.name || state.name;
+        state.objects = parsed.data_json?.objects || [];
+        document.getElementById('project-title').value = state.name;
+      }
+    }
+
+    async function saveToCloud() {
+      if (!state.userId) return;
+      updateSyncStatus("Salvando na nuvem...");
+
+      try {
+        const payload = {
+          user_id: state.userId,
+          name: state.name,
+          version: state.version,
+          data_json: { objects: state.objects, settings: { gridSize: state.gridSize } }
+        };
+
+        if (state.docId) payload.id = state.docId;
+
+        const { data, error } = await dbClient.from('cad_drawings').upsert(payload).select().single();
+        if (error) throw error;
+
+        state.docId = data.id;
+        updateSyncStatus("Sincronizado");
+      } catch (err) {
+        updateSyncStatus("Erro na nuvem");
+      }
+    }
+
+    async function toggleDrawingsModal(show) {
+      const modal = document.getElementById('modal-drawings');
+      modal.classList.toggle('hidden', !show);
+
+      if (show && state.userId) {
+        const { data } = await dbClient.from('cad_drawings').select('*').is('deleted_at', null).order('updated_at', { ascending: false });
+        const list = document.getElementById('drawings-list');
+
+        if (!data || data.length === 0) {
+          list.innerHTML = `<p class="text-xs text-zinc-500 text-center py-6">Nenhum desenho CAD salvo encontrado.</p>`;
+          return;
+        }
+
+        list.innerHTML = data.map(d => `
+          <div onclick="restoreDrawing(${JSON.stringify(d).replace(/"/g, '&quot;')})" class="p-3 rounded-xl border border-matte-border bg-white/[0.02] hover:bg-white/[0.05] cursor-pointer flex items-center justify-between">
+            <div>
+              <h4 class="text-xs font-bold text-white truncate max-w-[200px]">${d.name}</h4>
+              <span class="text-[10px] text-zinc-500">${d.data_json?.objects?.length || 0} objetos • ${new Date(d.updated_at).toLocaleDateString()}</span>
+            </div>
+            <i class="ph ph-compass text-blue-400"></i>
+          </div>
+        `).join('');
+      }
+    }
+
+    function restoreDrawing(doc) {
+      state.docId = doc.id;
+      state.name = doc.name;
+      state.objects = doc.data_json?.objects || [];
+      document.getElementById('project-title').value = doc.name;
+      redraw();
+      toggleDrawingsModal(false);
+    }
+
+    // Auxiliares Matemáticos
+    function distToSegment(p, v, w) {
+      const l2 = (v.x - w.x) ** 2 + (v.y - w.y) ** 2;
+      if (l2 === 0) return Math.hypot(p.x - v.x, p.y - v.y);
+      let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+      t = Math.max(0, Math.min(1, t));
+      return Math.hypot(p.x - (v.x + t * (w.x - v.x)), p.y - (v.y + t * (w.y - v.y)));
+    }
+
+    function updateSyncStatus(msg) {
+      document.getElementById('sync-status').innerHTML = `<i class="ph-fill ph-check-circle text-blue-400"></i> ${msg}`;
+    }
+  </script>
+</body>
+</html>

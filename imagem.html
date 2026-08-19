@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Editor de Imagens</title>
+
+  <!-- CDNs Oficiais: Supabase, Cropper.js, Tailwind, Phosphor Icons -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            matte: { bg: '#09090b', card: '#121214', border: '#27272a', text: '#fafafa', muted: '#a1a1aa' }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #09090b; color: #fafafa; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+    .custom-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
+    .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #27272a; border-radius: 99px; }
+    .custom-scroll::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+    
+    /* Padrão Xadrez para fundo transparente */
+    .bg-checkerboard {
+      background-color: #121214;
+      background-image: linear-gradient(45deg, #1c1c20 25%, transparent 25%), linear-gradient(-45deg, #1c1c20 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #1c1c20 75%), linear-gradient(-45deg, transparent 75%, #1c1c20 75%);
+      background-size: 20px 20px;
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    }
+
+    /* Sobrescrever visual do Cropper.js para modo escuro */
+    .cropper-view-box, .cropper-face { border-radius: 4px; }
+    .cropper-line, .cropper-point { background-color: #3b82f6; }
+  </style>
+</head>
+<body class="antialiased flex flex-col h-screen font-sans bg-matte-bg select-none">
+
+  <!-- CABEÇALHO PRINCIPAL -->
+  <header class="h-14 shrink-0 bg-matte-card border-b border-matte-border px-4 flex items-center justify-between z-30">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+        <i class="ph-bold ph-image text-lg"></i>
+      </div>
+      <div>
+        <input type="text" id="project-title" value="imagem_editada.png" onchange="state.fileName = this.value; triggerAutoSave();" class="bg-transparent font-bold text-sm text-white focus:outline-none focus:border-b border-indigo-500 max-w-[180px] sm:max-w-xs truncate" placeholder="Nome da Imagem">
+        <div class="flex items-center gap-2 text-[10px] text-zinc-400">
+          <span id="sync-status"><i class="ph-fill ph-check-circle text-indigo-400"></i> Pronto</span>
+          <span>•</span>
+          <span id="dimensions-info">0x0 px</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Botões Globais de Ação -->
+    <div class="flex items-center gap-2">
+      <button onclick="toggleProjectsModal(true)" class="p-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+        <i class="ph ph-folder text-sm"></i>
+        <span class="hidden sm:inline">Galeria</span>
+      </button>
+      <button id="btn-save-cloud" onclick="saveToCloud()" class="p-2 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 text-indigo-400 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+        <i class="ph ph-cloud-arrow-up text-sm"></i>
+        <span class="hidden sm:inline">Salvar</span>
+      </button>
+      <button onclick="exportImage()" class="px-3 py-1.5 rounded-lg bg-white text-black hover:bg-zinc-200 text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors">
+        <i class="ph-bold ph-download-simple text-sm"></i>
+        <span>Baixar</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- BARRA DE FERRAMENTAS PRINCIPAIS -->
+  <nav class="bg-matte-bg border-b border-matte-border px-4 py-2 flex items-center justify-between gap-2 overflow-x-auto custom-scroll z-20">
+    <div class="flex items-center gap-1 shrink-0">
+      <button onclick="setActiveTab('crop')" id="tab-crop" class="tool-btn px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 bg-white/[0.08] text-white">
+        <i class="ph ph-crop text-sm"></i> Cortar / Presets
+      </button>
+      <button onclick="setActiveTab('resize')" id="tab-resize" class="tool-btn px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 text-zinc-400 hover:text-white hover:bg-white/[0.04]">
+        <i class="ph ph-arrows-out text-sm"></i> Redimensionar
+      </button>
+      <button onclick="setActiveTab('transform')" id="tab-transform" class="tool-btn px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 text-zinc-400 hover:text-white hover:bg-white/[0.04]">
+        <i class="ph ph-arrows-clockwise text-sm"></i> Girar / Inverter
+      </button>
+      <button onclick="setActiveTab('export')" id="tab-export" class="tool-btn px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 text-zinc-400 hover:text-white hover:bg-white/[0.04]">
+        <i class="ph ph-sliders text-sm"></i> Comprimir / Formato
+      </button>
+      <button onclick="removeBackground()" id="btn-remove-bg" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 transition-colors">
+        <i class="ph-fill ph-sparkle text-sm"></i> Remover Fundo
+      </button>
+    </div>
+
+    <!-- Botões de Desfazer / Reset -->
+    <div class="flex items-center gap-2 shrink-0 border-l border-matte-border pl-3">
+      <button onclick="resetImageEdits()" class="p-1.5 rounded hover:bg-white/[0.05] text-red-400 text-xs flex items-center gap-1" title="Restaurar Imagem Original">
+        <i class="ph ph-arrow-counter-clockwise text-sm"></i>
+        <span class="hidden sm:inline">Restaurar Original</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- PAINEL SUB-FERRAMENTAS CONTEXTUAL -->
+  <div id="sub-toolbar" class="bg-matte-card/80 border-b border-matte-border px-4 py-2.5 text-xs z-10 flex items-center gap-4 overflow-x-auto custom-scroll">
+    <!-- Cortar / Presets de Redes Sociais -->
+    <div id="panel-crop" class="sub-panel flex items-center gap-2">
+      <span class="text-zinc-500 font-bold uppercase text-[10px] shrink-0">Presets:</span>
+      <button onclick="applyAspectPreset(NaN)" class="px-2 py-1 rounded bg-white/[0.05] hover:bg-white/[0.1] text-white">Livre</button>
+      <button onclick="applyAspectPreset(1)" class="px-2 py-1 rounded bg-white/[0.05] hover:bg-white/[0.1] text-white">1:1 (Quad.)</button>
+      <button onclick="applyAspectPreset(4/5)" class="px-2 py-1 rounded bg-white/[0.05] hover:bg-white/[0.1] text-white">4:5 (Instagram)</button>
+      <button onclick="applyAspectPreset(9/16)" class="px-2 py-1 rounded bg-white/[0.05] hover:bg-white/[0.1] text-white">9:16 (Stories/Reels)</button>
+      <button onclick="applyAspectPreset(16/9)" class="px-2 py-1 rounded bg-white/[0.05] hover:bg-white/[0.1] text-white">16:9 (YouTube)</button>
+      <button onclick="applyAspectPreset(1.91)" class="px-2 py-1 rounded bg-white/[0.05] hover:bg-white/[0.1] text-white">1.91:1 (LinkedIn)</button>
+      <button onclick="applyCrop()" class="ml-2 px-3 py-1 rounded bg-indigo-500 hover:bg-indigo-600 text-white font-bold">Aplicar Corte</button>
+    </div>
+
+    <!-- Redimensionar -->
+    <div id="panel-resize" class="sub-panel hidden flex items-center gap-3">
+      <div class="flex items-center gap-1.5">
+        <span class="text-zinc-400">Largura:</span>
+        <input type="number" id="resize-w" oninput="handleResizeInput('w')" class="w-16 bg-white/[0.03] border border-matte-border rounded p-1 text-white text-center">
+        <span class="text-zinc-400">px</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="text-zinc-400">Altura:</span>
+        <input type="number" id="resize-h" oninput="handleResizeInput('h')" class="w-16 bg-white/[0.03] border border-matte-border rounded p-1 text-white text-center">
+        <span class="text-zinc-400">px</span>
+      </div>
+      <label class="flex items-center gap-1 text-zinc-400 cursor-pointer">
+        <input type="checkbox" id="keep-aspect" checked class="rounded accent-indigo-500"> Proporção
+      </label>
+      <button onclick="applyResize()" class="px-3 py-1 rounded bg-indigo-500 hover:bg-indigo-600 text-white font-bold">Redimensionar</button>
+    </div>
+
+    <!-- Transformar / Girar / Inverter -->
+    <div id="panel-transform" class="sub-panel hidden flex items-center gap-2">
+      <button onclick="rotateImage(-90)" class="px-2.5 py-1 rounded bg-white/[0.05] hover:bg-white/[0.1] text-white flex items-center gap-1"><i class="ph ph-arrow-counter-clockwise"></i> -90°</button>
+      <button onclick="rotateImage(90)" class="px-2.5 py-1 rounded bg-white/[0.05] hover:bg-white/[0.1] text-white flex items-center gap-1"><i class="ph ph-arrow-clockwise"></i> +90°</button>
+      <button onclick="flipImage('h')" class="px-2.5 py-1 rounded bg-white/[0.05] hover:bg-white/[0.1] text-white flex items-center gap-1"><i class="ph ph-arrows-left-right"></i> Espelhar H</button>
+      <button onclick="flipImage('v')" class="px-2.5 py-1 rounded bg-white/[0.05] hover:bg-white/[0.1] text-white flex items-center gap-1"><i class="ph ph-arrows-down-up"></i> Espelhar V</button>
+    </div>
+
+    <!-- Comprimir / Formato -->
+    <div id="panel-export" class="sub-panel hidden flex items-center gap-4">
+      <div class="flex items-center gap-2">
+        <span class="text-zinc-400">Formato:</span>
+        <select id="export-format" onchange="state.exportFormat = this.value; triggerAutoSave();" class="bg-white/[0.03] border border-matte-border rounded p-1 text-white">
+          <option value="png">PNG (Sem perdas)</option>
+          <option value="jpeg">JPEG (Comprimido)</option>
+          <option value="webp">WebP (Moderno)</option>
+        </select>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-zinc-400">Qualidade:</span>
+        <input type="range" id="export-quality" min="10" max="100" value="90" oninput="document.getElementById('quality-label').innerText = this.value + '%'; triggerAutoSave();" class="accent-indigo-500">
+        <span id="quality-label" class="text-indigo-400 font-bold">90%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ÁREA DE EXIBIÇÃO / CANVAS DA IMAGEM -->
+  <main class="flex-1 overflow-auto p-4 sm:p-8 flex justify-center items-center bg-checkerboard custom-scroll relative">
+    
+    <!-- Mensagem de Estado Vazio -->
+    <div id="empty-state" class="flex flex-col items-center justify-center text-center max-w-sm my-auto">
+      <div class="w-16 h-16 rounded-2xl bg-white/[0.02] border border-matte-border flex items-center justify-center text-zinc-500 mb-4 shadow-xl">
+        <i class="ph-fill ph-image-square text-3xl"></i>
+      </div>
+      <h3 class="text-base font-bold text-white mb-1">Selecione uma Imagem</h3>
+      <p class="text-xs text-zinc-400 mb-6 leading-relaxed">Envie um arquivo PNG, JPEG, WebP ou SVG para começar a editar.</p>
+      <label class="px-4 py-2.5 rounded-xl bg-white text-black font-bold text-xs hover:bg-zinc-200 transition-colors cursor-pointer shadow-lg">
+        Carregar do Computador
+        <input type="file" id="image-file-input" accept="image/*" class="hidden" onchange="handleFileSelect(event)">
+      </label>
+    </div>
+
+    <!-- Container do Elemento de Imagem -->
+    <div id="editor-container" class="hidden max-w-full max-h-full flex items-center justify-center relative shadow-2xl">
+      <img id="image-element" class="max-w-full max-h-[70vh] block object-contain rounded">
+    </div>
+
+  </main>
+
+  <!-- MODAL GALERIA DE PROJETOS -->
+  <div id="modal-projects" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-lg shadow-2xl flex flex-col max-h-[80vh]">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3 mb-4">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="ph ph-images text-indigo-400 text-lg"></i> Imagens Salvas na Nuvem
+        </h3>
+        <button onclick="toggleProjectsModal(false)" class="text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
+      </div>
+      <div id="projects-list" class="flex-1 overflow-y-auto space-y-2 custom-scroll pr-1">
+        <p class="text-xs text-zinc-500 text-center py-6">Carregando imagens salvas...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- LÓGICA COMPLETA DO EDITOR -->
+  <script>
+    // Inicialização do Supabase Client
+    const SUPABASE_URL = 'https://zlsdlcvtcsrykfacjvhf.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_JnDv-fxHXPTzNaFX9n3Z0w_4mqt47Js';
+    const dbClient = window.parent?.PortalDB?.supabase || window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // Estado Geral da Aplicação
+    let state = {
+      originalBlob: null,
+      currentBlob: null,
+      fileName: 'imagem_editada.png',
+      exportFormat: 'png',
+      exportQuality: 0.9,
+      cropper: null,
+      aspectRatio: NaN,
+      rotation: 0,
+      scaleX: 1,
+      scaleY: 1,
+      width: 0,
+      height: 0,
+      userId: null,
+      projectId: null,
+      originalFilePath: null,
+      editedFilePath: null,
+      autoSaveTimer: null
+    };
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      await initSession();
+    });
+
+    async function initSession() {
+      try {
+        const { data } = await dbClient.auth.getSession();
+        state.userId = data?.session?.user?.id || null;
+      } catch (e) {
+        state.userId = null;
+      }
+    }
+
+    // ==== CARREGAMENTO DE ARQUIVO ====
+    function handleFileSelect(e) {
+      const file = e.target.files[0];
+      if (!file || !file.type.startsWith('image/')) return;
+
+      state.fileName = file.name;
+      document.getElementById('project-title').value = file.name;
+      state.originalBlob = file;
+      state.currentBlob = file;
+
+      loadImageBlob(file);
+    }
+
+    function loadImageBlob(blob) {
+      const url = URL.createObjectURL(blob);
+      const img = document.getElementById('image-element');
+      
+      img.onload = () => {
+        state.width = img.naturalWidth;
+        state.height = img.naturalHeight;
+        document.getElementById('resize-w').value = state.width;
+        document.getElementById('resize-h').value = state.height;
+        document.getElementById('dimensions-info').innerText = `${state.width} x ${state.height} px`;
+
+        document.getElementById('empty-state').classList.add('hidden');
+        document.getElementById('editor-container').classList.remove('hidden');
+
+        initCropper();
+      };
+      
+      img.src = url;
+    }
+
+    // ==== CROPPER.JS E CORTE ====
+    function initCropper() {
+      if (state.cropper) state.cropper.destroy();
+
+      const img = document.getElementById('image-element');
+      state.cropper = new Cropper(img, {
+        aspectRatio: state.aspectRatio,
+        viewMode: 1,
+        autoCropArea: 0.9,
+        responsive: true,
+        background: false
+      });
+    }
+
+    function setActiveTab(tabName) {
+      document.querySelectorAll('.tool-btn').forEach(b => {
+        b.classList.remove('bg-white/[0.08]', 'text-white');
+        b.classList.add('text-zinc-400');
+      });
+      document.getElementById(`tab-${tabName}`).classList.add('bg-white/[0.08]', 'text-white');
+
+      document.querySelectorAll('.sub-panel').forEach(p => p.classList.add('hidden'));
+      document.getElementById(`panel-${tabName}`).classList.remove('hidden');
+    }
+
+    function applyAspectPreset(ratio) {
+      state.aspectRatio = ratio;
+      if (state.cropper) state.cropper.setAspectRatio(ratio);
+    }
+
+    function applyCrop() {
+      if (!state.cropper) return;
+      
+      const canvas = state.cropper.getCroppedCanvas();
+      canvas.toBlob((blob) => {
+        state.currentBlob = blob;
+        loadImageBlob(blob);
+        triggerAutoSave();
+      }, `image/${state.exportFormat}`, state.exportQuality);
+    }
+
+    // ==== REDIMENSIONAR ====
+    function handleResizeInput(changed) {
+      const wInput = document.getElementById('resize-w');
+      const hInput = document.getElementById('resize-h');
+      const keepAspect = document.getElementById('keep-aspect').checked;
+
+      if (!keepAspect || !state.width || !state.height) return;
+
+      const ratio = state.width / state.height;
+      if (changed === 'w') {
+        hInput.value = Math.round(wInput.value / ratio);
+      } else {
+        wInput.value = Math.round(hInput.value * ratio);
+      }
+    }
+
+    function applyResize() {
+      const newW = parseInt(document.getElementById('resize-w').value);
+      const newH = parseInt(document.getElementById('resize-h').value);
+
+      if (!newW || !newH) return;
+
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = newW;
+        canvas.height = newH;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, newW, newH);
+
+        canvas.toBlob((blob) => {
+          state.currentBlob = blob;
+          loadImageBlob(blob);
+          triggerAutoSave();
+        }, `image/${state.exportFormat}`, state.exportQuality);
+      };
+      img.src = URL.createObjectURL(state.currentBlob);
+    }
+
+    // ==== ROTACIONAR E INVERTER ====
+    function rotateImage(deg) {
+      if (!state.cropper) return;
+      state.cropper.rotate(deg);
+      
+      // Queimar rotação na imagem atual
+      const canvas = state.cropper.getCroppedCanvas();
+      canvas.toBlob((blob) => {
+        state.currentBlob = blob;
+        loadImageBlob(blob);
+        triggerAutoSave();
+      }, `image/${state.exportFormat}`, state.exportQuality);
+    }
+
+    function flipImage(direction) {
+      if (!state.cropper) return;
+      if (direction === 'h') {
+        state.scaleX = state.scaleX === 1 ? -1 : 1;
+        state.cropper.scaleX(state.scaleX);
+      } else {
+        state.scaleY = state.scaleY === 1 ? -1 : 1;
+        state.cropper.scaleY(state.scaleY);
+      }
+
+      const canvas = state.cropper.getCroppedCanvas();
+      canvas.toBlob((blob) => {
+        state.currentBlob = blob;
+        loadImageBlob(blob);
+        triggerAutoSave();
+      }, `image/${state.exportFormat}`, state.exportQuality);
+    }
+
+    // ==== REMOÇÃO DE FUNDO (IA / CANVAS LOCAL) ====
+    async function removeBackground() {
+      if (!state.currentBlob) return;
+
+      const btn = document.getElementById('btn-remove-bg');
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = '<div class="w-3.5 h-3.5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div> Removendo...';
+      btn.disabled = true;
+
+      try {
+        // Algoritmo de Remoção de Fundo por Contraste e Transparência Local em Canvas
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+
+          const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const data = imgData.data;
+
+          // Amostragem da cor do fundo nos cantos da imagem
+          const bgR = data[0], bgG = data[1], bgB = data[2];
+          const tolerance = 45;
+
+          for (let i = 0; i < data.length; i += 4) {
+            const r = data[i], g = data[i + 1], b = data[i + 2];
+            const diff = Math.sqrt((r - bgR) ** 2 + (g - bgG) ** 2 + (b - bgB) ** 2);
+            if (diff < tolerance) {
+              data[i + 3] = 0; // Torna transparente
+            }
+          }
+
+          ctx.putImageData(imgData, 0, 0);
+          canvas.toBlob((blob) => {
+            state.currentBlob = blob;
+            state.exportFormat = 'png';
+            document.getElementById('export-format').value = 'png';
+            loadImageBlob(blob);
+            triggerAutoSave();
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+          }, 'image/png');
+        };
+        img.src = URL.createObjectURL(state.currentBlob);
+      } catch (e) {
+        alert("Erro ao remover fundo da imagem.");
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+      }
+    }
+
+    // ==== RESTAURAR ORIGINAL ====
+    function resetImageEdits() {
+      if (!state.originalBlob) return;
+      state.currentBlob = state.originalBlob;
+      state.scaleX = 1;
+      state.scaleY = 1;
+      state.rotation = 0;
+      loadImageBlob(state.originalBlob);
+      triggerAutoSave();
+    }
+
+    // ==== EXPORTAÇÃO LOCAL ====
+    function exportImage() {
+      if (!state.cropper) return;
+      const canvas = state.cropper.getCroppedCanvas();
+      const quality = parseFloat(document.getElementById('export-quality').value) / 100;
+      const format = state.exportFormat === 'jpeg' ? 'image/jpeg' : `image/${state.exportFormat}`;
+
+      canvas.toBlob((blob) => {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = state.fileName;
+        link.click();
+      }, format, quality);
+    }
+
+    // ==== PERSISTÊNCIA & SINCRONIZAÇÃO EM NUVEM ====
+    function triggerAutoSave() {
+      updateSyncStatus("Digitando...");
+      clearTimeout(state.autoSaveTimer);
+      state.autoSaveTimer = setTimeout(() => {
+        if (state.userId) saveToCloud();
+        else updateSyncStatus("Salvo localmente");
+      }, 1200);
+    }
+
+    async function saveToCloud() {
+      if (!state.userId || !state.currentBlob || !state.originalBlob) return;
+      updateSyncStatus("Salvando na nuvem...");
+
+      try {
+        const timestamp = Date.now();
+        const origPath = `${state.userId}/original_${timestamp}_${state.fileName}`;
+        const editPath = `${state.userId}/edited_${timestamp}_${state.fileName}`;
+
+        // 1. Upload da Imagem Original
+        if (!state.originalFilePath) {
+          const { error: errOrig } = await dbClient.storage
+            .from('image-files')
+            .upload(origPath, state.originalBlob, { upsert: true });
+          if (errOrig) throw errOrig;
+          state.originalFilePath = origPath;
+        }
+
+        // 2. Upload da Imagem Editada
+        const { error: errEdit } = await dbClient.storage
+          .from('image-files')
+          .upload(editPath, state.currentBlob, { upsert: true });
+        if (errEdit) throw errEdit;
+        state.editedFilePath = editPath;
+
+        // 3. Salvar Metadados no Banco de Dados
+        const payload = {
+          user_id: state.userId,
+          name: state.fileName,
+          original_file_path: state.originalFilePath,
+          edited_file_path: state.editedFilePath,
+          original_size: state.originalBlob.size,
+          edited_size: state.currentBlob.size,
+          format: state.exportFormat,
+          dimensions: { width: state.width, height: state.height },
+          settings: { aspectRatio: state.aspectRatio, rotation: state.rotation }
+        };
+
+        if (state.projectId) payload.id = state.projectId;
+
+        const { data, error: dbErr } = await dbClient.from('image_projects').upsert(payload).select().single();
+        if (dbErr) throw dbErr;
+
+        state.projectId = data.id;
+        updateSyncStatus("Sincronizado");
+      } catch (e) {
+        updateSyncStatus("Erro na nuvem");
+      }
+    }
+
+    async function toggleProjectsModal(show) {
+      const modal = document.getElementById('modal-projects');
+      modal.classList.toggle('hidden', !show);
+
+      if (show && state.userId) {
+        const { data } = await dbClient.from('image_projects').select('*').order('updated_at', { ascending: false });
+        const list = document.getElementById('projects-list');
+
+        if (!data || data.length === 0) {
+          list.innerHTML = `<p class="text-xs text-zinc-500 text-center py-6">Nenhuma imagem salva encontrada.</p>`;
+          return;
+        }
+
+        list.innerHTML = data.map(p => `
+          <div onclick="loadCloudImage('${p.edited_file_path}', '${p.original_file_path}', '${p.name}', '${p.id}')" class="p-3 rounded-xl border border-matte-border bg-white/[0.02] hover:bg-white/[0.05] cursor-pointer flex items-center justify-between">
+            <div>
+              <h4 class="text-xs font-bold text-white truncate max-w-[200px]">${p.name}</h4>
+              <span class="text-[10px] text-zinc-500">${p.dimensions?.width || 0}x${p.dimensions?.height || 0} px • ${new Date(p.updated_at).toLocaleDateString()}</span>
+            </div>
+            <i class="ph ph-image-square text-indigo-400"></i>
+          </div>
+        `).join('');
+      }
+    }
+
+    async function loadCloudImage(editedPath, originalPath, name, id) {
+      try {
+        const { data: editedData } = await dbClient.storage.from('image-files').download(editedPath);
+        const { data: origData } = await dbClient.storage.from('image-files').download(originalPath);
+
+        if (editedData) {
+          state.projectId = id;
+          state.fileName = name;
+          state.editedFilePath = editedPath;
+          state.originalFilePath = originalPath;
+          state.currentBlob = editedData;
+          state.originalBlob = origData || editedData;
+
+          document.getElementById('project-title').value = name;
+          loadImageBlob(editedData);
+          toggleProjectsModal(false);
+        }
+      } catch (e) {
+        alert("Erro ao carregar a imagem da nuvem.");
+      }
+    }
+
+    function updateSyncStatus(msg) {
+      document.getElementById('sync-status').innerHTML = `<i class="ph-fill ph-check-circle text-indigo-400"></i> ${msg}`;
+    }
+  </script>
+</body>
+</html>

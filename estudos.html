@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Plano de Estudos</title>
+
+  <!-- CDNs Supabase, Chart.js, Tailwind & Phosphor Icons -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            matte: { bg: '#09090b', card: '#121214', border: '#27272a', text: '#fafafa', muted: '#a1a1aa' }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #09090b; color: #fafafa; -webkit-tap-highlight-color: transparent; }
+    .custom-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
+    .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #27272a; border-radius: 99px; }
+    .custom-scroll::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+  </style>
+</head>
+<body class="antialiased flex flex-col min-h-screen font-sans bg-matte-bg custom-scroll select-none">
+
+  <!-- CABEÇALHO DA APLICAÇÃO -->
+  <header class="h-16 shrink-0 bg-matte-card border-b border-matte-border px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+        <i class="ph-bold ph-student text-xl"></i>
+      </div>
+      <div>
+        <input type="text" id="plan-objective-title" value="Meu Plano de Estudos" onchange="updatePlanObjective(this.value)" class="bg-transparent font-bold text-sm text-white focus:outline-none focus:border-b border-blue-500 max-w-[180px] sm:max-w-xs truncate" placeholder="Objetivo de Estudo">
+        <div class="flex items-center gap-2 text-[10px] text-zinc-400">
+          <span id="sync-status"><i class="ph-fill ph-check-circle text-blue-400"></i> Pronto</span>
+          <span>•</span>
+          <span id="daily-hours-badge">2h / dia</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ações e Modais -->
+    <div class="flex items-center gap-2">
+      <button onclick="togglePlansModal(true)" class="p-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+        <i class="ph ph-folder text-base"></i>
+        <span class="hidden sm:inline">Meus Planos</span>
+      </button>
+      <button onclick="openAiGeneratorModal()" class="px-3 py-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 text-xs font-bold flex items-center gap-1.5 transition-colors">
+        <i class="ph-fill ph-sparkle text-sm"></i>
+        <span>Gerar com IA</span>
+      </button>
+      <button onclick="openManualPlanModal()" class="px-3 py-2 rounded-xl bg-white text-black hover:bg-zinc-200 text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors">
+        <i class="ph-bold ph-plus text-sm"></i>
+        <span class="hidden sm:inline">Novo Plano</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- BARRA DE NAVEGAÇÃO INTERNA DAS SEÇÕES DE ESTUDO -->
+  <nav class="bg-matte-bg border-b border-matte-border px-4 sm:px-8 py-2.5 flex items-center gap-2 overflow-x-auto custom-scroll z-20">
+    <button onclick="switchTab('overview')" id="tab-btn-overview" class="px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 bg-white/[0.08] text-white transition-all">
+      <i class="ph-bold ph-chart-donut text-base"></i> Visão Geral & Matérias
+    </button>
+    <button onclick="switchTab('sessions')" id="tab-btn-sessions" class="px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 text-zinc-400 hover:text-white hover:bg-white/[0.04] transition-all">
+      <i class="ph-bold ph-timer text-base"></i> Sessões & Cronômetro
+    </button>
+    <button onclick="switchTab('tasks')" id="tab-btn-tasks" class="px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 text-zinc-400 hover:text-white hover:bg-white/[0.04] transition-all">
+      <i class="ph-bold ph-check-square text-base"></i> Tarefas & Cronograma
+    </button>
+  </nav>
+
+  <!-- CONTEÚDO PRINCIPAL (3 ABAS) -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-8 space-y-6 custom-scroll">
+
+    <!-- KPI CARDS GLOBAIS DE DESEMPENHO DO PLANO -->
+    <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="bg-matte-card border border-matte-border rounded-2xl p-4 flex items-center justify-between shadow-xl">
+        <div>
+          <span class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Progresso Geral</span>
+          <h4 id="kpi-progress-pct" class="text-xl font-bold text-blue-400 truncate">0%</h4>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 text-xl">
+          <i class="ph-bold ph-chart-line-up"></i>
+        </div>
+      </div>
+
+      <div class="bg-matte-card border border-matte-border rounded-2xl p-4 flex items-center justify-between shadow-xl">
+        <div>
+          <span class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Total Estudo</span>
+          <h4 id="kpi-total-time" class="text-xl font-bold text-emerald-400 truncate">0 min</h4>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-xl">
+          <i class="ph-bold ph-clock"></i>
+        </div>
+      </div>
+
+      <div class="bg-matte-card border border-matte-border rounded-2xl p-4 flex items-center justify-between shadow-xl">
+        <div>
+          <span class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Tópicos Concluídos</span>
+          <h4 id="kpi-topics-completed" class="text-xl font-bold text-purple-400 truncate">0 / 0</h4>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 text-xl">
+          <i class="ph-bold ph-book-open"></i>
+        </div>
+      </div>
+
+      <div class="bg-matte-card border border-matte-border rounded-2xl p-4 flex items-center justify-between shadow-xl">
+        <div>
+          <span class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Tarefas Pendentes</span>
+          <h4 id="kpi-tasks-pending" class="text-xl font-bold text-amber-400 truncate">0</h4>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 text-xl">
+          <i class="ph-bold ph-check-square font-bold"></i>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABA 1: VISÃO GERAL & MATÉRIAS -->
+    <section id="view-overview" class="space-y-6">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="ph-bold ph-books text-blue-400"></i> Disciplinas e Conteúdos
+        </h3>
+        <button onclick="openSubjectModal()" class="px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-matte-border text-xs font-bold text-white flex items-center gap-1.5 transition-colors">
+          <i class="ph-bold ph-plus text-xs"></i> Adicionar Matéria
+        </button>
+      </div>
+
+      <!-- GRID DE CARDS DAS MATÉRIAS -->
+      <div id="subjects-cards-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Injetado dinamicamente via JS -->
+      </div>
+    </section>
+
+    <!-- ABA 2: SESSÕES DE ESTUDO & CRONÔMETRO -->
+    <section id="view-sessions" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      
+      <!-- CRONÔMETRO DE ESTUDOS (POMODORO / LIVRE) -->
+      <div class="lg:col-span-5 bg-matte-card border border-matte-border rounded-2xl p-6 flex flex-col items-center text-center shadow-xl">
+        <h3 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Cronômetro de Estudo</h3>
+        
+        <div class="my-6">
+          <span id="timer-display" class="text-5xl font-mono font-bold text-white tracking-widest">00:00:00</span>
+        </div>
+
+        <!-- Seletor de Matéria para a Sessão -->
+        <div class="w-full text-left mb-4">
+          <label class="text-[11px] font-semibold text-zinc-400">Matéria da Sessão</label>
+          <select id="timer-subject-select" class="w-full mt-1 bg-white/[0.03] border border-matte-border rounded-xl p-2.5 text-xs text-white focus:outline-none"></select>
+        </div>
+
+        <!-- Controles do Cronômetro -->
+        <div class="flex items-center gap-3 w-full">
+          <button id="btn-timer-toggle" onclick="toggleTimer()" class="flex-1 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-xs transition-colors flex items-center justify-center gap-2">
+            <i class="ph-bold ph-play"></i> Iniciar
+          </button>
+          <button onclick="resetTimer()" class="p-3 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-matte-border text-zinc-300 text-xs">
+            <i class="ph-bold ph-arrow-counter-clockwise"></i>
+          </button>
+          <button onclick="finishSession()" class="flex-1 py-3 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs transition-colors flex items-center justify-center gap-2">
+            <i class="ph-bold ph-check"></i> Registrar
+          </button>
+        </div>
+      </div>
+
+      <!-- HISTÓRICO DE SESSÕES REGISTRADAS -->
+      <div class="lg:col-span-7 bg-matte-card border border-matte-border rounded-2xl p-6 flex flex-col gap-4 shadow-xl">
+        <h3 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+          <i class="ph-bold ph-history text-emerald-400"></i> Histórico de Estudos
+        </h3>
+        <div id="sessions-history-list" class="space-y-2 max-h-[320px] overflow-y-auto custom-scroll pr-1">
+          <!-- Injetado via JS -->
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ABA 3: TAREFAS & CRONOGRAMA -->
+    <section id="view-tasks" class="hidden space-y-6">
+      <div class="flex items-center justify-between border-b border-matte-border pb-4">
+        <div>
+          <h3 class="text-sm font-bold text-white">Tarefas e Cronograma de Revisão</h3>
+          <p class="text-xs text-zinc-400">Organize exercícios, leitura de capítulos e simulados.</p>
+        </div>
+        <button onclick="openTaskModal()" class="px-3 py-1.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-colors">
+          <i class="ph-bold ph-plus"></i> Nova Tarefa
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- TAREFAS PENDENTES -->
+        <div class="bg-matte-card border border-matte-border rounded-2xl p-5 space-y-3">
+          <h4 class="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+            <i class="ph-bold ph-clock"></i> Pendentes
+          </h4>
+          <div id="tasks-pending-list" class="space-y-2">
+            <!-- Injetado via JS -->
+          </div>
+        </div>
+
+        <!-- TAREFAS CONCLUÍDAS -->
+        <div class="bg-matte-card border border-matte-border rounded-2xl p-5 space-y-3">
+          <h4 class="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+            <i class="ph-bold ph-check-circle"></i> Concluídas
+          </h4>
+          <div id="tasks-completed-list" class="space-y-2">
+            <!-- Injetado via JS -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL IA: ENTRADA EM LINGUAGEM NATURAL -->
+  <div id="modal-ai-generator" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-lg shadow-2xl flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="ph-fill ph-sparkle text-blue-400 text-lg"></i> Gerar Plano de Estudos com IA
+        </h3>
+        <button onclick="closeAiGeneratorModal()" class="text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
+      </div>
+
+      <p class="text-xs text-zinc-400 leading-relaxed">
+        Descreva sua disponibilidade e o que deseja estudar. Exemplo:<br>
+        <span class="text-zinc-300 italic">"Tenho 2 horas por dia, quero estudar matemática, português e direito constitucional para concurso."</span>
+      </p>
+
+      <textarea id="ai-prompt-input" placeholder="Digite seu tempo disponível e as matérias..." class="w-full bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-blue-500 h-28 custom-scroll resize-none"></textarea>
+
+      <button id="btn-generate-ai" onclick="generatePlanWithAI()" class="w-full py-3 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors">
+        <i class="ph-bold ph-magic-wand"></i> Gerar Proposta de Plano
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL OBRIGATÓRIO DE REVISÃO DO PLANO GERADO PELA IA -->
+  <div id="modal-ai-review" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-2xl shadow-2xl flex flex-col gap-4 max-h-[90vh]">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3">
+        <div>
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <i class="ph-bold ph-eye text-emerald-400 text-lg"></i> Revisar Plano Gerado
+          </h3>
+          <p class="text-xs text-zinc-400">Confira e ajuste as matérias e tópicos sugeridos pela IA antes de salvar.</p>
+        </div>
+        <button onclick="closeAiReviewModal()" class="text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
+      </div>
+
+      <div id="ai-review-content" class="flex-1 overflow-y-auto space-y-4 custom-scroll pr-1">
+        <!-- Injetado via JS -->
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-3 border-t border-matte-border">
+        <button onclick="closeAiReviewModal()" class="px-4 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-xs font-semibold text-zinc-300">Descartar</button>
+        <button id="btn-confirm-save-ai" onclick="confirmSaveAIPlan()" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-xs transition-colors">
+          Aprovar e Salvar Plano
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL MEUS PLANOS SALVOS -->
+  <div id="modal-plans" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-lg shadow-2xl flex flex-col max-h-[80vh]">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3 mb-4">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="ph ph-folder text-blue-400 text-lg"></i> Meus Planos de Estudo
+        </h3>
+        <button onclick="togglePlansModal(false)" class="text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
+      </div>
+      <div id="plans-list" class="flex-1 overflow-y-auto space-y-2 custom-scroll pr-1">
+        <p class="text-xs text-zinc-500 text-center py-6">Carregando planos salvos...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL ADICIONAR MATÉRIA MANUALLMENTE -->
+  <div id="modal-subject" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-sm shadow-2xl flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3">
+        <h3 class="text-sm font-bold text-white">Nova Matéria</h3>
+        <button onclick="closeSubjectModal()" class="text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
+      </div>
+      <form onsubmit="saveSubjectManual(event)" class="space-y-3">
+        <input type="text" id="subj-name" required placeholder="Nome da Matéria" class="w-full bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white">
+        <input type="number" step="0.5" id="subj-hours" required placeholder="Horas Dedicadas" class="w-full bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white">
+        <select id="subj-priority" class="w-full bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white">
+          <option value="Alta">Prioridade Alta</option>
+          <option value="Média" selected>Prioridade Média</option>
+          <option value="Baixa">Prioridade Baixa</option>
+        </select>
+        <button type="submit" class="w-full py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs">Salvar Matéria</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL TAREFA -->
+  <div id="modal-task" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-sm shadow-2xl flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3">
+        <h3 class="text-sm font-bold text-white">Nova Tarefa</h3>
+        <button onclick="closeTaskModal()" class="text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
+      </div>
+      <form onsubmit="saveTaskManual(event)" class="space-y-3">
+        <input type="text" id="task-title" required placeholder="Título da Tarefa" class="w-full bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white">
+        <select id="task-subject-select" class="w-full bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white"></select>
+        <button type="submit" class="w-full py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs">Salvar Tarefa</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- LÓGICA DE GERENCIAMENTO DO PLANO DE ESTUDOS -->
+  <script>
+    // Inicialização do Supabase Client
+    const SUPABASE_URL = 'https://zlsdlcvtcsrykfacjvhf.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_JnDv-fxHXPTzNaFX9n3Z0w_4mqt47Js';
+    const dbClient = window.parent?.PortalDB?.supabase || window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // Chave padrão da API Gemini
+    const apiKey = "";
+
+    // Estado Geral da Aplicação
+    let state = {
+      userId: null,
+      activePlanId: null,
+      plan: null,
+      subjects: [],
+      topics: [],
+      tasks: [],
+      sessions: [],
+      proposedAIPlan: null, // Armazena plano retornado pela IA antes da aprovação
+      timerInterval: null,
+      timerSeconds: 0,
+      isTimerRunning: false
+    };
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      await initSession();
+      await loadActivePlan();
+    });
+
+    async function initSession() {
+      try {
+        const { data } = await dbClient.auth.getSession();
+        state.userId = data?.session?.user?.id || null;
+      } catch (e) {
+        state.userId = null;
+      }
+    }
+
+    // ==== NAVEGAÇÃO DE ABAS ====
+    function switchTab(tab) {
+      document.getElementById('view-overview').classList.toggle('hidden', tab !== 'overview');
+      document.getElementById('view-sessions').classList.toggle('hidden', tab !== 'sessions');
+      document.getElementById('view-tasks').classList.toggle('hidden', tab !== 'tasks');
+
+      document.querySelectorAll('nav button').forEach(b => {
+        b.className = 'px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 text-zinc-400 hover:text-white hover:bg-white/[0.04] transition-all';
+      });
+      document.getElementById(`tab-btn-${tab}`).className = 'px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 bg-white/[0.08] text-white transition-all';
+    }
+
+    // ==== CARREGAMENTO DE DADOS RELACIONAIS DO PLANO ====
+    async function loadActivePlan(planId = null) {
+      updateSyncStatus("Carregando...");
+      if (!state.userId) {
+        updateSyncStatus("Modo Offline");
+        return;
+      }
+
+      try {
+        // 1. Obter Plano Ativo ou Primeiro Disponível
+        let query = dbClient.from('study_plans').select('*').eq('user_id', state.userId).is('deleted_at', null);
+        if (planId) query = query.eq('id', planId);
+        
+        const { data: plans } = await query.order('updated_at', { ascending: false }).limit(1);
+
+        if (!plans || plans.length === 0) {
+          // Criar plano padrão inicial se nenhum existir
+          await createDefaultPlan();
+          return;
+        }
+
+        state.plan = plans[0];
+        state.activePlanId = state.plan.id;
+
+        document.getElementById('plan-objective-title').value = state.plan.objective;
+        document.getElementById('daily-hours-badge').innerText = `${state.plan.daily_hours}h / dia`;
+
+        // 2. Carregar Matérias
+        const { data: subjs } = await dbClient.from('study_subjects').select('*').eq('plan_id', state.activePlanId);
+        state.subjects = subjs || [];
+
+        // 3. Carregar Tópicos/Conteúdos
+        const subjIds = state.subjects.map(s => s.id);
+        if (subjIds.length > 0) {
+          const { data: topcs } = await dbClient.from('study_topics').select('*').in('subject_id', subjIds);
+          state.topics = topcs || [];
+        } else {
+          state.topics = [];
+        }
+
+        // 4. Carregar Tarefas
+        const { data: tsks } = await dbClient.from('study_tasks').select('*').eq('plan_id', state.activePlanId);
+        state.tasks = tsks || [];
+
+        // 5. Carregar Sessões
+        const { data: sess } = await dbClient.from('study_sessions').select('*, subject:study_subjects(name)').eq('plan_id', state.activePlanId).order('created_at', { ascending: false });
+        state.sessions = sess || [];
+
+        renderAllViews();
+        updateSyncStatus("Sincronizado");
+
+      } catch (e) {
+        updateSyncStatus("Erro na nuvem");
+      }
+    }
+
+    async function createDefaultPlan() {
+      if (!state.userId) return;
+      const { data } = await dbClient.from('study_plans').insert({
+        user_id: state.userId,
+        objective: 'Meu Primeiro Plano de Estudos',
+        daily_hours: 2.0
+      }).select().single();
+
+      if (data) loadActivePlan(data.id);
+    }
+
+    // ==== RENDERIZAÇÃO DAS SEÇÕES ====
+    function renderAllViews() {
+      renderKPIs();
+      renderSubjectsGrid();
+      renderSessionsHistory();
+      renderTasksLists();
+      populateSubjectSelects();
+    }
+
+    function renderKPIs() {
+      const totalTopics = state.topics.length;
+      const completedTopics = state.topics.filter(t => t.status === 'completed').length;
+      const progressPct = totalTopics > 0 ? Math.round((completedTopics / totalTopics) * 100) : 0;
+
+      const totalMinutes = state.sessions.reduce((acc, s) => acc + (s.duration_minutes || 0), 0);
+      const pendingTasks = state.tasks.filter(t => t.status === 'pending').length;
+
+      document.getElementById('kpi-progress-pct').innerText = `${progressPct}%`;
+      document.getElementById('kpi-total-time').innerText = `${totalMinutes} min`;
+      document.getElementById('kpi-topics-completed').innerText = `${completedTopics} / ${totalTopics}`;
+      document.getElementById('kpi-tasks-pending').innerText = pendingTasks;
+    }
+
+    function renderSubjectsGrid() {
+      const grid = document.getElementById('subjects-cards-grid');
+      if (state.subjects.length === 0) {
+        grid.innerHTML = `
+          <div class="col-span-full p-8 text-center bg-matte-card border border-matte-border rounded-2xl">
+            <p class="text-xs text-zinc-500 mb-3">Nenhuma matéria cadastrada neste plano.</p>
+            <button onclick="openSubjectModal()" class="px-3 py-1.5 bg-blue-500 text-white font-bold text-xs rounded-xl">Adicionar Matéria</button>
+          </div>`;
+        return;
+      }
+
+      grid.innerHTML = state.subjects.map(s => {
+        const subTopics = state.topics.filter(t => t.subject_id === s.id);
+        const comp = subTopics.filter(t => t.status === 'completed').length;
+        const pct = subTopics.length > 0 ? Math.round((comp / subTopics.length) * 100) : 0;
+
+        return `
+          <div class="bg-matte-card border border-matte-border rounded-2xl p-5 flex flex-col justify-between gap-4 shadow-xl">
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase ${s.priority === 'Alta' ? 'bg-red-500/10 text-red-400' : 'bg-blue-500/10 text-blue-400'}">${s.priority} Prioridade</span>
+                <span class="text-xs font-bold text-zinc-400">${s.allocated_hours}h/semana</span>
+              </div>
+              <h4 class="text-sm font-bold text-white mb-3">${s.name}</h4>
+
+              <!-- Lista de Conteúdos / Tópicos -->
+              <div class="space-y-1.5 my-3">
+                ${subTopics.map(t => `
+                  <div onclick="toggleTopicStatus('${t.id}', '${t.status}')" class="p-2 rounded-xl bg-white/[0.02] border border-matte-border hover:bg-white/[0.05] cursor-pointer flex items-center justify-between text-xs">
+                    <span class="${t.status === 'completed' ? 'line-through text-zinc-500' : 'text-zinc-300'} truncate">${t.name}</span>
+                    <i class="ph-bold ${t.status === 'completed' ? 'ph-check-circle text-emerald-400' : 'ph-circle text-zinc-600'}"></i>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+
+            <div class="pt-2 border-t border-matte-border flex items-center justify-between">
+              <button onclick="addTopicToSubject('${s.id}')" class="text-xs text-blue-400 hover:text-blue-300 font-bold flex items-center gap-1">+ Conteúdo</button>
+              <span class="text-[10px] text-zinc-500 font-bold">${pct}% Concluído</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ==== INTEGRAÇÃO COM GEMINI REST (GERAÇÃO DE PLANO + REVISÃO MANDATÓRIA) ====
+    function openAiGeneratorModal() { document.getElementById('modal-ai-generator').classList.remove('hidden'); }
+    function closeAiGeneratorModal() { document.getElementById('modal-ai-generator').classList.add('hidden'); }
+    function closeAiReviewModal() { document.getElementById('modal-ai-review').classList.add('hidden'); }
+
+    async function generatePlanWithAI() {
+      const userPrompt = document.getElementById('ai-prompt-input').value.trim();
+      if (!userPrompt) return;
+
+      const btn = document.getElementById('btn-generate-ai');
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = '<div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Processando...';
+      btn.disabled = true;
+
+      try {
+        const systemPrompt = `Você é um mentor especialista em organização de planos de estudo. Analise o pedido do usuário e gere obrigatoriamente um JSON estruturado com o schema:
+        {
+          "objective": "string",
+          "daily_hours": number,
+          "subjects": [
+            {
+              "name": "string",
+              "allocated_hours": number,
+              "priority": "Alta" | "Média" | "Baixa",
+              "topics": ["string"]
+            }
+          ]
+        }. Nunca envie textos fora do JSON.`;
+
+        const resultData = await callGeminiAPI(userPrompt, systemPrompt);
+        state.proposedAIPlan = resultData;
+
+        closeAiGeneratorModal();
+        renderAIReviewModal(resultData);
+
+      } catch (err) {
+        alert("Erro ao consultar a IA para gerar o plano.");
+      } finally {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+      }
+    }
+
+    async function callGeminiAPI(userQuery, systemPrompt) {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+      const delays = [1000, 2000, 4000, 8000, 16000];
+
+      const payload = {
+        contents: [{ parts: [{ text: userQuery }] }],
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        generationConfig: {
+          responseMimeType: "application/json"
+        }
+      };
+
+      for (let attempt = 0; attempt <= delays.length; attempt++) {
+        try {
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (!res.ok) throw new Error(`Status ${res.status}`);
+          const result = await res.json();
+          return JSON.parse(result.candidates?.[0]?.content?.parts?.[0]?.text);
+        } catch (e) {
+          if (attempt === delays.length) throw e;
+          await new Promise(resolve => setTimeout(resolve, delays[attempt]));
+        }
+      }
+    }
+
+    // EXIBE MODAL DE REVISÃO ANTES DE GRAVAR NO BANCO
+    function renderAIReviewModal(planData) {
+      const container = document.getElementById('ai-review-content');
+      document.getElementById('modal-ai-review').classList.remove('hidden');
+
+      container.innerHTML = `
+        <div class="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300">
+          <strong>Objetivo Identificado:</strong> ${planData.objective || 'Estudos gerais'}<br>
+          <strong>Carga Horária Diária:</strong> ${planData.daily_hours || 2} horas
+        </div>
+        <div class="space-y-3">
+          ${(planData.subjects || []).map((s, idx) => `
+            <div class="p-3 rounded-xl border border-matte-border bg-white/[0.02]">
+              <div class="flex items-center justify-between mb-2">
+                <h4 class="font-bold text-white text-xs">${idx + 1}. ${s.name}</h4>
+                <span class="text-[10px] text-zinc-400 font-bold">${s.allocated_hours}h/semana • Prioridade: ${s.priority}</span>
+              </div>
+              <p class="text-[11px] text-zinc-400">Conteúdos sugeridos: ${(s.topics || []).join(', ')}</p>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    // APROVAÇÃO DO USUÁRIO -> SALVA NAS TABELAS RELACIONAIS
+    async function confirmSaveAIPlan() {
+      if (!state.userId || !state.proposedAIPlan) return;
+
+      const btn = document.getElementById('btn-confirm-save-ai');
+      btn.innerHTML = '<div class="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin"></div> Salvando...';
+      btn.disabled = true;
+
+      try {
+        const planData = state.proposedAIPlan;
+
+        // 1. Criar Registro na Tabela study_plans
+        const { data: newPlan, error: pErr } = await dbClient.from('study_plans').insert({
+          user_id: state.userId,
+          objective: planData.objective || 'Plano IA',
+          daily_hours: planData.daily_hours || 2.0
+        }).select().single();
+
+        if (pErr) throw pErr;
+
+        // 2. Gravar Disciplinas e Tópicos Relacionados
+        for (const subj of (planData.subjects || [])) {
+          const { data: newSubj, error: sErr } = await dbClient.from('study_subjects').insert({
+            plan_id: newPlan.id,
+            user_id: state.userId,
+            name: subj.name,
+            allocated_hours: subj.allocated_hours || 1.0,
+            priority: subj.priority || 'Média'
+          }).select().single();
+
+          if (!sErr && newSubj) {
+            for (const topicName of (subj.topics || [])) {
+              await dbClient.from('study_topics').insert({
+                subject_id: newSubj.id,
+                user_id: state.userId,
+                name: topicName,
+                status: 'pending'
+              });
+            }
+          }
+        }
+
+        closeAiReviewModal();
+        await loadActivePlan(newPlan.id);
+
+      } catch (err) {
+        alert("Erro ao gravar plano no banco relacional.");
+      } finally {
+        btn.innerHTML = 'Aprovar e Salvar Plano';
+        btn.disabled = false;
+      }
+    }
+
+    // ==== CRONÔMETRO DE ESTUDO ====
+    function toggleTimer() {
+      const btn = document.getElementById('btn-timer-toggle');
+      if (state.isTimerRunning) {
+        clearInterval(state.timerInterval);
+        state.isTimerRunning = false;
+        btn.innerHTML = '<i class="ph-bold ph-play"></i> Continuar';
+      } else {
+        state.isTimerRunning = true;
+        btn.innerHTML = '<i class="ph-bold ph-pause"></i> Pausar';
+        state.timerInterval = setInterval(() => {
+          state.timerSeconds++;
+          updateTimerDisplay();
+        }, 1000);
+      }
+    }
+
+    function resetTimer() {
+      clearInterval(state.timerInterval);
+      state.isTimerRunning = false;
+      state.timerSeconds = 0;
+      updateTimerDisplay();
+      document.getElementById('btn-timer-toggle').innerHTML = '<i class="ph-bold ph-play"></i> Iniciar';
+    }
+
+    function updateTimerDisplay() {
+      const hrs = Math.floor(state.timerSeconds / 3600).toString().padStart(2, '0');
+      const mins = Math.floor((state.timerSeconds % 3600) / 60).toString().padStart(2, '0');
+      const secs = (state.timerSeconds % 60).toString().padStart(2, '0');
+      document.getElementById('timer-display').innerText = `${hrs}:${mins}:${secs}`;
+    }
+
+    async function finishSession() {
+      if (state.timerSeconds < 60) {
+        alert("A sessão precisa durar pelo menos 1 minuto para ser registrada.");
+        return;
+      }
+
+      const minutes = Math.round(state.timerSeconds / 60);
+      const subjectId = document.getElementById('timer-subject-select').value;
+
+      if (!state.userId || !state.activePlanId) return;
+
+      await dbClient.from('study_sessions').insert({
+        plan_id: state.activePlanId,
+        subject_id: subjectId || null,
+        user_id: state.userId,
+        duration_minutes: minutes,
+        session_date: new Date().toISOString().substring(0, 10)
+      });
+
+      resetTimer();
+      await loadActivePlan(state.activePlanId);
+    }
+
+    function renderSessionsHistory() {
+      const list = document.getElementById('sessions-history-list');
+      if (state.sessions.length === 0) {
+        list.innerHTML = `<p class="text-xs text-zinc-500 text-center py-4">Nenhuma sessão registrada.</p>`;
+        return;
+      }
+
+      list.innerHTML = state.sessions.map(s => `
+        <div class="p-2.5 rounded-xl border border-matte-border bg-white/[0.02] flex items-center justify-between text-xs">
+          <div>
+            <h5 class="font-bold text-white">${s.subject?.name || 'Sessão Geral'}</h5>
+            <span class="text-[10px] text-zinc-500">${new Date(s.session_date + 'T00:00:00').toLocaleDateString()}</span>
+          </div>
+          <span class="font-mono text-emerald-400 font-bold">${s.duration_minutes} min</span>
+        </div>
+      `).join('');
+    }
+
+    // ==== TAREFAS ====
+    function renderTasksLists() {
+      const pendingEl = document.getElementById('tasks-pending-list');
+      const completedEl = document.getElementById('tasks-completed-list');
+
+      const pend = state.tasks.filter(t => t.status === 'pending');
+      const comp = state.tasks.filter(t => t.status === 'completed');
+
+      pendingEl.innerHTML = pend.length === 0 ? `<p class="text-xs text-zinc-500">Nenhuma tarefa pendente.</p>` :
+        pend.map(t => `
+          <div onclick="toggleTaskStatus('${t.id}', 'completed')" class="p-3 rounded-xl border border-matte-border bg-white/[0.02] hover:bg-white/[0.05] cursor-pointer flex items-center justify-between text-xs">
+            <span class="text-white font-medium">${t.title}</span>
+            <i class="ph ph-circle text-zinc-500"></i>
+          </div>
+        `).join('');
+
+      completedEl.innerHTML = comp.length === 0 ? `<p class="text-xs text-zinc-500">Nenhuma tarefa concluída.</p>` :
+        comp.map(t => `
+          <div onclick="toggleTaskStatus('${t.id}', 'pending')" class="p-3 rounded-xl border border-matte-border bg-white/[0.02] hover:bg-white/[0.05] cursor-pointer flex items-center justify-between text-xs">
+            <span class="line-through text-zinc-500">${t.title}</span>
+            <i class="ph-bold ph-check-circle text-emerald-400"></i>
+          </div>
+        `).join('');
+    }
+
+    async function toggleTaskStatus(id, newStatus) {
+      await dbClient.from('study_tasks').update({ status: newStatus }).eq('id', id);
+      await loadActivePlan(state.activePlanId);
+    }
+
+    async function toggleTopicStatus(id, currentStatus) {
+      const nextStatus = currentStatus === 'completed' ? 'pending' : 'completed';
+      await dbClient.from('study_topics').update({ status: nextStatus }).eq('id', id);
+      await loadActivePlan(state.activePlanId);
+    }
+
+    // ==== MODAIS E MANIPULAÇÃO MANUALL ====
+    function openSubjectModal() { document.getElementById('modal-subject').classList.remove('hidden'); }
+    function closeSubjectModal() { document.getElementById('modal-subject').classList.add('hidden'); }
+    function openTaskModal() { document.getElementById('modal-task').classList.remove('hidden'); }
+    function closeTaskModal() { document.getElementById('modal-task').classList.add('hidden'); }
+
+    async function saveSubjectManual(e) {
+      e.preventDefault();
+      if (!state.userId || !state.activePlanId) return;
+
+      await dbClient.from('study_subjects').insert({
+        plan_id: state.activePlanId,
+        user_id: state.userId,
+        name: document.getElementById('subj-name').value.trim(),
+        allocated_hours: parseFloat(document.getElementById('subj-hours').value),
+        priority: document.getElementById('subj-priority').value
+      });
+
+      closeSubjectModal();
+      await loadActivePlan(state.activePlanId);
+    }
+
+    async function addTopicToSubject(subjId) {
+      const name = prompt("Nome do conteúdo / tópico:");
+      if (!name) return;
+
+      await dbClient.from('study_topics').insert({
+        subject_id: subjId,
+        user_id: state.userId,
+        name: name,
+        status: 'pending'
+      });
+
+      await loadActivePlan(state.activePlanId);
+    }
+
+    async function saveTaskManual(e) {
+      e.preventDefault();
+      if (!state.userId || !state.activePlanId) return;
+
+      await dbClient.from('study_tasks').insert({
+        plan_id: state.activePlanId,
+        subject_id: document.getElementById('task-subject-select').value || null,
+        user_id: state.userId,
+        title: document.getElementById('task-title').value.trim()
+      });
+
+      closeTaskModal();
+      await loadActivePlan(state.activePlanId);
+    }
+
+    function populateSubjectSelects() {
+      const opts = state.subjects.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+      document.getElementById('timer-subject-select').innerHTML = opts;
+      document.getElementById('task-subject-select').innerHTML = opts;
+    }
+
+    async function updatePlanObjective(val) {
+      if (!state.activePlanId) return;
+      await dbClient.from('study_plans').update({ objective: val }).eq('id', state.activePlanId);
+    }
+
+    async function togglePlansModal(show) {
+      const modal = document.getElementById('modal-plans');
+      modal.classList.toggle('hidden', !show);
+
+      if (show && state.userId) {
+        const { data } = await dbClient.from('study_plans').select('*').eq('user_id', state.userId).is('deleted_at', null).order('updated_at', { ascending: false });
+        const list = document.getElementById('plans-list');
+
+        if (!data || data.length === 0) {
+          list.innerHTML = `<p class="text-xs text-zinc-500 text-center py-6">Nenhum plano cadastrado.</p>`;
+          return;
+        }
+
+        list.innerHTML = data.map(p => `
+          <div onclick="loadActivePlan('${p.id}'); togglePlansModal(false);" class="p-3 rounded-xl border border-matte-border bg-white/[0.02] hover:bg-white/[0.05] cursor-pointer flex items-center justify-between">
+            <div>
+              <h4 class="text-xs font-bold text-white truncate max-w-[200px]">${p.objective}</h4>
+              <span class="text-[10px] text-zinc-500">${p.daily_hours}h/dia • ${new Date(p.updated_at).toLocaleDateString()}</span>
+            </div>
+            <i class="ph ph-student text-blue-400"></i>
+          </div>
+        `).join('');
+      }
+    }
+
+    function updateSyncStatus(msg) {
+      document.getElementById('sync-status').innerHTML = `<i class="ph-fill ph-check-circle text-blue-400"></i> ${msg}`;
+    }
+  </script>
+</body>
+</html>

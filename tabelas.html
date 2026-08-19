@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Tabelas e Organização de Dados</title>
+
+  <!-- CDNs Oficiais: Supabase, SheetJS (XLSX/CSV), Chart.js, Gemini Helper, Tailwind & Ícones -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            matte: { bg: '#09090b', card: '#121214', border: '#27272a', text: '#fafafa', muted: '#a1a1aa' }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #09090b; color: #fafafa; -webkit-tap-highlight-color: transparent; }
+    .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #27272a; border-radius: 99px; }
+    .custom-scroll::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+
+    /* Estilização das Células Editáveis da Tabela */
+    .table-cell-input {
+      background: transparent;
+      border: 1px solid transparent;
+      width: 100%;
+      padding: 0.375rem 0.5rem;
+      color: #fafafa;
+      border-radius: 0.375rem;
+      transition: all 0.15s ease;
+    }
+    .table-cell-input:focus {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: #3b82f6;
+      outline: none;
+    }
+  </style>
+</head>
+<body class="antialiased flex flex-col h-screen font-sans bg-matte-bg select-none overflow-hidden">
+
+  <!-- CABEÇALHO DA APLICAÇÃO -->
+  <header class="h-16 shrink-0 bg-matte-card border-b border-matte-border px-4 sm:px-6 flex items-center justify-between z-30">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+        <i class="ph-bold ph-table text-xl"></i>
+      </div>
+      <div>
+        <input type="text" id="dataset-name" value="Nova Tabela Sem Título" onchange="state.datasetName = this.value; triggerAutoSave();" class="bg-transparent font-bold text-sm text-white focus:outline-none focus:border-b border-amber-500 max-w-[180px] sm:max-w-xs truncate" placeholder="Nome da Tabela">
+        <div class="flex items-center gap-2 text-[10px] text-zinc-400">
+          <span id="sync-status"><i class="ph-fill ph-check-circle text-amber-400"></i> Pronto</span>
+          <span>•</span>
+          <span id="rows-count-badge">0 linhas, 0 colunas</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ações e Integração com Nuvem -->
+    <div class="flex items-center gap-2">
+      <button onclick="toggleDatasetsModal(true)" class="p-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+        <i class="ph ph-folder text-base"></i>
+        <span class="hidden sm:inline">Minhas Tabelas</span>
+      </button>
+      <button id="btn-save-cloud" onclick="saveToCloud()" class="p-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-400 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+        <i class="ph ph-cloud-arrow-up text-base"></i>
+        <span class="hidden sm:inline">Salvar</span>
+      </button>
+      
+      <!-- Menu de Exportação -->
+      <div class="relative group">
+        <button class="px-3 py-2 rounded-xl bg-white text-black hover:bg-zinc-200 text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors">
+          <i class="ph-bold ph-download-simple text-sm"></i>
+          <span>Exportar</span>
+        </button>
+        <div class="absolute right-0 top-full mt-1 w-36 bg-matte-card border border-matte-border rounded-xl shadow-2xl hidden group-hover:flex flex-col p-1 z-50">
+          <button onclick="exportCSV()" class="px-3 py-2 text-left text-xs text-zinc-300 hover:text-white hover:bg-white/[0.05] rounded-lg flex items-center gap-2">
+            <i class="ph ph-file-csv text-base text-amber-400"></i> CSV
+          </button>
+          <button onclick="exportXLSX()" class="px-3 py-2 text-left text-xs text-zinc-300 hover:text-white hover:bg-white/[0.05] rounded-lg flex items-center gap-2">
+            <i class="ph ph-file-xls text-base text-emerald-400"></i> Excel (XLSX)
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- BARRA DE FERRAMENTAS E IMPORTAÇÃO -->
+  <nav class="bg-matte-bg border-b border-matte-border px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0 z-20">
+    <div class="flex items-center gap-2 overflow-x-auto custom-scroll max-w-full">
+      <!-- Botão IA / Colar Texto Desorganizado -->
+      <button onclick="openAiImportModal()" class="px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 font-bold text-xs flex items-center gap-1.5 transition-colors shrink-0">
+        <i class="ph-fill ph-sparkle text-sm"></i>
+        <span>Transformar Texto com IA</span>
+      </button>
+
+      <!-- Importar CSV / XLSX -->
+      <label class="px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-matte-border text-zinc-300 font-medium text-xs flex items-center gap-1.5 cursor-pointer transition-colors shrink-0">
+        <i class="ph ph-upload-simple text-sm"></i>
+        <span>Importar CSV / XLSX</span>
+        <input type="file" id="file-import-input" accept=".csv, .xlsx, .xls" class="hidden" onchange="handleFileImport(event)">
+      </label>
+
+      <div class="h-4 w-px bg-matte-border mx-1 shrink-0"></div>
+
+      <!-- Estruturação de Tabela -->
+      <button onclick="addColumn()" class="px-2.5 py-1.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 text-xs font-medium flex items-center gap-1 transition-colors shrink-0">
+        <i class="ph ph-plus text-xs"></i> Coluna
+      </button>
+      <button onclick="addRow()" class="px-2.5 py-1.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 text-xs font-medium flex items-center gap-1 transition-colors shrink-0">
+        <i class="ph ph-plus text-xs"></i> Linha
+      </button>
+      <button onclick="toggleChartModal()" class="px-2.5 py-1.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 text-xs font-medium flex items-center gap-1.5 transition-colors shrink-0">
+        <i class="ph ph-chart-bar text-sm text-purple-400"></i> Gráfico
+      </button>
+      <button onclick="clearTable()" class="px-2 py-1.5 rounded-xl hover:bg-red-500/10 text-red-400 text-xs transition-colors shrink-0" title="Limpar Tudo">
+        <i class="ph ph-trash text-sm"></i>
+      </button>
+    </div>
+
+    <!-- Campo de Busca / Filtro em Tempo Real -->
+    <div class="relative min-w-[200px] w-full sm:w-auto">
+      <i class="ph ph-magnifying-glass absolute left-3 top-2.5 text-zinc-500 text-xs"></i>
+      <input type="text" id="search-filter" oninput="state.searchQuery = this.value; renderTable();" placeholder="Pesquisar registros..." class="w-full bg-white/[0.03] border border-matte-border rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500/50">
+    </div>
+  </nav>
+
+  <!-- CONTAINER DA TABELA DE DADOS -->
+  <main class="flex-1 overflow-auto p-4 sm:p-6 custom-scroll relative">
+    
+    <!-- Estado Vazio quando não houver dados -->
+    <div id="empty-state" class="hidden flex-col items-center justify-center text-center h-full max-w-sm mx-auto my-auto py-12">
+      <div class="w-16 h-16 rounded-2xl bg-white/[0.02] border border-matte-border flex items-center justify-center text-zinc-500 mb-4 shadow-xl">
+        <i class="ph-fill ph-table text-3xl"></i>
+      </div>
+      <h3 class="text-base font-bold text-white mb-1">Nenhum dado estruturado</h3>
+      <p class="text-xs text-zinc-400 mb-6 leading-relaxed">Cole um texto desorganizado para a IA extrair os campos automaticamente ou importe um arquivo CSV/XLSX.</p>
+      <button onclick="openAiImportModal()" class="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 font-bold text-black text-xs transition-colors shadow-lg shadow-amber-500/10 flex items-center gap-2">
+        <i class="ph-fill ph-sparkle"></i> Organizar Texto com IA
+      </button>
+    </div>
+
+    <!-- Tabela Interativa de Registros -->
+    <div id="table-wrapper" class="w-full overflow-x-auto border border-matte-border rounded-2xl bg-matte-card shadow-2xl">
+      <table class="w-full text-left border-collapse text-xs">
+        
+        <!-- Cabeçalho das Colunas -->
+        <thead class="bg-white/[0.02] border-b border-matte-border text-zinc-400 font-bold uppercase tracking-wider select-none" id="table-head">
+          <!-- Injetado dinamicamente via JS -->
+        </thead>
+
+        <!-- Corpo com as Linhas e Células Editáveis -->
+        <tbody class="divide-y divide-matte-border" id="table-body">
+          <!-- Injetado dinamicamente via JS -->
+        </tbody>
+
+      </table>
+    </div>
+
+  </main>
+
+  <!-- MODAL IA: TRANSFORMAR TEXTO DESORGANIZADO -->
+  <div id="modal-ai-import" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-lg shadow-2xl flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="ph-fill ph-sparkle text-amber-400 text-lg"></i> Transformar Texto Desorganizado
+        </h3>
+        <button onclick="toggleAiImportModal(false)" class="text-zinc-500 hover:text-white"><i class="ph ph-x text-base"></i></button>
+      </div>
+
+      <p class="text-xs text-zinc-400 leading-relaxed">
+        Cole frases, listas desordenadas ou dados brutos em linguagem natural. A IA irá identificar as colunas relevantes e transformar em uma tabela formatada.
+      </p>
+
+      <textarea id="ai-raw-text" placeholder="Exemplo: João vendeu 4500, Maria 6200 e Carlos 3800. Ou dados de produtos, datas e contatos..." class="w-full bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-amber-500 h-32 custom-scroll resize-none"></textarea>
+
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button onclick="toggleAiImportModal(false)" class="px-4 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-xs font-semibold text-zinc-300">Cancelar</button>
+        <button id="btn-process-ai" onclick="processTextWithAI()" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-xs font-bold text-black flex items-center gap-2 transition-colors">
+          <i class="ph-bold ph-magic-wand"></i> Processar com IA
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE GRÁFICOS -->
+  <div id="modal-chart" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-2xl shadow-2xl flex flex-col gap-4 max-h-[90vh]">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="ph ph-chart-bar text-purple-400 text-lg"></i> Gerador de Gráficos
+        </h3>
+        <button onclick="toggleChartModal(false)" class="text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div class="flex flex-col gap-1">
+          <label class="text-[11px] font-semibold text-zinc-400">Eixo X (Categorias)</label>
+          <select id="chart-x-axis" onchange="renderChart()" class="bg-white/[0.03] border border-matte-border rounded-xl p-2 text-xs text-white"></select>
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-[11px] font-semibold text-zinc-400">Eixo Y (Valores Métricos)</label>
+          <select id="chart-y-axis" onchange="renderChart()" class="bg-white/[0.03] border border-matte-border rounded-xl p-2 text-xs text-white"></select>
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-[11px] font-semibold text-zinc-400">Tipo de Gráfico</label>
+          <select id="chart-type" onchange="renderChart()" class="bg-white/[0.03] border border-matte-border rounded-xl p-2 text-xs text-white">
+            <option value="bar">Barras</option>
+            <option value="line">Linha</option>
+            <option value="pie">Pizza</option>
+            <option value="doughnut">Rosca</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Container do Canvas do Chart.js -->
+      <div class="w-full flex-1 min-h-[280px] bg-white/[0.02] border border-matte-border rounded-xl p-4 flex items-center justify-center relative">
+        <canvas id="chart-canvas"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL TABELAS SALVAS NA NUVEM -->
+  <div id="modal-datasets" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-lg shadow-2xl flex flex-col max-h-[80vh]">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3 mb-4">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="ph ph-cloud-check text-amber-400 text-lg"></i> Minhas Tabelas Salvas
+        </h3>
+        <button onclick="toggleDatasetsModal(false)" class="text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
+      </div>
+      <div id="datasets-list" class="flex-1 overflow-y-auto space-y-2 custom-scroll pr-1">
+        <p class="text-xs text-zinc-500 text-center py-6">Carregando tabelas salvas...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- LÓGICA DA APLICAÇÃO DE TABELAS -->
+  <script>
+    // Inicialização do Supabase Client
+    const SUPABASE_URL = 'https://zlsdlcvtcsrykfacjvhf.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_JnDv-fxHXPTzNaFX9n3Z0w_4mqt47Js';
+    const dbClient = window.parent?.PortalDB?.supabase || window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // Chave padrão da API Gemini obtida do ambiente de execução
+    const apiKey = "";
+
+    // Estado Geral da Aplicação
+    let state = {
+      datasetId: null,
+      datasetName: 'Nova Tabela Sem Título',
+      columns: ['Nome', 'Valor', 'Categoria'],
+      rows: [
+        { 'Nome': 'João', 'Valor': '4500', 'Categoria': 'Vendas' },
+        { 'Nome': 'Maria', 'Valor': '6200', 'Categoria': 'Vendas' },
+        { 'Nome': 'Carlos', 'Valor': '3800', 'Categoria': 'Vendas' }
+      ],
+      sortColumn: null,
+      sortDirection: 'asc', // 'asc' | 'desc'
+      searchQuery: '',
+      userId: null,
+      chartInstance: null,
+      autoSaveTimer: null
+    };
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      await initSession();
+      loadFromLocalStorageCache();
+      renderTable();
+    });
+
+    async function initSession() {
+      try {
+        const { data } = await dbClient.auth.getSession();
+        state.userId = data?.session?.user?.id || null;
+      } catch (e) {
+        state.userId = null;
+      }
+    }
+
+    // ==== RENDERIZAÇÃO DA TABELA DE DADOS ====
+    function renderTable() {
+      const headEl = document.getElementById('table-head');
+      const bodyEl = document.getElementById('table-body');
+      const emptyEl = document.getElementById('empty-state');
+      const wrapperEl = document.getElementById('table-wrapper');
+
+      if (state.columns.length === 0) {
+        wrapperEl.classList.add('hidden');
+        emptyEl.classList.remove('hidden');
+        emptyEl.classList.add('flex');
+        document.getElementById('rows-count-badge').innerText = '0 linhas, 0 colunas';
+        return;
+      }
+
+      emptyEl.classList.add('hidden');
+      emptyEl.classList.remove('flex');
+      wrapperEl.classList.remove('hidden');
+
+      // 1. Renderizar Cabeçalho com Ordenação e Edição de Nome de Coluna
+      headEl.innerHTML = `
+        <tr>
+          <th class="p-3 w-10 text-center border-r border-matte-border text-zinc-600">#</th>
+          ${state.columns.map((col, colIdx) => `
+            <th class="p-2 border-r border-matte-border min-w-[150px]">
+              <div class="flex items-center justify-between gap-2">
+                <input type="text" value="${escapeHtml(col)}" onchange="renameColumn(${colIdx}, this.value)" class="bg-transparent font-bold text-xs text-amber-400 focus:outline-none focus:border-b border-amber-500 w-full truncate">
+                <div class="flex items-center gap-1 shrink-0">
+                  <button onclick="sortDataBy('${col}')" class="hover:text-white text-zinc-500 p-0.5" title="Ordenar por esta coluna">
+                    <i class="ph ph-arrows-down-up text-xs"></i>
+                  </button>
+                  <button onclick="removeColumn(${colIdx})" class="hover:text-red-400 text-zinc-600 p-0.5" title="Excluir Coluna">
+                    <i class="ph ph-x text-xs"></i>
+                  </button>
+                </div>
+              </div>
+            </th>
+          `).join('')}
+          <th class="p-2 w-12 text-center">Ação</th>
+        </tr>
+      `;
+
+      // 2. Filtrar e Ordenar Registros
+      let filteredRows = [...state.rows];
+
+      if (state.searchQuery) {
+        const q = state.searchQuery.toLowerCase();
+        filteredRows = filteredRows.filter(row => {
+          return Object.values(row).some(val => String(val).toLowerCase().includes(q));
+        });
+      }
+
+      if (state.sortColumn) {
+        filteredRows.sort((a, b) => {
+          let valA = a[state.sortColumn] ?? '';
+          let valB = b[state.sortColumn] ?? '';
+          
+          const numA = Number(valA);
+          const numB = Number(valB);
+
+          if (!isNaN(numA) && !isNaN(numB)) {
+            return state.sortDirection === 'asc' ? numA - numB : numB - numA;
+          }
+          return state.sortDirection === 'asc' 
+            ? String(valA).localeCompare(String(valB)) 
+            : String(valB).localeCompare(String(valA));
+        });
+      }
+
+      document.getElementById('rows-count-badge').innerText = `${filteredRows.length} linhas, ${state.columns.length} colunas`;
+
+      // 3. Renderizar Linhas Editáveis
+      if (filteredRows.length === 0) {
+        bodyEl.innerHTML = `
+          <tr>
+            <td colspan="${state.columns.length + 2}" class="p-6 text-center text-zinc-500">
+              Nenhum registro encontrado correspondente à pesquisa.
+            </td>
+          </tr>`;
+        return;
+      }
+
+      bodyEl.innerHTML = filteredRows.map((row, rowIdx) => `
+        <tr class="hover:bg-white/[0.01] transition-colors">
+          <td class="p-2 text-center border-r border-matte-border text-zinc-500 text-[11px] font-mono">${rowIdx + 1}</td>
+          ${state.columns.map(col => `
+            <td class="p-1 border-r border-matte-border">
+              <input type="text" value="${escapeHtml(row[col] ?? '')}" oninput="updateCellValue(${rowIdx}, '${col}', this.value)" class="table-cell-input">
+            </td>
+          `).join('')}
+          <td class="p-1 text-center">
+            <button onclick="removeRow(${rowIdx})" class="p-1.5 rounded hover:bg-red-500/10 text-zinc-500 hover:text-red-400 transition-colors" title="Excluir Linha">
+              <i class="ph ph-trash text-sm"></i>
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // ==== EDIÇÃO DA ESTRUTURA ====
+    function updateCellValue(rowIndex, colName, value) {
+      state.rows[rowIndex][colName] = value;
+      triggerAutoSave();
+    }
+
+    function renameColumn(colIdx, newName) {
+      const oldName = state.columns[colIdx];
+      if (!newName || oldName === newName) return;
+
+      state.columns[colIdx] = newName;
+      state.rows.forEach(row => {
+        row[newName] = row[oldName];
+        delete row[oldName];
+      });
+
+      renderTable();
+      triggerAutoSave();
+    }
+
+    function addColumn() {
+      const name = prompt("Nome da nova coluna:", `Coluna ${state.columns.length + 1}`);
+      if (!name) return;
+
+      state.columns.push(name);
+      state.rows.forEach(row => row[name] = '');
+      renderTable();
+      triggerAutoSave();
+    }
+
+    function removeColumn(colIdx) {
+      const colName = state.columns[colIdx];
+      state.columns.splice(colIdx, 1);
+      state.rows.forEach(row => delete row[colName]);
+      renderTable();
+      triggerAutoSave();
+    }
+
+    function addRow() {
+      const newRow = {};
+      state.columns.forEach(col => newRow[col] = '');
+      state.rows.push(newRow);
+      renderTable();
+      triggerAutoSave();
+    }
+
+    function removeRow(rowIdx) {
+      state.rows.splice(rowIdx, 1);
+      renderTable();
+      triggerAutoSave();
+    }
+
+    function sortDataBy(colName) {
+      if (state.sortColumn === colName) {
+        state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
+      } else {
+        state.sortColumn = colName;
+        state.sortDirection = 'asc';
+      }
+      renderTable();
+    }
+
+    function clearTable() {
+      if (confirm("Deseja realmente limpar toda a tabela?")) {
+        state.columns = [];
+        state.rows = [];
+        renderTable();
+        triggerAutoSave();
+      }
+    }
+
+    // ==== INTEGRAÇÃO COM GEMINI IA (TEXTO DESORGANIZADO -> JSON) ====
+    function openAiImportModal() { toggleAiImportModal(true); }
+    function toggleAiImportModal(show) { document.getElementById('modal-ai-import').classList.toggle('hidden', !show); }
+
+    async function processTextWithAI() {
+      const rawText = document.getElementById('ai-raw-text').value.trim();
+      if (!rawText) return;
+
+      const btn = document.getElementById('btn-process-ai');
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = '<div class="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div> Processando...';
+      btn.disabled = true;
+
+      try {
+        const systemPrompt = "Você é um assistente de estruturação de dados. Extraia as informações do texto desorganizado enviado e transforme rigorosamente em um JSON no formato: {\"columns\": [\"Nome\", \"Valor\", ...], \"rows\": [{\"Nome\": \"...\", \"Valor\": \"...\"}]}. Nunca gere HTML ou comandos executáveis.";
+
+        const resultData = await callGeminiAPI(rawText, systemPrompt);
+
+        if (resultData && Array.isArray(resultData.columns) && Array.isArray(resultData.rows)) {
+          state.columns = resultData.columns;
+          state.rows = resultData.rows;
+          renderTable();
+          toggleAiImportModal(false);
+          document.getElementById('ai-raw-text').value = '';
+          triggerAutoSave();
+        } else {
+          throw new Error("Formato do JSON retornado inválido.");
+        }
+
+      } catch (err) {
+        // Fallback local simples caso a IA/Rede falhe
+        alert("A IA não conseguiu interpretar o texto. Executando extrator heurístico local...");
+        fallbackLocalParse(rawText);
+        toggleAiImportModal(false);
+      } finally {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+      }
+    }
+
+    // Chamada à API Gemini REST com Retries e Exponential Backoff
+    async function callGeminiAPI(userQuery, systemPrompt) {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+      const delays = [1000, 2000, 4000, 8000, 16000];
+
+      const payload = {
+        contents: [{ parts: [{ text: userQuery }] }],
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              columns: { type: "ARRAY", items: { type: "STRING" } },
+              rows: {
+                type: "ARRAY",
+                items: {
+                  type: "OBJECT",
+                  additionalProperties: { type: "STRING" }
+                }
+              }
+            },
+            required: ["columns", "rows"]
+          }
+        }
+      };
+
+      for (let attempt = 0; attempt <= delays.length; attempt++) {
+        try {
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          if (!res.ok) throw new Error(`Status ${res.status}`);
+
+          const result = await res.json();
+          const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+          return JSON.parse(text);
+
+        } catch (e) {
+          if (attempt === delays.length) throw e;
+          await new Promise(resolve => setTimeout(resolve, delays[attempt]));
+        }
+      }
+    }
+
+    function fallbackLocalParse(text) {
+      const lines = text.split('\n').filter(l => l.trim().length > 0);
+      if (lines.length === 0) return;
+
+      const delimiter = lines[0].includes(';') ? ';' : lines[0].includes(',') ? ',' : '\t';
+      const parts = lines.map(l => l.split(delimiter).map(p => p.trim()));
+
+      state.columns = parts[0].map((_, i) => `Coluna ${i + 1}`);
+      state.rows = parts.map(rowParts => {
+        const obj = {};
+        state.columns.forEach((col, idx) => { obj[col] = rowParts[idx] || ''; });
+        return obj;
+      });
+      renderTable();
+    }
+
+    // ==== IMPORTAÇÃO DE ARQUIVOS (CSV / XLSX) ====
+    function handleFileImport(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+        if (jsonData.length > 0) {
+          state.columns = jsonData[0].map(c => String(c || '').trim());
+          state.rows = jsonData.slice(1).map(rowArray => {
+            const rowObj = {};
+            state.columns.forEach((col, idx) => {
+              rowObj[col] = rowArray[idx] !== undefined ? String(rowArray[idx]) : '';
+            });
+            return rowObj;
+          });
+          state.datasetName = file.name.replace(/\.[^/.]+$/, "");
+          document.getElementById('dataset-name').value = state.datasetName;
+          renderTable();
+          triggerAutoSave();
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    // ==== EXPORTAÇÃO (CSV / XLSX) ====
+    function exportCSV() {
+      if (state.columns.length === 0) return;
+      const worksheet = XLSX.utils.json_to_sheet(state.rows, { header: state.columns });
+      const csvOutput = XLSX.utils.sheet_to_csv(worksheet);
+      
+      const blob = new Blob([csvOutput], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `${state.datasetName}.csv`;
+      link.click();
+    }
+
+    function exportXLSX() {
+      if (state.columns.length === 0) return;
+      const worksheet = XLSX.utils.json_to_sheet(state.rows, { header: state.columns });
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Dados");
+      XLSX.writeFile(workbook, `${state.datasetName}.xlsx`);
+    }
+
+    // ==== GERADOR DE GRÁFICOS (CHART.JS) ====
+    function toggleChartModal(show = true) {
+      document.getElementById('modal-chart').classList.toggle('hidden', !show);
+      if (show) {
+        populateChartControls();
+        renderChart();
+      }
+    }
+
+    function populateChartControls() {
+      const xSel = document.getElementById('chart-x-axis');
+      const ySel = document.getElementById('chart-y-axis');
+
+      xSel.innerHTML = state.columns.map(c => `<option value="${c}">${c}</option>`).join('');
+      ySel.innerHTML = state.columns.map(c => `<option value="${c}">${c}</option>`).join('');
+
+      if (state.columns.length >= 2) {
+        ySel.selectedIndex = 1;
+      }
+    }
+
+    function renderChart() {
+      const xCol = document.getElementById('chart-x-axis').value;
+      const yCol = document.getElementById('chart-y-axis').value;
+      const type = document.getElementById('chart-type').value;
+
+      if (!xCol || !yCol) return;
+
+      const labels = state.rows.map(r => r[xCol] || 'N/A');
+      const data = state.rows.map(r => Number(r[yCol]) || 0);
+
+      const ctx = document.getElementById('chart-canvas').getContext('2d');
+
+      if (state.chartInstance) {
+        state.chartInstance.destroy();
+      }
+
+      state.chartInstance = new Chart(ctx, {
+        type: type,
+        data: {
+          labels: labels,
+          datasets: [{
+            label: yCol,
+            data: data,
+            backgroundColor: [
+              'rgba(245, 158, 11, 0.6)',
+              'rgba(59, 130, 246, 0.6)',
+              'rgba(16, 185, 129, 0.6)',
+              'rgba(168, 85, 247, 0.6)',
+              'rgba(236, 72, 153, 0.6)'
+            ],
+            borderColor: '#121214',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: '#fafafa' } }
+          },
+          scales: ['pie', 'doughnut'].includes(type) ? {} : {
+            x: { ticks: { color: '#a1a1aa' }, grid: { color: '#27272a' } },
+            y: { ticks: { color: '#a1a1aa' }, grid: { color: '#27272a' } }
+          }
+        }
+      });
+    }
+
+    // ==== PERSISTÊNCIA & NUVEM SUPABASE ====
+    function triggerAutoSave() {
+      updateSyncStatus("Digitando...");
+      clearTimeout(state.autoSaveTimer);
+      state.autoSaveTimer = setTimeout(() => {
+        saveToLocalStorageCache();
+        if (state.userId) saveToCloud();
+        else updateSyncStatus("Salvo localmente");
+      }, 1000);
+    }
+
+    function saveToLocalStorageCache() {
+      const payload = {
+        name: state.datasetName,
+        data_json: { columns: state.columns, rows: state.rows }
+      };
+      localStorage.setItem('dataset_active', JSON.stringify(payload));
+    }
+
+    function loadFromLocalStorageCache() {
+      const cached = localStorage.getItem('dataset_active');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        state.datasetName = parsed.name || state.datasetName;
+        state.columns = parsed.data_json?.columns || state.columns;
+        state.rows = parsed.data_json?.rows || state.rows;
+        document.getElementById('dataset-name').value = state.datasetName;
+      }
+    }
+
+    async function saveToCloud() {
+      if (!state.userId) return;
+      updateSyncStatus("Salvando na nuvem...");
+
+      try {
+        const payload = {
+          user_id: state.userId,
+          name: state.datasetName,
+          tool_type: 'table_organizer',
+          data_json: { columns: state.columns, rows: state.rows }
+        };
+
+        if (state.datasetId) payload.id = state.datasetId;
+
+        const { data, error } = await dbClient.from('user_datasets').upsert(payload).select().single();
+        if (error) throw error;
+
+        state.datasetId = data.id;
+        updateSyncStatus("Sincronizado");
+      } catch (err) {
+        updateSyncStatus("Erro na nuvem");
+      }
+    }
+
+    async function toggleDatasetsModal(show) {
+      const modal = document.getElementById('modal-datasets');
+      modal.classList.toggle('hidden', !show);
+
+      if (show && state.userId) {
+        const { data } = await dbClient
+          .from('user_datasets')
+          .select('*')
+          .eq('tool_type', 'table_organizer')
+          .order('updated_at', { ascending: false });
+
+        const list = document.getElementById('datasets-list');
+        if (!data || data.length === 0) {
+          list.innerHTML = `<p class="text-xs text-zinc-500 text-center py-6">Nenhuma tabela salva encontrada.</p>`;
+          return;
+        }
+
+        list.innerHTML = data.map(item => `
+          <div onclick="restoreDataset(${JSON.stringify(item).replace(/"/g, '&quot;')})" class="p-3 rounded-xl border border-matte-border bg-white/[0.02] hover:bg-white/[0.05] cursor-pointer flex items-center justify-between">
+            <div>
+              <h4 class="text-xs font-bold text-white truncate max-w-[200px]">${item.name}</h4>
+              <span class="text-[10px] text-zinc-500">${item.data_json?.rows?.length || 0} linhas • ${new Date(item.updated_at).toLocaleDateString()}</span>
+            </div>
+            <i class="ph ph-table text-amber-400"></i>
+          </div>
+        `).join('');
+      }
+    }
+
+    function restoreDataset(item) {
+      state.datasetId = item.id;
+      state.datasetName = item.name;
+      state.columns = item.data_json?.columns || [];
+      state.rows = item.data_json?.rows || [];
+
+      document.getElementById('dataset-name').value = item.name;
+      renderTable();
+      toggleDatasetsModal(false);
+    }
+
+    function updateSyncStatus(msg) {
+      document.getElementById('sync-status').innerHTML = `<i class="ph-fill ph-check-circle text-amber-400"></i> ${msg}`;
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+  </script>
+</body>
+</html>

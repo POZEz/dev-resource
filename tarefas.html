@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Gerenciador de Tarefas e Projetos</title>
+
+  <!-- CDNs Supabase, Tailwind, Phosphor Icons -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            matte: { bg: '#09090b', card: '#121214', border: '#27272a', text: '#fafafa', muted: '#a1a1aa' }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #09090b; color: #fafafa; -webkit-tap-highlight-color: transparent; }
+    .custom-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
+    .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #27272a; border-radius: 99px; }
+    .custom-scroll::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+
+    /* Visual dos Cards do Kanban */
+    .task-card {
+      background-color: #121214;
+      border: 1px solid #27272a;
+      border-radius: 12px;
+      padding: 12px;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+    .task-card:hover {
+      border-color: #3f3f46;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+  </style>
+</head>
+<body class="antialiased flex flex-col h-screen font-sans bg-matte-bg select-none overflow-hidden">
+
+  <!-- CABEÇALHO DA APLICAÇÃO -->
+  <header class="h-16 shrink-0 bg-matte-card border-b border-matte-border px-4 sm:px-6 flex items-center justify-between z-30">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+        <i class="ph-bold ph-check-square-offset text-xl"></i>
+      </div>
+      <div>
+        <h1 id="active-project-title" class="text-base font-bold text-white leading-tight">Todas as Tarefas</h1>
+        <div class="flex items-center gap-2 text-[10px] text-zinc-400">
+          <span id="sync-status"><i class="ph-fill ph-check-circle text-blue-400"></i> Pronto</span>
+          <span>•</span>
+          <span id="progress-summary-badge">0% concluído</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ações e Modais -->
+    <div class="flex items-center gap-2">
+      <button onclick="toggleLabelsModal(true)" class="p-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+        <i class="ph ph-tag text-base"></i>
+        <span class="hidden sm:inline">Etiquetas</span>
+      </button>
+      <button onclick="openProjectModal()" class="p-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+        <i class="ph ph-folder-plus text-base"></i>
+        <span class="hidden sm:inline">Novo Projeto</span>
+      </button>
+      <button onclick="openTaskModal()" class="px-3 py-2 rounded-xl bg-blue-500 text-white hover:bg-blue-600 font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-blue-500/10 transition-colors">
+        <i class="ph-bold ph-plus text-sm"></i>
+        <span>Nova Tarefa</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- BARRA DE NAVEGAÇÃO E FILTROS -->
+  <nav class="bg-matte-bg border-b border-matte-border px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0 z-20">
+    <div class="flex items-center gap-2 overflow-x-auto custom-scroll max-w-full">
+      <!-- Alternar Modos de Exibição (Kanban x Lista) -->
+      <button onclick="setViewMode('kanban')" id="btn-view-kanban" class="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 bg-white/[0.08] text-white">
+        <i class="ph-bold ph-kanban text-sm"></i> Quadro Kanban
+      </button>
+      <button onclick="setViewMode('list')" id="btn-view-list" class="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 text-zinc-400 hover:text-white hover:bg-white/[0.04]">
+        <i class="ph-bold ph-list-checks text-sm"></i> Lista Simples
+      </button>
+
+      <div class="h-4 w-px bg-matte-border mx-1 shrink-0"></div>
+
+      <!-- Filtro Favoritos -->
+      <button onclick="toggleFavoritesFilter()" id="btn-filter-fav" class="px-2.5 py-1.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-400 hover:text-amber-400 text-xs font-medium flex items-center gap-1 transition-colors">
+        <i class="ph-fill ph-star text-amber-400 text-xs"></i> Favoritos
+      </button>
+    </div>
+
+    <!-- Campo de Busca -->
+    <div class="relative min-w-[200px] w-full sm:w-auto">
+      <i class="ph ph-magnifying-glass absolute left-3 top-2.5 text-zinc-500 text-xs"></i>
+      <input type="text" id="search-input" oninput="state.searchQuery = this.value; renderAll();" placeholder="Pesquisar tarefas..." class="w-full bg-white/[0.03] border border-matte-border rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500/50">
+    </div>
+  </nav>
+
+  <!-- ÁREA PRINCIPAL (PAINEL LATERAL DE PROJETOS + QUADRO DE TAREFAS) -->
+  <main class="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-12 gap-0">
+
+    <!-- PAINEL LATERAL DE PROJETOS -->
+    <aside class="lg:col-span-3 border-r border-matte-border bg-matte-card p-4 flex flex-col gap-4 custom-scroll overflow-y-auto">
+      <div class="flex items-center justify-between pb-2 border-b border-matte-border">
+        <h3 class="text-xs font-bold text-zinc-400 uppercase tracking-wider">Projetos</h3>
+        <button onclick="openProjectModal()" class="text-xs text-blue-400 hover:text-blue-300 font-bold">+ Novo</button>
+      </div>
+
+      <!-- Item Todos os Projetos -->
+      <div onclick="selectProject(null)" class="p-2.5 rounded-xl border border-matte-border bg-white/[0.02] hover:bg-white/[0.05] cursor-pointer flex items-center justify-between text-xs font-bold text-white">
+        <div class="flex items-center gap-2">
+          <i class="ph-bold ph-squares-four text-blue-400 text-sm"></i>
+          <span>Todas as Tarefas</span>
+        </div>
+        <span id="badge-count-all" class="text-[10px] text-zinc-500 font-mono">0</span>
+      </div>
+
+      <!-- Lista de Projetos do Usuário -->
+      <div id="projects-list-container" class="space-y-1.5">
+        <!-- Injetado via JS -->
+      </div>
+    </aside>
+
+    <!-- ÁREA DE EXIBIÇÃO DE TAREFAS (KANBAN OU LISTA) -->
+    <section class="lg:col-span-9 p-4 sm:p-6 overflow-y-auto custom-scroll">
+      
+      <!-- BARRA DE PROGRESSO DO PROJETO ATIVO -->
+      <div class="bg-matte-card border border-matte-border rounded-2xl p-4 mb-6 flex flex-col gap-2 shadow-xl">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-zinc-300">Progresso do Projeto</span>
+          <span id="progress-percentage-label" class="text-xs font-bold text-blue-400">0%</span>
+        </div>
+        <div class="w-full h-2 bg-matte-border rounded-full overflow-hidden">
+          <div id="progress-bar-fill" class="h-full bg-blue-500 rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- MODO KANBAN (3 COLUNAS) -->
+      <div id="view-kanban-container" class="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+        
+        <!-- Coluna A Fazer -->
+        <div class="bg-matte-card/60 border border-matte-border rounded-2xl p-4 flex flex-col gap-3">
+          <div class="flex items-center justify-between border-b border-matte-border pb-2">
+            <h4 class="text-xs font-bold text-zinc-300 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-zinc-400"></span> A Fazer
+            </h4>
+            <span id="count-todo" class="text-[10px] font-mono text-zinc-500 font-bold">0</span>
+          </div>
+          <div id="col-todo" class="space-y-3 min-h-[150px]"></div>
+        </div>
+
+        <!-- Coluna Em Andamento -->
+        <div class="bg-matte-card/60 border border-matte-border rounded-2xl p-4 flex flex-col gap-3">
+          <div class="flex items-center justify-between border-b border-matte-border pb-2">
+            <h4 class="text-xs font-bold text-blue-400 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-blue-500"></span> Em Andamento
+            </h4>
+            <span id="count-in_progress" class="text-[10px] font-mono text-zinc-500 font-bold">0</span>
+          </div>
+          <div id="col-in_progress" class="space-y-3 min-h-[150px]"></div>
+        </div>
+
+        <!-- Coluna Concluídas -->
+        <div class="bg-matte-card/60 border border-matte-border rounded-2xl p-4 flex flex-col gap-3">
+          <div class="flex items-center justify-between border-b border-matte-border pb-2">
+            <h4 class="text-xs font-bold text-emerald-400 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Concluídas
+            </h4>
+            <span id="count-completed" class="text-[10px] font-mono text-zinc-500 font-bold">0</span>
+          </div>
+          <div id="col-completed" class="space-y-3 min-h-[150px]"></div>
+        </div>
+
+      </div>
+
+      <!-- MODO LISTA SIMPLES -->
+      <div id="view-list-container" class="hidden space-y-2">
+        <!-- Injetado via JS -->
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- MODAL CRIAR/EDITAR PROJETO -->
+  <div id="modal-project" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-sm shadow-2xl flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3">
+        <h3 id="modal-proj-title" class="text-sm font-bold text-white">Novo Projeto</h3>
+        <button onclick="closeProjectModal()" class="text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
+      </div>
+
+      <form onsubmit="saveProject(event)" class="space-y-3">
+        <input type="text" id="proj-title" required placeholder="Título do Projeto" class="w-full bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white focus:outline-none focus:border-blue-500">
+        <textarea id="proj-desc" placeholder="Descrição opcional..." class="w-full bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white focus:outline-none h-20 custom-scroll resize-none"></textarea>
+        
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-zinc-400 font-semibold">Cor do Projeto:</span>
+          <input type="color" id="proj-color" value="#3b82f6" class="w-8 h-8 rounded bg-transparent border-0 cursor-pointer">
+        </div>
+
+        <button type="submit" class="w-full py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs transition-colors shadow-lg">Salvar Projeto</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL CRIAR/EDITAR TAREFA COMPLETA COM SUBTAREFAS -->
+  <div id="modal-task" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-lg shadow-2xl flex flex-col gap-4 max-h-[90vh]">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3">
+        <h3 id="modal-task-title" class="text-sm font-bold text-white">Nova Tarefa</h3>
+        <button onclick="closeTaskModal()" class="text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
+      </div>
+
+      <form id="task-form" onsubmit="saveTask(event)" class="space-y-4 overflow-y-auto custom-scroll pr-1">
+        <input type="text" id="task-title-input" required placeholder="Título da tarefa..." class="w-full bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white focus:outline-none focus:border-blue-500 font-bold">
+
+        <textarea id="task-desc-input" placeholder="Descrição mais detalhada..." class="w-full bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white focus:outline-none h-20 custom-scroll resize-none"></textarea>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="flex flex-col gap-1">
+            <label class="text-[11px] font-semibold text-zinc-400">Projeto</label>
+            <select id="task-project-select" class="bg-white/[0.03] border border-matte-border rounded-xl p-2.5 text-xs text-white focus:outline-none"></select>
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-[11px] font-semibold text-zinc-400">Etiqueta (Label)</label>
+            <select id="task-label-select" class="bg-white/[0.03] border border-matte-border rounded-xl p-2.5 text-xs text-white focus:outline-none"></select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="flex flex-col gap-1">
+            <label class="text-[11px] font-semibold text-zinc-400">Status</label>
+            <select id="task-status-select" class="bg-white/[0.03] border border-matte-border rounded-xl p-2.5 text-xs text-white focus:outline-none">
+              <option value="todo">A Fazer</option>
+              <option value="in_progress">Em Andamento</option>
+              <option value="completed">Concluída</option>
+            </select>
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-[11px] font-semibold text-zinc-400">Prioridade</label>
+            <select id="task-priority-select" class="bg-white/[0.03] border border-matte-border rounded-xl p-2.5 text-xs text-white focus:outline-none">
+              <option value="low">Baixa</option>
+              <option value="medium" selected>Média</option>
+              <option value="high">Alta</option>
+              <option value="urgent">Urgente</option>
+            </select>
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-[11px] font-semibold text-zinc-400">Data de Entrega</label>
+            <input type="date" id="task-due-date" class="bg-white/[0.03] border border-matte-border rounded-xl p-2.5 text-xs text-white focus:outline-none">
+          </div>
+        </div>
+
+        <!-- SEÇÃO DE SUBTAREFAS -->
+        <div class="border-t border-matte-border pt-3 space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-bold text-zinc-300">Subtarefas (Checklist)</label>
+            <button type="button" onclick="addSubtaskInput()" class="text-xs text-blue-400 font-bold hover:text-blue-300">+ Subtarefa</button>
+          </div>
+          <div id="subtasks-inputs-list" class="space-y-2"></div>
+        </div>
+
+        <button type="submit" class="w-full py-3 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs transition-colors shadow-lg shadow-blue-500/10">
+          Salvar Tarefa
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL GERENCIAR ETIQUETAS -->
+  <div id="modal-labels" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-xs shadow-2xl flex flex-col gap-4 max-h-[80vh]">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2"><i class="ph ph-tag text-purple-400"></i> Etiquetas</h3>
+        <button onclick="toggleLabelsModal(false)" class="text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
+      </div>
+
+      <form onsubmit="addLabel(event)" class="flex gap-2">
+        <input type="text" id="label-name-input" required placeholder="Nova etiqueta" class="flex-1 bg-white/[0.03] border border-matte-border rounded-xl p-2 text-xs text-white">
+        <button type="submit" class="px-3 py-2 bg-purple-500 text-white font-bold text-xs rounded-xl">Add</button>
+      </form>
+
+      <div id="labels-list-modal" class="space-y-2 overflow-y-auto custom-scroll pr-1 flex-1"></div>
+    </div>
+  </div>
+
+  <!-- LÓGICA DE GERENCIAMENTO DE TAREFAS E PROJETOS -->
+  <script>
+    // Inicialização do Supabase Client
+    const SUPABASE_URL = 'https://zlsdlcvtcsrykfacjvhf.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_JnDv-fxHXPTzNaFX9n3Z0w_4mqt47Js';
+    const dbClient = window.parent?.PortalDB?.supabase || window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // Estado da Aplicação
+    let state = {
+      userId: null,
+      activeProjectId: null,
+      viewMode: 'kanban', // 'kanban' | 'list'
+      filterOnlyFavorites: false,
+      searchQuery: '',
+      projects: [],
+      labels: [],
+      tasks: [],
+      subtasks: [],
+      editingTaskId: null,
+      editingProjectId: null,
+      tempSubtasks: []
+    };
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      await initSession();
+      await loadAllData();
+    });
+
+    async function initSession() {
+      try {
+        const { data } = await dbClient.auth.getSession();
+        state.userId = data?.session?.user?.id || null;
+      } catch (e) {
+        state.userId = null;
+      }
+    }
+
+    // ==== CARREGAMENTO DE DADOS RELACIONAIS ====
+    async function loadAllData() {
+      updateSyncStatus("Carregando...");
+      if (!state.userId) {
+        updateSyncStatus("Modo Offline");
+        return;
+      }
+
+      try {
+        // 1. Carregar Projetos
+        const { data: projs } = await dbClient.from('projects').select('*').eq('user_id', state.userId).is('deleted_at', null).order('title');
+        state.projects = projs || [];
+
+        // 2. Carregar Etiquetas
+        const { data: lbls } = await dbClient.from('task_labels').select('*').eq('user_id', state.userId).order('name');
+        state.labels = lbls || [];
+
+        // 3. Carregar Tarefas
+        const { data: tsks } = await dbClient.from('tasks').select('*, label:task_labels(name, color)').eq('user_id', state.userId).is('deleted_at', null).order('created_at', { ascending: false });
+        state.tasks = tsks || [];
+
+        // 4. Carregar Subtarefas
+        const taskIds = state.tasks.map(t => t.id);
+        if (taskIds.length > 0) {
+          const { data: subs } = await dbClient.from('subtasks').select('*').in('task_id', taskIds);
+          state.subtasks = subs || [];
+        } else {
+          state.subtasks = [];
+        }
+
+        renderAll();
+        updateSyncStatus("Sincronizado");
+
+      } catch (e) {
+        updateSyncStatus("Erro na nuvem");
+      }
+    }
+
+    // ==== RENDERIZAÇÃO DA INTERFACE ====
+    function renderAll() {
+      renderProjectsList();
+      renderTasksView();
+      renderOverallProgress();
+    }
+
+    function renderProjectsList() {
+      const container = document.getElementById('projects-list-container');
+      document.getElementById('badge-count-all').innerText = state.tasks.length;
+
+      container.innerHTML = state.projects.map(p => {
+        const count = state.tasks.filter(t => t.project_id === p.id).length;
+        const isSelected = p.id === state.activeProjectId;
+
+        return `
+          <div onclick="selectProject('${p.id}')" class="p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between text-xs ${isSelected ? 'bg-white/[0.08] border-blue-500/40 text-white font-bold' : 'bg-white/[0.02] border-matte-border hover:bg-white/[0.05] text-zinc-300'}">
+            <div class="flex items-center gap-2 overflow-hidden">
+              <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${p.color}"></span>
+              <span class="truncate">${p.title}</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <span class="text-[10px] text-zinc-500 font-mono">${count}</span>
+              <button onclick="event.stopPropagation(); deleteProject('${p.id}')" class="p-0.5 hover:text-red-400 text-zinc-600"><i class="ph ph-trash text-xs"></i></button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderTasksView() {
+      let filtered = [...state.tasks];
+
+      if (state.activeProjectId) {
+        filtered = filtered.filter(t => t.project_id === state.activeProjectId);
+        const proj = state.projects.find(p => p.id === state.activeProjectId);
+        document.getElementById('active-project-title').innerText = proj ? proj.title : 'Todas as Tarefas';
+      } else {
+        document.getElementById('active-project-title').innerText = 'Todas as Tarefas';
+      }
+
+      if (state.filterOnlyFavorites) {
+        filtered = filtered.filter(t => t.is_favorite);
+      }
+
+      if (state.searchQuery) {
+        const q = state.searchQuery.toLowerCase();
+        filtered = filtered.filter(t => t.title.toLowerCase().includes(q) || (t.description || '').toLowerCase().includes(q));
+      }
+
+      if (state.viewMode === 'kanban') {
+        document.getElementById('view-kanban-container').classList.remove('hidden');
+        document.getElementById('view-list-container').classList.add('hidden');
+        renderKanban(filtered);
+      } else {
+        document.getElementById('view-kanban-container').classList.add('hidden');
+        document.getElementById('view-list-container').classList.remove('hidden');
+        renderList(filtered);
+      }
+    }
+
+    function renderKanban(tasksList) {
+      const colTodo = document.getElementById('col-todo');
+      const colInProg = document.getElementById('col-in_progress');
+      const colComp = document.getElementById('col-completed');
+
+      const todo = tasksList.filter(t => t.status === 'todo');
+      const inProg = tasksList.filter(t => t.status === 'in_progress');
+      const comp = tasksList.filter(t => t.status === 'completed');
+
+      document.getElementById('count-todo').innerText = todo.length;
+      document.getElementById('count-in_progress').innerText = inProg.length;
+      document.getElementById('count-completed').innerText = comp.length;
+
+      colTodo.innerHTML = todo.map(t => renderTaskCard(t)).join('');
+      colInProg.innerHTML = inProg.map(t => renderTaskCard(t)).join('');
+      colComp.innerHTML = comp.map(t => renderTaskCard(t)).join('');
+    }
+
+    function renderList(tasksList) {
+      const container = document.getElementById('view-list-container');
+      if (tasksList.length === 0) {
+        container.innerHTML = `<p class="text-xs text-zinc-500 text-center py-8">Nenhuma tarefa encontrada.</p>`;
+        return;
+      }
+
+      container.innerHTML = tasksList.map(t => `
+        <div onclick="openTaskModal('${t.id}')" class="p-3 rounded-xl border border-matte-border bg-matte-card hover:bg-white/[0.03] cursor-pointer flex items-center justify-between text-xs">
+          <div class="flex items-center gap-3">
+            <button onclick="event.stopPropagation(); quickToggleStatus('${t.id}', '${t.status}')" class="text-base text-zinc-500 hover:text-emerald-400">
+              <i class="ph-bold ${t.status === 'completed' ? 'ph-check-circle text-emerald-400' : 'ph-circle'}"></i>
+            </button>
+            <span class="${t.status === 'completed' ? 'line-through text-zinc-500' : 'text-white font-medium'}">${t.title}</span>
+          </div>
+          <div class="flex items-center gap-3">
+            ${t.due_date ? `<span class="text-[10px] text-zinc-400 font-mono"><i class="ph ph-calendar"></i> ${t.due_date}</span>` : ''}
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase ${getPriorityBadgeClass(t.priority)}">${t.priority}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderTaskCard(t) {
+      const sub = state.subtasks.filter(s => s.task_id === t.id);
+      const subComp = sub.filter(s => s.completed).length;
+
+      return `
+        <div onclick="openTaskModal('${t.id}')" class="task-card flex flex-col gap-2">
+          <div class="flex items-center justify-between">
+            ${t.label ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold text-white" style="background-color: ${t.label.color}">${t.label.name}</span>` : '<span></span>'}
+            <button onclick="event.stopPropagation(); toggleFavoriteTask('${t.id}', ${t.is_favorite})" class="text-xs text-zinc-500 hover:text-amber-400">
+              <i class="ph-fill ${t.is_favorite ? 'ph-star text-amber-400' : 'ph-star text-zinc-600'}"></i>
+            </button>
+          </div>
+
+          <h5 class="text-xs font-bold text-white ${t.status === 'completed' ? 'line-through text-zinc-500' : ''}">${t.title}</h5>
+
+          ${t.description ? `<p class="text-[11px] text-zinc-400 line-clamp-2">${t.description}</p>` : ''}
+
+          <div class="flex items-center justify-between pt-2 border-t border-matte-border text-[10px] text-zinc-500">
+            <span class="px-1.5 py-0.5 rounded font-bold uppercase ${getPriorityBadgeClass(t.priority)}">${t.priority}</span>
+            ${sub.length > 0 ? `<span><i class="ph ph-check-square"></i> ${subComp}/${sub.length}</span>` : ''}
+            ${t.due_date ? `<span><i class="ph ph-calendar"></i> ${t.due_date}</span>` : ''}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderOverallProgress() {
+      let relevantTasks = state.tasks;
+      if (state.activeProjectId) {
+        relevantTasks = state.tasks.filter(t => t.project_id === state.activeProjectId);
+      }
+
+      const total = relevantTasks.length;
+      const completed = relevantTasks.filter(t => t.status === 'completed').length;
+      const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+      document.getElementById('progress-percentage-label').innerText = `${pct}%`;
+      document.getElementById('progress-bar-fill').style.width = `${pct}%`;
+      document.getElementById('progress-summary-badge').innerText = `${pct}% concluído (${completed}/${total})`;
+    }
+
+    // ==== MANIPULAÇÃO DE TAREFAS E PROJETOS ====
+    function selectProject(projId) {
+      state.activeProjectId = projId;
+      renderAll();
+    }
+
+    function setViewMode(mode) {
+      state.viewMode = mode;
+      document.getElementById('btn-view-kanban').className = mode === 'kanban' ? 'px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 bg-white/[0.08] text-white' : 'px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 text-zinc-400 hover:text-white hover:bg-white/[0.04]';
+      document.getElementById('btn-view-list').className = mode === 'list' ? 'px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 bg-white/[0.08] text-white' : 'px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 text-zinc-400 hover:text-white hover:bg-white/[0.04]';
+      renderTasksView();
+    }
+
+    function toggleFavoritesFilter() {
+      state.filterOnlyFavorites = !state.filterOnlyFavorites;
+      document.getElementById('btn-filter-fav').classList.toggle('text-amber-400', state.filterOnlyFavorites);
+      renderTasksView();
+    }
+
+    async function quickToggleStatus(id, currentStatus) {
+      const nextStatus = currentStatus === 'completed' ? 'todo' : 'completed';
+      await dbClient.from('tasks').update({ status: nextStatus }).eq('id', id);
+      await loadAllData();
+    }
+
+    async function toggleFavoriteTask(id, currentFav) {
+      await dbClient.from('tasks').update({ is_favorite: !currentFav }).eq('id', id);
+      await loadAllData();
+    }
+
+    // ==== MODAIS E FORMULÁRIOS ====
+    function openProjectModal() { document.getElementById('modal-project').classList.remove('hidden'); }
+    function closeProjectModal() { document.getElementById('modal-project').classList.add('hidden'); }
+
+    async function saveProject(e) {
+      e.preventDefault();
+      if (!state.userId) return;
+
+      const payload = {
+        user_id: state.userId,
+        title: document.getElementById('proj-title').value.trim(),
+        description: document.getElementById('proj-desc').value.trim(),
+        color: document.getElementById('proj-color').value
+      };
+
+      await dbClient.from('projects').insert(payload);
+      closeProjectModal();
+      document.getElementById('proj-title').value = '';
+      await loadAllData();
+    }
+
+    async function deleteProject(id) {
+      if (!confirm("Deseja excluir este projeto e suas tarefas associadas?")) return;
+      await dbClient.from('projects').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+      if (state.activeProjectId === id) state.activeProjectId = null;
+      await loadAllData();
+    }
+
+    function openTaskModal(editId = null) {
+      state.editingTaskId = editId;
+      document.getElementById('modal-task-title').innerText = editId ? 'Editar Tarefa' : 'Nova Tarefa';
+
+      populateProjectSelects();
+      populateLabelSelects();
+
+      if (editId) {
+        const t = state.tasks.find(x => x.id === editId);
+        if (t) {
+          document.getElementById('task-title-input').value = t.title;
+          document.getElementById('task-desc-input').value = t.description || '';
+          document.getElementById('task-project-select').value = t.project_id || '';
+          document.getElementById('task-label-select').value = t.label_id || '';
+          document.getElementById('task-status-select').value = t.status;
+          document.getElementById('task-priority-select').value = t.priority;
+          document.getElementById('task-due-date').value = t.due_date || '';
+
+          // Carregar subtarefas da tarefa
+          state.tempSubtasks = state.subtasks.filter(s => s.task_id === editId).map(s => ({ id: s.id, title: s.title, completed: s.completed }));
+        }
+      } else {
+        document.getElementById('task-form').reset();
+        if (state.activeProjectId) document.getElementById('task-project-select').value = state.activeProjectId;
+        state.tempSubtasks = [];
+      }
+
+      renderSubtasksInputs();
+      document.getElementById('modal-task').classList.remove('hidden');
+    }
+
+    function closeTaskModal() { document.getElementById('modal-task').classList.add('hidden'); }
+
+    function addSubtaskInput() {
+      state.tempSubtasks.push({ id: crypto.randomUUID(), title: '', completed: false });
+      renderSubtasksInputs();
+    }
+
+    function renderSubtasksInputs() {
+      const container = document.getElementById('subtasks-inputs-list');
+      container.innerHTML = state.tempSubtasks.map((s, idx) => `
+        <div class="flex items-center gap-2">
+          <input type="checkbox" ${s.completed ? 'checked' : ''} onchange="state.tempSubtasks[${idx}].completed = this.checked" class="rounded accent-blue-500">
+          <input type="text" value="${escapeHtml(s.title)}" oninput="state.tempSubtasks[${idx}].title = this.value" placeholder="Título da subtarefa..." class="flex-1 bg-white/[0.03] border border-matte-border rounded-xl p-2 text-xs text-white focus:outline-none">
+          <button type="button" onclick="state.tempSubtasks.splice(${idx}, 1); renderSubtasksInputs();" class="text-zinc-500 hover:text-red-400 p-1"><i class="ph ph-trash"></i></button>
+        </div>
+      `).join('');
+    }
+
+    async function saveTask(e) {
+      e.preventDefault();
+      if (!state.userId) return;
+
+      const payload = {
+        user_id: state.userId,
+        title: document.getElementById('task-title-input').value.trim(),
+        description: document.getElementById('task-desc-input').value.trim(),
+        project_id: document.getElementById('task-project-select').value || null,
+        label_id: document.getElementById('task-label-select').value || null,
+        status: document.getElementById('task-status-select').value,
+        priority: document.getElementById('task-priority-select').value,
+        due_date: document.getElementById('task-due-date').value || null
+      };
+
+      if (state.editingTaskId) payload.id = state.editingTaskId;
+
+      const { data: savedTask, error } = await dbClient.from('tasks').upsert(payload).select().single();
+
+      if (!error && savedTask) {
+        // Gravar/Atualizar Subtarefas
+        for (const st of state.tempSubtasks) {
+          if (st.title.trim()) {
+            await dbClient.from('subtasks').upsert({
+              user_id: state.userId,
+              task_id: savedTask.id,
+              title: st.title.trim(),
+              completed: st.completed
+            });
+          }
+        }
+        closeTaskModal();
+        await loadAllData();
+      }
+    }
+
+    // ==== ETIQUETAS (LABELS) ====
+    function toggleLabelsModal(show) {
+      document.getElementById('modal-labels').classList.toggle('hidden', !show);
+      if (show) renderLabelsModal();
+    }
+
+    function renderLabelsModal() {
+      const container = document.getElementById('labels-list-modal');
+      container.innerHTML = state.labels.map(l => `
+        <div class="p-2 rounded-xl border border-matte-border bg-white/[0.02] flex items-center justify-between text-xs">
+          <span class="font-bold text-white px-2 py-0.5 rounded" style="background-color: ${l.color}">${l.name}</span>
+          <button onclick="deleteLabel('${l.id}')" class="text-zinc-500 hover:text-red-400 p-1"><i class="ph ph-trash"></i></button>
+        </div>
+      `).join('');
+    }
+
+    async function addLabel(e) {
+      e.preventDefault();
+      if (!state.userId) return;
+      const name = document.getElementById('label-name-input').value.trim();
+      await dbClient.from('task_labels').insert({ user_id: state.userId, name });
+      document.getElementById('label-name-input').value = '';
+      await loadAllData();
+      renderLabelsModal();
+    }
+
+    async function deleteLabel(id) {
+      await dbClient.from('task_labels').delete().eq('id', id);
+      await loadAllData();
+      renderLabelsModal();
+    }
+
+    function populateProjectSelects() {
+      const sel = document.getElementById('task-project-select');
+      sel.innerHTML = '<option value="">Sem Projeto (Geral)</option>' + state.projects.map(p => `<option value="${p.id}">${p.title}</option>`).join('');
+    }
+
+    function populateLabelSelects() {
+      const sel = document.getElementById('task-label-select');
+      sel.innerHTML = '<option value="">Sem Etiqueta</option>' + state.labels.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+    }
+
+    // ==== AUXILIARES ====
+    function getPriorityBadgeClass(p) {
+      if (p === 'urgent') return 'bg-red-500/10 text-red-400';
+      if (p === 'high') return 'bg-amber-500/10 text-amber-400';
+      if (p === 'medium') return 'bg-blue-500/10 text-blue-400';
+      return 'bg-zinc-500/10 text-zinc-400';
+    }
+
+    function updateSyncStatus(msg) {
+      document.getElementById('sync-status').innerHTML = `<i class="ph-fill ph-check-circle text-blue-400"></i> ${msg}`;
+    }
+
+    function escapeHtml(str) {
+      return String(str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+  </script>
+</body>
+</html>
