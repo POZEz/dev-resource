@@ -204,8 +204,8 @@
 
   <!-- CABEÇALHO PRINCIPAL DO MY HUB -->
   <header class="h-14 shrink-0 bg-matte-card border-b border-matte-border px-4 sm:px-6 flex items-center justify-between z-30">
-    <div class="flex items-center gap-3">
-      <!-- Botão para Abrir Menu Lateral Expansivo -->
+    <!-- VISÃO HOME: LOGO E TÍTULO -->
+    <div id="header-home-content" class="flex items-center gap-2.5">
       <button onclick="toggleSidebarMenu(true)" class="p-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 hover:text-white transition-colors" title="Abrir Menu NAVEBAR">
         <i class="ph-bold ph-list text-lg"></i>
       </button>
@@ -224,14 +224,22 @@
       </div>
     </div>
 
+    <!-- VISÃO MÓDULO ABERTO: APENAS BOTAO VOLTAR -->
+    <div id="header-module-content" class="hidden items-center gap-3">
+      <button onclick="closeModuleIframe()" class="px-3 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-matte-border text-white text-xs font-bold flex items-center gap-2 transition-colors">
+        <i class="ph-bold ph-arrow-left text-sm"></i> Voltar ao My Hub
+      </button>
+      <span id="header-active-module-name" class="text-xs font-bold text-zinc-400 truncate max-w-xs sm:max-w-md"></span>
+    </div>
+
     <!-- BOTÕES MINIMALISTAS DO CABEÇALHO -->
-    <div class="flex items-center gap-1.5">
+    <div id="header-actions-right" class="flex items-center gap-1.5">
       <!-- Ícone de Armazenamento: Abre Direto a Central de Meus Dados -->
       <button onclick="openModule('Armazenamento', 'meus-dados.html')" class="p-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1.5" title="Armazenamento & Meus Dados">
         <i class="ph-fill ph-database text-lg"></i>
       </button>
 
-      <!-- Ícone Indicador de Conexão com Supabase (VERMELHO = Desconectado | AZUL = Conectado) -->
+      <!-- Ícone Indicador de Conexão com Supabase -->
       <div id="user-auth-section" class="flex items-center">
         <button onclick="toggleAuthModal(true)" id="btn-login-trigger" class="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-500 transition-colors flex items-center gap-1.5 text-xs font-bold" title="Desconectado - Clique para conectar ao Supabase">
           <i class="ph-fill ph-user-circle text-lg text-red-500"></i>
@@ -559,8 +567,8 @@
       <div class="absolute top-2 right-4 z-40 flex items-center gap-2">
         <button onclick="closeModuleIframe()" class="px-3 py-1.5 rounded-xl bg-matte-card border border-matte-border text-zinc-300 hover:text-white text-xs font-bold flex items-center gap-1.5 shadow-2xl">
           <i class="ph-bold ph-arrow-left"></i> Voltar ao My Hub
-        </button>
-      </div>
+    <!-- IFRAME PARA RENDERIZAÇÃO DO MÓDULO ABERTO (SEM SOBREPOSIÇÕES) -->
+    <div id="module-iframe-wrapper" class="hidden h-full w-full relative">
       <iframe id="module-iframe"></iframe>
     </div>
 
@@ -686,6 +694,13 @@
 
     function openModule(title, fileUrl) {
       document.getElementById('modules-grid-container').classList.add('hidden');
+      document.getElementById('header-home-content').classList.add('hidden');
+      
+      const headerModule = document.getElementById('header-module-content');
+      headerModule.classList.remove('hidden');
+      headerModule.classList.add('flex');
+      document.getElementById('header-active-module-name').innerText = title;
+
       const wrapper = document.getElementById('module-iframe-wrapper');
       const iframe = document.getElementById('module-iframe');
 
@@ -696,6 +711,11 @@
     function closeModuleIframe() {
       document.getElementById('module-iframe-wrapper').classList.add('hidden');
       document.getElementById('module-iframe').src = 'about:blank';
+      
+      document.getElementById('header-module-content').classList.add('hidden');
+      document.getElementById('header-module-content').classList.remove('flex');
+      document.getElementById('header-home-content').classList.remove('hidden');
+
       document.getElementById('modules-grid-container').classList.remove('hidden');
     }
 
