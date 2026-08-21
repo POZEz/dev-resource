@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#09090b">
-  <title>Editor de PDF</title>
+  <title>Editor de PDF Pro</title>
 
-  <!-- CDNs Oficiais: Supabase, PDF.js, PDF-lib, Tailwind, Phosphor Icons -->
+  <!-- Bibliotecas: Supabase, PDF.js, PDF-lib, Tailwind, Phosphor Icons -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
@@ -22,7 +22,7 @@
         extend: {
           fontFamily: { sans: ['Inter', 'sans-serif'] },
           colors: {
-            matte: { bg: '#09090b', card: '#121214', border: '#27272a', text: '#fafafa', muted: '#a1a1aa' }
+            matte: { bg: '#09090b', card: '#121214', border: '#27272a', text: '#fafafa', muted: '#a1a1aa', primary: '#3b82f6' }
           }
         }
       }
@@ -30,37 +30,16 @@
   </script>
 
   <style>
-    body, html { 
-      margin: 0; 
-      padding: 0; 
-      width: 100%; 
-      height: 100%; 
-      background-color: #09090b; 
-      color: #fafafa; 
-      overflow: hidden; 
-      overscroll-behavior: none;
-      -webkit-tap-highlight-color: transparent;
-    }
-    
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #09090b; color: #fafafa; overflow: hidden; overscroll-behavior: none; }
     .no-scrollbars::-webkit-scrollbar { display: none; }
     .no-scrollbars { -ms-overflow-style: none; scrollbar-width: none; }
 
-    /* Layout absoluto garantido dentro do frame */
-    #editor-ui {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      width: 100%;
-      height: 100%;
-    }
-
+    /* Área de Trabalho do PDF */
     #workspace {
       position: absolute;
-      top: 44px;
-      bottom: 0; 
-      left: 0;
+      top: 56px; /* Header */
+      bottom: 0;
+      left: 64px; /* Toolbar lateral */
       right: 0;
       overflow: hidden;
       background-color: #121214;
@@ -77,250 +56,283 @@
       box-shadow: 0 10px 40px rgba(0,0,0,0.8);
     }
 
-    canvas { display: block; position: absolute; top: 0; left: 0; }
-    
-    #pdf-layer { z-index: 1; pointer-events: none; }
-    #drawing-layer { z-index: 2; pointer-events: none; }
-    #overlay-layer { z-index: 3; position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+    canvas { display: block; position: absolute; top: 0; left: 0; pointer-events: none; }
+    #overlay-layer { z-index: 10; position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
 
-    .text-box {
+    /* Estilos dos Elementos Editáveis no Overlay */
+    .pdf-element {
       position: absolute;
-      pointer-events: auto;
-      color: #000;
-      font-size: 16px;
-      font-family: Arial, sans-serif;
-      min-width: 20px;
-      min-height: 20px;
-      padding: 2px;
-      border: 1px dashed transparent;
+      cursor: grab;
+      user-select: none;
+      box-sizing: border-box;
+      transform-origin: 0 0;
+    }
+    .pdf-element.selected {
+      outline: 2px solid #3b82f6;
+      z-index: 50;
+    }
+    .pdf-element:active { cursor: grabbing; }
+
+    /* Textos */
+    .pdf-text-content {
+      width: 100%;
+      height: 100%;
       outline: none;
-      white-space: pre-wrap;
+      color: #000;
+      font-family: Arial, Helvetica, sans-serif; /* Padrão seguro para pdf-lib */
       line-height: 1.2;
+      overflow: hidden;
+      white-space: pre-wrap;
+      word-wrap: break-word;
     }
-    .text-box:focus, .text-box:hover { border-color: #a1a1aa; background: rgba(0,0,0,0.05); cursor: move; }
+    
+    /* Imagens e Retângulos */
+    .pdf-image-content { width: 100%; height: 100%; object-fit: fill; pointer-events: none; }
+    .pdf-rect-content { width: 100%; height: 100%; pointer-events: none; }
 
-    /* Drawer de Páginas */
-    #pages-drawer {
-      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    /* Alças de Redimensionamento (Resize Handles) */
+    .resize-handle {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      background-color: #fff;
+      border: 2px solid #3b82f6;
+      border-radius: 50%;
+      display: none;
+      z-index: 60;
     }
-    .drawer-closed { transform: translateX(-100%); }
-    .drawer-open { transform: translateX(0); }
+    .pdf-element.selected .resize-handle { display: block; }
+    .handle-tl { top: -6px; left: -6px; cursor: nwse-resize; }
+    .handle-tr { top: -6px; right: -6px; cursor: nesw-resize; }
+    .handle-bl { bottom: -6px; left: -6px; cursor: nesw-resize; }
+    .handle-br { bottom: -6px; right: -6px; cursor: nwse-resize; }
 
-    /* Pílula e Botões Minimalistas Estilo Apple */
+    /* Menu Contextual Flutuante */
+    #context-menu {
+      position: absolute;
+      display: none;
+      background: rgba(28, 28, 30, 0.95);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 6px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      z-index: 100;
+      align-items: center;
+      gap: 6px;
+    }
+    #context-menu.active { display: flex; }
+
+    .ctx-btn {
+      padding: 6px;
+      border-radius: 6px;
+      color: #a1a1aa;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    .ctx-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+    .ctx-btn.active { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+    
+    .ctx-input {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: #fff;
+      border-radius: 6px;
+      padding: 4px;
+      font-size: 12px;
+      text-align: center;
+      outline: none;
+    }
+
+    /* Toolbar Lateral */
+    .side-toolbar {
+      position: absolute;
+      top: 56px;
+      bottom: 0;
+      left: 0;
+      width: 64px;
+      background: #121214;
+      border-right: 1px solid #27272a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 16px;
+      gap: 16px;
+      z-index: 40;
+    }
     .tool-btn {
-      width: 36px;
-      height: 36px;
-      border-radius: 9999px;
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
       color: #a1a1aa;
-      transition: all 0.15s ease;
+      transition: all 0.2s;
       cursor: pointer;
-      flex-shrink: 0;
     }
-    .tool-btn:hover {
-      background: rgba(255, 255, 255, 0.1);
-      color: #fff;
-    }
-    .tool-btn.active {
-      background: rgba(255, 255, 255, 0.22); 
-      color: #fff;
-    }
+    .tool-btn:hover { background: rgba(255,255,255,0.05); color: #fff; }
+    .tool-btn.active { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
 
-    /* Subpainéis Popover */
-    .popover-panel {
-      position: absolute;
-      bottom: 56px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(28, 28, 30, 0.95);
-      backdrop-filter: blur(20px);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 20px;
-      padding: 10px 14px;
-      box-shadow: 0 16px 40px rgba(0,0,0,0.8);
-      z-index: 60;
-    }
-
-    input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
-    input[type="color"]::-webkit-color-swatch { border: none; }
+    /* Drawer de Páginas */
+    #pages-drawer { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    .drawer-closed { transform: translateX(100%); }
+    .drawer-open { transform: translateX(0); }
   </style>
 </head>
-<body class="antialiased text-white select-none">
+<body class="antialiased text-white">
 
-  <!-- ESTADO VAZIO: TELA INICIAL -->
+  <!-- TELA INICIAL (ESTADO VAZIO) -->
   <div id="empty-state" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-matte-bg px-6">
-    <div class="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-zinc-400 mb-5 shadow-2xl backdrop-blur-xl">
-      <i class="ph-fill ph-file-pdf text-3xl"></i>
+    <div class="w-20 h-20 rounded-[24px] bg-white/[0.02] border border-white/5 flex items-center justify-center text-zinc-500 mb-6 shadow-2xl">
+      <i class="ph-fill ph-file-pdf text-4xl text-blue-500/80"></i>
     </div>
-    <h2 class="text-lg font-bold text-white mb-1.5 text-center">Editor de PDF</h2>
-    <p class="text-xs text-zinc-400 mb-6 text-center max-w-xs leading-relaxed">Abra um documento existente ou crie uma folha em branco.</p>
+    <h2 class="text-xl font-bold text-white mb-2 text-center">Editor de PDF Profissional</h2>
+    <p class="text-sm text-zinc-400 mb-8 text-center max-w-sm leading-relaxed">Adicione textos, imagens, cubra informações sensíveis e gerencie páginas de forma fluida e direta.</p>
     
-    <div class="flex flex-col sm:flex-row items-center gap-3 w-full max-w-xs">
-      <label class="w-full px-4 py-3 rounded-xl bg-white text-black font-bold text-xs hover:bg-zinc-200 transition-colors cursor-pointer shadow-lg flex items-center justify-center gap-2">
-        <i class="ph-bold ph-upload-simple text-base"></i>
-        Abrir PDF
+    <div class="flex flex-col sm:flex-row items-center gap-4 w-full max-w-sm">
+      <label class="w-full px-5 py-3.5 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-500 transition-colors cursor-pointer shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2">
+        <i class="ph-bold ph-folder-open text-lg"></i> Abrir Documento
         <input type="file" id="file-upload" accept="application/pdf" class="hidden" onchange="handleFileSelect(event)">
       </label>
 
-      <button onclick="createBlankPDF()" class="w-full px-4 py-3 rounded-xl bg-white/[0.05] border border-white/10 text-white font-bold text-xs hover:bg-white/[0.1] transition-colors flex items-center justify-center gap-2">
-        <i class="ph-bold ph-file-plus text-base"></i>
-        Criar em Branco
+      <button onclick="createBlankPDF()" class="w-full px-5 py-3.5 rounded-xl bg-white/[0.05] border border-white/10 text-white font-bold text-sm hover:bg-white/[0.1] transition-colors flex items-center justify-center gap-2">
+        <i class="ph-bold ph-file-plus text-lg"></i> Criar em Branco
       </button>
     </div>
   </div>
 
-  <!-- CONTAINER COMPLETO DO EDITOR -->
-  <div id="editor-ui" class="hidden">
+  <!-- EDITOR PRINCIPAL -->
+  <div id="editor-ui" class="hidden flex-col h-full w-full relative">
     
-    <!-- CABEÇALHO SUPERIOR MINIMALISTA -->
-    <header class="h-11 bg-[#121214]/90 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-3 shrink-0 absolute top-0 w-full z-30">
-      <div class="flex items-center gap-2">
-        <button onclick="toggleDrawer(true)" class="p-1.5 rounded-lg text-zinc-300 hover:bg-white/[0.08] hover:text-white transition-colors" title="Páginas">
-          <i class="ph-bold ph-sidebar-simple text-base"></i>
-        </button>
-        <span id="header-filename" class="text-xs font-semibold truncate max-w-[130px] sm:max-w-xs text-zinc-300">documento.pdf</span>
+    <!-- CABEÇALHO SUPERIOR -->
+    <header class="h-14 bg-matte-card border-b border-matte-border flex items-center justify-between px-4 shrink-0 absolute top-0 w-full z-40">
+      <div class="flex items-center gap-4">
+        <div class="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400">
+          <i class="ph-fill ph-file-pdf text-lg"></i>
+        </div>
+        <div>
+          <input type="text" id="header-filename" value="documento.pdf" onchange="state.filename = this.value" class="bg-transparent font-bold text-sm text-white focus:outline-none focus:border-b border-blue-500 truncate w-32 sm:w-64">
+          <div class="text-[10px] text-zinc-500 flex items-center gap-1">
+            <span id="sync-status">Alterações salvas localmente</span>
+          </div>
+        </div>
       </div>
 
       <div class="flex items-center gap-2">
-        <span id="sync-status" class="text-[10px] text-zinc-500 hidden sm:block">Editando</span>
-        <button onclick="exportFinalPDF()" class="px-3 py-1 rounded-full bg-white/[0.08] hover:bg-white/[0.15] text-white border border-white/10 text-xs font-bold flex items-center gap-1.5 transition-colors">
-          <i class="ph-bold ph-download-simple"></i>
-          <span>Exportar</span>
+        <button onclick="toggleDrawer(true)" class="px-3 py-1.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 text-zinc-300 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+          <i class="ph-bold ph-files"></i> <span class="hidden sm:inline">Páginas</span>
+        </button>
+        <button onclick="exportFinalPDF()" class="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-lg shadow-blue-500/20 flex items-center gap-1.5 transition-colors">
+          <i class="ph-bold ph-download-simple"></i> Exportar
         </button>
       </div>
     </header>
 
-    <!-- MOTOR DE VISUALIZAÇÃO E GESTOS -->
+    <!-- BARRA DE FERRAMENTAS LATERAL -->
+    <nav class="side-toolbar">
+      <button onclick="setTool('select')" id="tool-select" class="tool-btn active" title="Selecionar & Mover (V)">
+        <i class="ph-bold ph-cursor text-xl"></i>
+      </button>
+      <button onclick="setTool('pan')" id="tool-pan" class="tool-btn" title="Navegar / Mão (H)">
+        <i class="ph-bold ph-hand-palm text-xl"></i>
+      </button>
+      
+      <div class="w-8 h-px bg-matte-border my-1"></div>
+
+      <button onclick="addElement('text')" class="tool-btn" title="Inserir Texto">
+        <i class="ph-bold ph-text-t text-xl"></i>
+      </button>
+      <label class="tool-btn cursor-pointer" title="Inserir Imagem">
+        <i class="ph-bold ph-image text-xl"></i>
+        <input type="file" accept="image/*" class="hidden" onchange="handleAddImage(event)">
+      </label>
+      <button onclick="addElement('whiteout')" class="tool-btn" title="Apagador / Retângulo Branco (Ocultar texto original)">
+        <i class="ph-bold ph-square text-xl"></i>
+      </button>
+      
+      <div class="flex-1"></div>
+      
+      <!-- Controles de Zoom -->
+      <div class="flex flex-col items-center gap-2 mb-4">
+        <button onclick="zoomCanvas(1.2)" class="p-2 text-zinc-400 hover:text-white"><i class="ph-bold ph-magnifying-glass-plus"></i></button>
+        <span id="zoom-level" class="text-[9px] font-mono text-zinc-500">100%</span>
+        <button onclick="zoomCanvas(0.8)" class="p-2 text-zinc-400 hover:text-white"><i class="ph-bold ph-magnifying-glass-minus"></i></button>
+      </div>
+    </nav>
+
+    <!-- WORKSPACE E MOTOR DE GESTOS -->
     <main id="workspace">
       <div id="document-container">
+        <!-- Renderização do PDF original -->
         <canvas id="pdf-layer"></canvas>
-        <canvas id="drawing-layer"></canvas>
+        <!-- Camada HTML com os elementos editáveis (Textos, Imagens, Formas) -->
         <div id="overlay-layer"></div>
+      </div>
+      
+      <!-- MENU CONTEXTUAL FLUTUANTE (Aparece ao selecionar elemento) -->
+      <div id="context-menu">
+        <!-- Controles de Texto -->
+        <div id="ctx-text-tools" class="flex items-center gap-1 hidden border-r border-white/10 pr-1 mr-1">
+          <input type="number" id="ctx-font-size" value="16" min="8" max="72" onchange="updateSelectedElement({fontSize: parseInt(this.value)})" class="ctx-input w-12" title="Tamanho da Fonte">
+          <button onclick="toggleElementStyle('isBold')" id="ctx-bold" class="ctx-btn" title="Negrito"><i class="ph-bold ph-text-b"></i></button>
+          <button onclick="toggleElementStyle('isItalic')" id="ctx-italic" class="ctx-btn" title="Itálico"><i class="ph-bold ph-text-italic"></i></button>
+          
+          <div class="w-px h-4 bg-white/10 mx-1"></div>
+          
+          <button onclick="updateSelectedElement({align: 'left'})" class="ctx-btn" title="Alinhar à Esquerda"><i class="ph-bold ph-text-align-left"></i></button>
+          <button onclick="updateSelectedElement({align: 'center'})" class="ctx-btn" title="Centralizar"><i class="ph-bold ph-text-align-center"></i></button>
+          <button onclick="updateSelectedElement({align: 'right'})" class="ctx-btn" title="Alinhar à Direita"><i class="ph-bold ph-text-align-right"></i></button>
+        </div>
+
+        <!-- Cores (Aparece para texto e retângulos) -->
+        <div id="ctx-color-tools" class="flex items-center gap-2 px-1">
+          <div class="relative w-6 h-6 rounded-full overflow-hidden border border-white/20" title="Cor Principal">
+            <input type="color" id="ctx-color" oninput="updateSelectedElement({color: this.value})" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+            <div id="ctx-color-preview" class="w-full h-full pointer-events-none bg-black"></div>
+          </div>
+          <!-- Botão Excluir Global -->
+          <div class="w-px h-4 bg-white/10 mx-1"></div>
+          <button onclick="deleteSelectedElement()" class="ctx-btn text-red-400 hover:text-red-300 hover:bg-red-500/10" title="Excluir (Del)"><i class="ph-bold ph-trash"></i></button>
+        </div>
       </div>
     </main>
 
-    <!-- SUBPAINÉIS POPOVER DE FERRAMENTAS -->
-    
-    <!-- Popover 1: Estilo de Desenho (Caneta / Marca-Texto) -->
-    <div id="popover-draw" class="popover-panel hidden flex-col gap-2">
-      <div class="text-[10px] font-bold uppercase text-zinc-400 mb-1">Modo de Desenho</div>
-      <div class="flex items-center gap-2">
-        <button onclick="setDrawMode('pen')" id="btn-mode-pen" class="px-3 py-1.5 rounded-lg bg-white/20 text-white text-xs font-semibold flex items-center gap-1.5">
-          <i class="ph-bold ph-pencil-simple"></i> Caneta
-        </button>
-        <button onclick="setDrawMode('highlighter')" id="btn-mode-highlighter" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-300 text-xs font-semibold flex items-center gap-1.5">
-          <i class="ph-bold ph-highlighter"></i> Marca-Texto
-        </button>
-      </div>
-    </div>
-
-    <!-- Popover 2: Cores e Espessura -->
-    <div id="popover-style" class="popover-panel hidden flex-col gap-3 min-w-[200px]">
-      <div class="text-[10px] font-bold uppercase text-zinc-400">Cor do Traço</div>
-      <div class="flex items-center gap-2">
-        <button onclick="selectPresetColor('#ef4444')" class="w-6 h-6 rounded-full bg-red-500 border border-white/20"></button>
-        <button onclick="selectPresetColor('#3b82f6')" class="w-6 h-6 rounded-full bg-blue-500 border border-white/20"></button>
-        <button onclick="selectPresetColor('#10b981')" class="w-6 h-6 rounded-full bg-emerald-500 border border-white/20"></button>
-        <button onclick="selectPresetColor('#f59e0b')" class="w-6 h-6 rounded-full bg-amber-500 border border-white/20"></button>
-        <button onclick="selectPresetColor('#000000')" class="w-6 h-6 rounded-full bg-black border border-white/20"></button>
-        <div class="relative w-6 h-6 rounded-full border border-white/20 overflow-hidden shrink-0" id="custom-color-preview" style="background: #ef4444">
-          <input type="color" id="tool-color" value="#ef4444" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
-        </div>
+    <!-- DRAWER LATERAL DE PÁGINAS (Fica à direita) -->
+    <div id="drawer-backdrop" onclick="toggleDrawer(false)" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 hidden transition-opacity"></div>
+    <aside id="pages-drawer" class="fixed inset-y-0 right-0 w-72 bg-matte-card border-l border-matte-border z-50 drawer-closed flex flex-col shadow-2xl">
+      <div class="h-14 px-4 border-b border-matte-border flex items-center justify-between shrink-0">
+        <span class="text-sm font-bold text-white">Layout da Página</span>
+        <button onclick="toggleDrawer(false)" class="text-zinc-500 hover:text-white p-1 rounded-md hover:bg-white/5"><i class="ph-bold ph-x"></i></button>
       </div>
       
-      <div class="border-t border-white/10 pt-2">
-        <div class="flex justify-between text-[10px] text-zinc-400 font-bold mb-1">
-          <span>Espessura</span>
-          <span id="stroke-val-label">3px</span>
-        </div>
-        <input type="range" id="stroke-width" min="1" max="12" value="3" oninput="setStrokeWidth(this.value)" class="w-full accent-white bg-white/10 h-1 rounded-lg">
-      </div>
-    </div>
-
-    <!-- Popover 3: Inserir Formas -->
-    <div id="popover-shapes" class="popover-panel hidden flex-col gap-2">
-      <div class="text-[10px] font-bold uppercase text-zinc-400 mb-1">Inserir Forma</div>
-      <div class="flex items-center gap-2">
-        <button onclick="addShape('rect')" class="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white text-xs flex items-center gap-1">
-          <i class="ph-bold ph-square text-base"></i> Retângulo
+      <div class="p-4 border-b border-matte-border grid grid-cols-2 gap-2">
+        <button onclick="addBlankPageToDoc('portrait')" class="py-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] text-xs font-semibold text-zinc-300 border border-white/5 flex flex-col items-center justify-center gap-1">
+          <i class="ph-bold ph-file-plus text-base"></i> Retrato A4
         </button>
-        <button onclick="addShape('circle')" class="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white text-xs flex items-center gap-1">
-          <i class="ph-bold ph-circle text-base"></i> Círculo
-        </button>
-        <button onclick="addShape('line')" class="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white text-xs flex items-center gap-1">
-          <i class="ph-bold ph-line-segment text-base"></i> Linha
+        <button onclick="addBlankPageToDoc('landscape')" class="py-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] text-xs font-semibold text-zinc-300 border border-white/5 flex flex-col items-center justify-center gap-1">
+          <i class="ph-bold ph-rectangle text-base"></i> Paisagem A4
         </button>
       </div>
-    </div>
 
-    <!-- PÍLULA FLUTUANTE INFERIOR (APPLE STYLE) - Garantida Absoluta -->
-    <nav class="absolute bottom-4 left-1/2 -translate-x-1/2 bg-[#1c1c1e]/90 backdrop-blur-2xl border border-white/10 rounded-full shadow-[0_12px_36px_rgba(0,0,0,0.8)] flex items-center gap-1 px-3 py-1.5 z-40">
-      
-      <button onclick="setTool('hand')" id="tool-hand" class="tool-btn active" title="Mover / Pan">
-        <i class="ph-bold ph-hand-palm text-lg"></i>
-      </button>
-
-      <button onclick="togglePopover('popover-draw'); setTool('draw');" id="tool-draw" class="tool-btn" title="Caneta / Marca-Texto">
-        <i class="ph-bold ph-pencil-simple text-lg"></i>
-      </button>
-
-      <button onclick="setTool('text')" id="tool-text" class="tool-btn" title="Inserir Texto">
-        <i class="ph-bold ph-text-t text-lg"></i>
-      </button>
-
-      <button onclick="togglePopover('popover-shapes')" id="tool-shapes" class="tool-btn" title="Formas Geométricas">
-        <i class="ph-bold ph-shapes text-lg"></i>
-      </button>
-
-      <label class="tool-btn cursor-pointer" title="Inserir Imagem / Assinatura">
-        <i class="ph-bold ph-image text-lg"></i>
-        <input type="file" accept="image/*" class="hidden" onchange="handleAddImage(event)">
-      </label>
-
-      <div class="w-px h-5 bg-white/10 mx-0.5 rounded-full"></div>
-
-      <!-- Seletor de Cores & Estilo -->
-      <button onclick="togglePopover('popover-style')" class="tool-btn" title="Cores e Espessura">
-        <div class="w-5 h-5 rounded-full border border-white/20" id="current-color-dot" style="background: #ef4444"></div>
-      </button>
-
-      <button onclick="clearCurrentPageDrawings()" class="tool-btn text-zinc-400 hover:text-white" title="Limpar Anotações">
-        <i class="ph-bold ph-eraser text-lg"></i>
-      </button>
-
-    </nav>
-
-    <!-- DRAWER LATERAL DE PÁGINAS COM THUMBNAILS REAIS -->
-    <div id="drawer-backdrop" onclick="toggleDrawer(false)" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 hidden transition-opacity"></div>
-    
-    <aside id="pages-drawer" class="fixed inset-y-0 left-0 w-60 bg-[#121214]/95 backdrop-blur-2xl border-r border-white/5 z-50 drawer-closed flex flex-col shadow-2xl">
-      <div class="h-12 px-3 border-b border-white/5 flex items-center justify-between shrink-0">
-        <span class="text-xs font-bold text-white tracking-wider">Páginas</span>
-        <div class="flex items-center gap-1">
-          <button onclick="addNewBlankPage()" class="p-1 rounded text-xs font-bold text-zinc-300 hover:text-white hover:bg-white/10 flex items-center gap-1" title="Nova Página">
-            <i class="ph-bold ph-plus"></i>
-          </button>
-          <button onclick="toggleDrawer(false)" class="text-zinc-500 hover:text-white p-1 rounded-full"><i class="ph-bold ph-x"></i></button>
-        </div>
-      </div>
-      
-      <div id="thumbnails-container" class="flex-1 overflow-y-auto p-3 space-y-3 no-scrollbars">
-        <!-- Thumbnails renderizadas via JS -->
+      <div id="thumbnails-container" class="flex-1 overflow-y-auto p-4 space-y-4 custom-scroll">
+        <!-- Miniaturas injetadas aqui -->
       </div>
     </aside>
 
   </div>
 
-  <!-- LÓGICA DO EDITOR (MOTOR DE GESTOS, PDF.JS, PDF-LIB) -->
   <script>
+    // ========================================================================
+    // ESTADO GLOBAL DO EDITOR
+    // ========================================================================
     let state = {
-      pdfDocLib: null,
-      pdfJsDoc: null,
-      originalBytes: null,
+      pdfDocLib: null,   // Instância manipulável (salvamento)
+      pdfJsDoc: null,    // Instância visual (renderização)
       filename: 'documento.pdf',
-      
       currentPage: 1,
       totalPages: 0,
       
@@ -328,69 +340,73 @@
       panX: 0,
       panY: 0,
       
-      activeTool: 'hand', // 'hand', 'draw', 'text'
-      drawMode: 'pen',    // 'pen' | 'highlighter'
-      strokeWidth: 3,
-      currentColor: '#ef4444',
+      activeTool: 'select', // 'select', 'pan'
+      selectedElementId: null,
       
-      edits: {} // edits[pageNum] = { paths: [], texts: [], shapes: [], images: [] }
+      // Banco de Objetos: edits[pageNum] = [ { id, type, x, y, width, height, ...props } ]
+      edits: {} 
     };
 
+    // Referências DOM
     const workspace = document.getElementById('workspace');
     const container = document.getElementById('document-container');
     const pdfLayer = document.getElementById('pdf-layer');
-    const drawLayer = document.getElementById('drawing-layer');
     const overlayLayer = document.getElementById('overlay-layer');
+    const contextMenu = document.getElementById('context-menu');
     
     let pdfCtx = pdfLayer.getContext('2d');
-    let drawCtx = drawLayer.getContext('2d');
 
     function initEditor() {
-      setupGestureEngine();
-      document.getElementById('tool-color').addEventListener('input', (e) => {
-        selectPresetColor(e.target.value);
+      setupPanZoomEngine();
+      setupOverlayInteraction();
+      
+      // Atalhos de teclado
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+          // Apenas deleta se não estiver editando um texto ativamente
+          if (document.activeElement.tagName !== 'DIV' && state.selectedElementId) {
+            deleteSelectedElement();
+          }
+        }
+        if (e.key === 'v' || e.key === 'V') setTool('select');
+        if (e.key === 'h' || e.key === 'H') setTool('pan');
       });
     }
 
-    // ==== CRIAÇÃO E ABERTURA DE ARQUIVOS ====
-    
+    // ========================================================================
+    // GESTÃO DE ARQUIVOS (ABRIR, CRIAR)
+    // ========================================================================
     async function createBlankPDF() {
       try {
         const pdfDoc = await PDFLib.PDFDocument.create();
-        pdfDoc.addPage([595.28, 841.89]);
+        pdfDoc.addPage([595.28, 841.89]); // A4 Portrait
         const pdfBytes = await pdfDoc.save();
-        state.filename = "Documento em Branco.pdf";
-        document.getElementById('header-filename').innerText = state.filename;
+        state.filename = "Novo_Documento.pdf";
+        document.getElementById('header-filename').value = state.filename;
         await loadPdfData(pdfBytes);
-      } catch (err) {
-        alert("Erro ao criar documento.");
-      }
+      } catch (err) { alert("Erro ao criar PDF."); }
     }
 
     async function handleFileSelect(e) {
       const file = e.target.files[0];
       if (!file || file.type !== 'application/pdf') return;
       state.filename = file.name;
-      document.getElementById('header-filename').innerText = file.name;
+      document.getElementById('header-filename').value = file.name;
       try {
         const arrayBuffer = await file.arrayBuffer();
         await loadPdfData(arrayBuffer);
-      } catch (err) {
-        alert("Erro ao ler o PDF.");
-      }
+      } catch (err) { alert("Erro ao carregar arquivo."); }
     }
 
     async function loadPdfData(arrayBuffer) {
       try {
-        state.originalBytes = arrayBuffer;
         state.pdfDocLib = await PDFLib.PDFDocument.load(arrayBuffer);
-        
         const typedArray = new Uint8Array(arrayBuffer);
         state.pdfJsDoc = await pdfjsLib.getDocument({ data: typedArray }).promise;
         state.totalPages = state.pdfJsDoc.numPages;
 
         for(let i=1; i<=state.totalPages; i++) {
-          state.edits[i] = { paths: [], texts: [], images: [] };
+          if (!state.edits[i]) state.edits[i] = [];
         }
 
         document.getElementById('empty-state').classList.add('hidden');
@@ -402,21 +418,25 @@
         centerDocument();
         renderThumbnailsDrawer();
       } catch(err) {
-        alert("Falha ao abrir PDF.");
+        alert("Erro fatal ao processar o PDF.");
+        console.error(err);
       }
     }
 
+    // ========================================================================
+    // RENDERIZAÇÃO DO PDF
+    // ========================================================================
     async function renderCurrentPage() {
       if (!state.pdfJsDoc) return;
-      const page = await state.pdfJsDoc.getPage(state.currentPage);
+      state.selectedElementId = null;
+      hideContextMenu();
       
+      const page = await state.pdfJsDoc.getPage(state.currentPage);
       const renderScale = 2.0; 
       const viewport = page.getViewport({ scale: renderScale });
 
       pdfLayer.width = viewport.width;
       pdfLayer.height = viewport.height;
-      drawLayer.width = viewport.width;
-      drawLayer.height = viewport.height;
 
       const cssWidth = viewport.width / renderScale;
       const cssHeight = viewport.height / renderScale;
@@ -424,142 +444,79 @@
       container.style.height = `${cssHeight}px`;
 
       await page.render({ canvasContext: pdfCtx, viewport }).promise;
-
-      redrawDrawings(renderScale);
-      renderTexts();
-      renderImages();
+      renderOverlayElements();
     }
 
-    // ==== MOTOR DE GESTOS E POINTERS (CORRIGIDO SEM SALTOS DE CAMERA) ====
-    let pointers = [];
-    let initialPinchDistance = null;
-    let initialZoom = 1;
-    let lastPanPt = null;
-    let isDrawingStroke = false;
-    let currentPath = [];
+    // ========================================================================
+    // MOTOR PAN & ZOOM (TELA E TOUCH)
+    // ========================================================================
+    let isPanning = false;
+    let startPanX, startPanY;
 
-    function setupGestureEngine() {
-      workspace.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
-
-      workspace.addEventListener('pointerdown', (e) => {
-        // Fecha popovers abertos ao tocar no workspace
-        closeAllPopovers();
-
-        pointers.push(e);
-
-        if (pointers.length === 2) {
-          initialPinchDistance = Math.hypot(pointers[0].clientX - pointers[1].clientX, pointers[0].clientY - pointers[1].clientY);
-          initialZoom = state.zoom;
-          isDrawingStroke = false; 
-        } 
-        else if (pointers.length === 1) {
-          if (state.activeTool === 'hand') {
-            lastPanPt = { x: e.clientX, y: e.clientY };
-          } 
-          else if (state.activeTool === 'draw') {
-            isDrawingStroke = true;
-            const pt = getRelativeCoordinates(e.clientX, e.clientY);
-            
-            const isHighlighter = state.drawMode === 'highlighter';
-            const color = isHighlighter ? hexToRgba(state.currentColor, 0.35) : state.currentColor;
-            const width = isHighlighter ? state.strokeWidth * 3.5 : state.strokeWidth;
-
-            currentPath = [{ x: pt.x, y: pt.y, c: color, w: width }];
-            drawCtx.beginPath();
-            drawCtx.strokeStyle = color;
-            drawCtx.lineWidth = width * 2;
-            drawCtx.lineCap = 'round';
-            drawCtx.lineJoin = 'round';
-            drawCtx.moveTo(pt.x * 2, pt.y * 2);
-          }
-          else if (state.activeTool === 'text') {
-            const pt = getRelativeCoordinates(e.clientX, e.clientY);
-            createTextElement(pt.x, pt.y);
-            setTool('hand');
+    function setupPanZoomEngine() {
+      workspace.addEventListener('mousedown', (e) => {
+        if (state.activeTool === 'pan' || e.button === 1 || e.shiftKey) {
+          isPanning = true;
+          startPanX = e.clientX - state.panX;
+          startPanY = e.clientY - state.panY;
+          workspace.style.cursor = 'grabbing';
+        } else {
+          // Deseleciona se clicar no fundo vazio
+          if (e.target === pdfLayer || e.target === overlayLayer) {
+            state.selectedElementId = null;
+            renderOverlayElements();
+            hideContextMenu();
           }
         }
       });
 
-      workspace.addEventListener('pointermove', (e) => {
-        const index = pointers.findIndex(p => p.pointerId === e.pointerId);
-        if (index !== -1) pointers[index] = e;
-
-        if (pointers.length === 2) {
-          const dist = Math.hypot(pointers[0].clientX - pointers[1].clientX, pointers[0].clientY - pointers[1].clientY);
-          if (!initialPinchDistance) return;
-          const scale = dist / initialPinchDistance;
-          let newZoom = initialZoom * scale;
-          newZoom = Math.max(0.5, Math.min(newZoom, 5.0)); 
-          
-          const centerX = (pointers[0].clientX + pointers[1].clientX) / 2;
-          const centerY = (pointers[0].clientY + pointers[1].clientY) / 2;
-          
-          const workspaceRect = workspace.getBoundingClientRect();
-          const relX = centerX - workspaceRect.left;
-          const relY = centerY - workspaceRect.top;
-
-          state.panX = relX - (relX - state.panX) * (newZoom / state.zoom);
-          state.panY = relY - (relY - state.panY) * (newZoom / state.zoom);
-          state.zoom = newZoom;
-          applyTransform();
-        } 
-        else if (pointers.length === 1) {
-          if (state.activeTool === 'hand' && lastPanPt) {
-            const dx = e.clientX - lastPanPt.x;
-            const dy = e.clientY - lastPanPt.y;
-            state.panX += dx;
-            state.panY += dy;
-            lastPanPt = { x: e.clientX, y: e.clientY };
-            applyTransform();
-          } 
-          else if (state.activeTool === 'draw' && isDrawingStroke) {
-            const pt = getRelativeCoordinates(e.clientX, e.clientY);
-            currentPath.push({ x: pt.x, y: pt.y });
-            drawCtx.lineTo(pt.x * 2, pt.y * 2);
-            drawCtx.stroke();
-          }
-        }
+      window.addEventListener('mousemove', (e) => {
+        if (!isPanning) return;
+        state.panX = e.clientX - startPanX;
+        state.panY = e.clientY - startPanY;
+        applyTransform();
       });
 
-      const endPointer = (e) => {
-        pointers = pointers.filter(p => p.pointerId !== e.pointerId);
-        
-        if (pointers.length < 2) {
-          initialPinchDistance = null;
-        }
-
-        // Recalibra o ponto de arraste para o dedo restante sem pular a tela
-        if (pointers.length === 1 && state.activeTool === 'hand') {
-          lastPanPt = { x: pointers[0].clientX, y: pointers[0].clientY };
-        } else if (pointers.length === 0) {
-          lastPanPt = null;
-        }
-
-        if (state.activeTool === 'draw' && isDrawingStroke && currentPath.length > 1) {
-          state.edits[state.currentPage].paths.push([...currentPath]);
-          isDrawingStroke = false;
-        }
-      };
-
-      workspace.addEventListener('pointerup', endPointer);
-      workspace.addEventListener('pointercancel', endPointer);
-      workspace.addEventListener('pointerout', endPointer);
+      window.addEventListener('mouseup', () => {
+        isPanning = false;
+        workspace.style.cursor = state.activeTool === 'pan' ? 'grab' : 'default';
+      });
 
       workspace.addEventListener('wheel', (e) => {
-        e.preventDefault();
-        const zoomDelta = e.deltaY < 0 ? 1.1 : 0.9;
-        let newZoom = state.zoom * zoomDelta;
-        newZoom = Math.max(0.5, Math.min(newZoom, 5.0));
-        
-        const workspaceRect = workspace.getBoundingClientRect();
-        const relX = e.clientX - workspaceRect.left;
-        const relY = e.clientY - workspaceRect.top;
-
-        state.panX = relX - (relX - state.panX) * (newZoom / state.zoom);
-        state.panY = relY - (relY - state.panY) * (newZoom / state.zoom);
-        state.zoom = newZoom;
-        applyTransform();
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          const zoomDelta = e.deltaY < 0 ? 1.1 : 0.9;
+          zoomCanvas(zoomDelta, e.clientX, e.clientY);
+        } else {
+          // Panning com scroll normal
+          state.panX -= e.deltaX;
+          state.panY -= e.deltaY;
+          applyTransform();
+        }
       }, { passive: false });
+    }
+
+    function zoomCanvas(factor, clientX = null, clientY = null) {
+      let newZoom = state.zoom * factor;
+      newZoom = Math.max(0.3, Math.min(newZoom, 4.0));
+      
+      if (clientX === null) {
+        const rect = workspace.getBoundingClientRect();
+        clientX = rect.left + rect.width / 2;
+        clientY = rect.top + rect.height / 2;
+      }
+
+      const rect = workspace.getBoundingClientRect();
+      const relX = clientX - rect.left;
+      const relY = clientY - rect.top;
+
+      state.panX = relX - (relX - state.panX) * (newZoom / state.zoom);
+      state.panY = relY - (relY - state.panY) * (newZoom / state.zoom);
+      state.zoom = newZoom;
+      
+      document.getElementById('zoom-level').innerText = `${Math.round(state.zoom * 100)}%`;
+      applyTransform();
+      updateContextMenuPosition();
     }
 
     function applyTransform() {
@@ -569,239 +526,274 @@
     function centerDocument() {
       const wRect = workspace.getBoundingClientRect();
       const cRect = container.getBoundingClientRect();
-      const fitZoom = (wRect.width - 32) / (cRect.width / state.zoom);
+      const fitZoom = (wRect.width - 60) / (cRect.width / state.zoom);
       state.zoom = Math.min(fitZoom, 1.2);
       state.panX = (wRect.width - (cRect.width / state.zoom) * state.zoom) / 2;
-      state.panY = 16;
+      state.panY = 30;
+      document.getElementById('zoom-level').innerText = `${Math.round(state.zoom * 100)}%`;
       applyTransform();
     }
 
-    function getRelativeCoordinates(clientX, clientY) {
-      const rect = container.getBoundingClientRect();
-      const x = (clientX - rect.left) / state.zoom;
-      const y = (clientY - rect.top) / state.zoom;
-      return { x, y };
-    }
-
-    // ==== MANIPULAÇÃO DE POPOVERS E FERRAMENTAS ====
-    function setTool(toolName) {
-      state.activeTool = toolName;
+    function setTool(tool) {
+      state.activeTool = tool;
       document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-      const activeBtn = document.getElementById(`tool-${toolName}`);
-      if (activeBtn) activeBtn.classList.add('active');
+      document.getElementById(`tool-${tool}`).classList.add('active');
+      workspace.style.cursor = tool === 'pan' ? 'grab' : 'default';
+      overlayLayer.style.pointerEvents = tool === 'pan' ? 'none' : 'auto';
+    }
+
+    // ========================================================================
+    // SISTEMA DE ELEMENTOS HTML (TEXTOS, IMAGENS, FORMAS)
+    // ========================================================================
+    function getActivePageEdits() {
+      return state.edits[state.currentPage] || [];
+    }
+
+    function addElement(type) {
+      setTool('select');
+      const id = crypto.randomUUID();
+      const containerRect = container.getBoundingClientRect();
       
-      overlayLayer.style.pointerEvents = (toolName === 'text' || toolName === 'hand') ? 'auto' : 'none';
+      // Adiciona no centro visível da tela
+      const centerX = (window.innerWidth / 2 - state.panX) / state.zoom;
+      const centerY = (window.innerHeight / 2 - state.panY) / state.zoom;
+
+      let el = { id, type, x: centerX, y: centerY };
+
+      if (type === 'text') {
+        el = { ...el, width: 200, height: 40, text: 'Digite seu texto', fontSize: 16, color: '#000000', align: 'left', isBold: false, isItalic: false };
+      } else if (type === 'whiteout') {
+        el = { ...el, width: 200, height: 50, color: '#ffffff', type: 'rect' }; // Retângulo branco
+      }
+
+      state.edits[state.currentPage].push(el);
+      state.selectedElementId = id;
+      renderOverlayElements();
     }
 
-    function togglePopover(popoverId) {
-      const el = document.getElementById(popoverId);
-      const isHidden = el.classList.contains('hidden');
-      closeAllPopovers();
-      if (isHidden) el.classList.remove('hidden');
-    }
-
-    function closeAllPopovers() {
-      document.querySelectorAll('.popover-panel').forEach(p => p.classList.add('hidden'));
-    }
-
-    function setDrawMode(mode) {
-      state.drawMode = mode;
-      document.getElementById('btn-mode-pen').className = mode === 'pen' ? 'px-3 py-1.5 rounded-lg bg-white/20 text-white text-xs font-semibold flex items-center gap-1.5' : 'px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-300 text-xs font-semibold flex items-center gap-1.5';
-      document.getElementById('btn-mode-highlighter').className = mode === 'highlighter' ? 'px-3 py-1.5 rounded-lg bg-white/20 text-white text-xs font-semibold flex items-center gap-1.5' : 'px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-300 text-xs font-semibold flex items-center gap-1.5';
-    }
-
-    function selectPresetColor(hex) {
-      state.currentColor = hex;
-      document.getElementById('tool-color').value = hex;
-      document.getElementById('custom-color-preview').style.background = hex;
-      document.getElementById('current-color-dot').style.background = hex;
-    }
-
-    function setStrokeWidth(val) {
-      state.strokeWidth = parseInt(val);
-      document.getElementById('stroke-val-label').innerText = `${val}px`;
-    }
-
-    // ==== DESENHO E REDRAW ====
-    function redrawDrawings(scale) {
-      drawCtx.clearRect(0, 0, drawLayer.width, drawLayer.height);
-      const paths = state.edits[state.currentPage].paths;
-      paths.forEach(path => {
-        if (path.length < 2) return;
-        drawCtx.beginPath();
-        drawCtx.strokeStyle = path[0].c || '#ef4444';
-        drawCtx.lineWidth = (path[0].w || 3) * scale;
-        drawCtx.lineCap = 'round';
-        drawCtx.lineJoin = 'round';
-        drawCtx.moveTo(path[0].x * scale, path[0].y * scale);
-        for (let i = 1; i < path.length; i++) {
-          drawCtx.lineTo(path[i].x * scale, path[i].y * scale);
-        }
-        drawCtx.stroke();
-      });
-    }
-
-    function clearCurrentPageDrawings() {
-      state.edits[state.currentPage].paths = [];
-      state.edits[state.currentPage].texts = [];
-      state.edits[state.currentPage].images = [];
-      redrawDrawings(2.0);
-      renderTexts();
-      renderImages();
-    }
-
-    // ==== ELEMENTOS DE TEXTO INSTANTÂNEOS ====
-    function createTextElement(x, y, content = '') {
-      const textId = crypto.randomUUID();
-      const textObj = { id: textId, x: x, y: y, text: content, color: state.currentColor };
-      state.edits[state.currentPage].texts.push(textObj);
-      renderTexts();
-      
-      setTimeout(() => {
-        const el = document.getElementById(textId);
-        if (el) {
-          el.focus();
-          const range = document.createRange();
-          const sel = window.getSelection();
-          range.selectNodeContents(el);
-          range.collapse(false);
-          sel.removeAllRanges();
-          sel.addRange(range);
-        }
-      }, 50);
-    }
-
-    function renderTexts() {
-      overlayLayer.querySelectorAll('.text-box').forEach(el => el.remove());
-      const texts = state.edits[state.currentPage].texts;
-
-      texts.forEach(txt => {
-        const div = document.createElement('div');
-        div.id = txt.id;
-        div.className = 'text-box';
-        div.contentEditable = true;
-        div.innerText = txt.text || '';
-        if (!txt.text) div.dataset.placeholder = 'Escreva...';
-        
-        div.style.left = `${txt.x}px`;
-        div.style.top = `${txt.y}px`;
-        div.style.color = txt.color;
-
-        div.onblur = () => {
-          if (!div.innerText.trim()) {
-            state.edits[state.currentPage].texts = state.edits[state.currentPage].texts.filter(t => t.id !== txt.id);
-            div.remove();
-          } else {
-            txt.text = div.innerText;
-          }
-        };
-
-        let isDragging = false;
-        let startX, startY;
-        div.onmousedown = div.ontouchstart = (e) => {
-          if(e.type === 'touchstart') e = e.touches[0];
-          if(document.activeElement === div) return;
-          isDragging = true;
-          startX = e.clientX;
-          startY = e.clientY;
-          e.stopPropagation();
-        };
-
-        window.addEventListener('mousemove', dragTxt);
-        window.addEventListener('touchmove', dragTxt, {passive: false});
-        window.addEventListener('mouseup', endDrag);
-        window.addEventListener('touchend', endDrag);
-
-        function dragTxt(e) {
-          if (!isDragging) return;
-          e.preventDefault();
-          if(e.type === 'touchmove') e = e.touches[0];
-          
-          const dx = (e.clientX - startX) / state.zoom;
-          const dy = (e.clientY - startY) / state.zoom;
-          txt.x += dx;
-          txt.y += dy;
-          div.style.left = `${txt.x}px`;
-          div.style.top = `${txt.y}px`;
-          
-          startX = e.clientX;
-          startY = e.clientY;
-        }
-        function endDrag() { isDragging = false; }
-
-        overlayLayer.appendChild(div);
-      });
-    }
-
-    // ==== CARREGAMENTO DE IMAGENS & ASSINATURAS ====
-    function handleAddImage(e) {
+    async function handleAddImage(e) {
       const file = e.target.files[0];
       if (!file || !file.type.startsWith('image/')) return;
-
+      
       const reader = new FileReader();
       reader.onload = (evt) => {
-        const imgObj = {
-          id: crypto.randomUUID(),
-          src: evt.target.result,
-          x: 40,
-          y: 40,
-          width: 120,
-          height: 120
+        const id = crypto.randomUUID();
+        const img = new Image();
+        img.onload = () => {
+          // Redimensiona proporcionalmente para caber na tela
+          const ratio = img.width / img.height;
+          const w = 200;
+          const h = 200 / ratio;
+          
+          state.edits[state.currentPage].push({
+            id, type: 'image', src: evt.target.result,
+            x: 50, y: 50, width: w, height: h
+          });
+          state.selectedElementId = id;
+          renderOverlayElements();
         };
-        state.edits[state.currentPage].images.push(imgObj);
-        renderImages();
+        img.src = evt.target.result;
       };
       reader.readAsDataURL(file);
+      e.target.value = ''; // Reset input
     }
 
-    function renderImages() {
-      overlayLayer.querySelectorAll('.img-stamp').forEach(el => el.remove());
-      const images = state.edits[state.currentPage].images;
+    function renderOverlayElements() {
+      overlayLayer.innerHTML = '';
+      const elements = getActivePageEdits();
 
-      images.forEach(imgData => {
-        const img = document.createElement('img');
-        img.className = 'img-stamp absolute pointer-events-auto cursor-move border border-dashed border-transparent hover:border-white/50 rounded';
-        img.src = imgData.src;
-        img.style.left = `${imgData.x}px`;
-        img.style.top = `${imgData.y}px`;
-        img.style.width = `${imgData.width}px`;
+      elements.forEach(el => {
+        const wrapper = document.createElement('div');
+        wrapper.className = `pdf-element ${el.id === state.selectedElementId ? 'selected' : ''}`;
+        wrapper.style.left = `${el.x}px`;
+        wrapper.style.top = `${el.y}px`;
+        wrapper.style.width = `${el.width}px`;
+        wrapper.style.height = `${el.height}px`;
 
-        let isDragging = false, startX, startY;
-        img.onmousedown = img.ontouchstart = (e) => {
-          if(e.type === 'touchstart') e = e.touches[0];
-          isDragging = true;
-          startX = e.clientX;
-          startY = e.clientY;
+        // Renderização Específica
+        if (el.type === 'text') {
+          const div = document.createElement('div');
+          div.className = 'pdf-text-content';
+          div.style.fontSize = `${el.fontSize}px`;
+          div.style.color = el.color;
+          div.style.textAlign = el.align;
+          div.style.fontWeight = el.isBold ? 'bold' : 'normal';
+          div.style.fontStyle = el.isItalic ? 'italic' : 'normal';
+          div.innerText = el.text;
+          
+          // Permite edição de texto fluida com duplo clique
+          div.ondblclick = () => {
+            div.contentEditable = true;
+            div.focus();
+            // Desabilita drag temporariamente
+            wrapper.onmousedown = null; 
+          };
+          div.onblur = () => {
+            div.contentEditable = false;
+            updateElementData(el.id, { text: div.innerText });
+            setupDragAndResize(wrapper, el); // Restaura drag
+          };
+          wrapper.appendChild(div);
+        } 
+        else if (el.type === 'rect') {
+          const rect = document.createElement('div');
+          rect.className = 'pdf-rect-content';
+          rect.style.backgroundColor = el.color;
+          wrapper.appendChild(rect);
+        }
+        else if (el.type === 'image') {
+          const img = document.createElement('img');
+          img.className = 'pdf-image-content';
+          img.src = el.src;
+          wrapper.appendChild(img);
+        }
+
+        // Adiciona alças de redimensionamento se estiver selecionado
+        if (el.id === state.selectedElementId) {
+          ['tl', 'tr', 'bl', 'br'].forEach(pos => {
+            const handle = document.createElement('div');
+            handle.className = `resize-handle handle-${pos}`;
+            handle.onmousedown = (e) => startResize(e, el, pos);
+            wrapper.appendChild(handle);
+          });
+          showContextMenu(el, wrapper);
+        }
+
+        // Lógica de Seleção e Arraste
+        wrapper.onmousedown = (e) => {
+          if (e.target.classList.contains('resize-handle') || e.target.contentEditable === "true") return;
           e.stopPropagation();
+          if (state.selectedElementId !== el.id) {
+            state.selectedElementId = el.id;
+            renderOverlayElements();
+          }
+          startDrag(e, el);
         };
 
-        window.addEventListener('mousemove', dragImg);
-        window.addEventListener('touchmove', dragImg, {passive: false});
-        window.addEventListener('mouseup', endDragImg);
-        window.addEventListener('touchend', endDragImg);
-
-        function dragImg(e) {
-          if (!isDragging) return;
-          e.preventDefault();
-          if(e.type === 'touchmove') e = e.touches[0];
-          
-          const dx = (e.clientX - startX) / state.zoom;
-          const dy = (e.clientY - startY) / state.zoom;
-          imgData.x += dx;
-          imgData.y += dy;
-          img.style.left = `${imgData.x}px`;
-          img.style.top = `${imgData.y}px`;
-          
-          startX = e.clientX;
-          startY = e.clientY;
-        }
-        function endDragImg() { isDragging = false; }
-
-        overlayLayer.appendChild(img);
+        overlayLayer.appendChild(wrapper);
       });
+
+      if (!state.selectedElementId) hideContextMenu();
     }
 
-    // ==== DRAWER LATERAL DE THUMBNAILS REAL ====
+    function updateElementData(id, data) {
+      const el = getActivePageEdits().find(e => e.id === id);
+      if (el) Object.assign(el, data);
+    }
+
+    // ==== MOTOR DE ARRASTE (DRAG) ====
+    function startDrag(e, el) {
+      let startX = e.clientX;
+      let startY = e.clientY;
+      let initialX = el.x;
+      let initialY = el.y;
+
+      function onMouseMove(ev) {
+        const dx = (ev.clientX - startX) / state.zoom;
+        const dy = (ev.clientY - startY) / state.zoom;
+        updateElementData(el.id, { x: initialX + dx, y: initialY + dy });
+        renderOverlayElements();
+      }
+      function onMouseUp() {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      }
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    }
+
+    // ==== MOTOR DE REDIMENSIONAMENTO (RESIZE) ====
+    function startResize(e, el, handle) {
+      e.stopPropagation();
+      let startX = e.clientX;
+      let startY = e.clientY;
+      let initialW = el.width;
+      let initialH = el.height;
+      let initialX = el.x;
+      let initialY = el.y;
+
+      function onMouseMove(ev) {
+        const dx = (ev.clientX - startX) / state.zoom;
+        const dy = (ev.clientY - startY) / state.zoom;
+
+        let newW = initialW, newH = initialH, newX = initialX, newY = initialY;
+
+        if (handle.includes('r')) newW = Math.max(20, initialW + dx);
+        if (handle.includes('l')) { newW = Math.max(20, initialW - dx); newX = initialX + (initialW - newW); }
+        if (handle.includes('b')) newH = Math.max(20, initialH + dy);
+        if (handle.includes('t')) { newH = Math.max(20, initialH - dy); newY = initialY + (initialH - newH); }
+
+        updateElementData(el.id, { x: newX, y: newY, width: newW, height: newH });
+        renderOverlayElements();
+      }
+      function onMouseUp() {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      }
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    }
+
+    // ==== MENU CONTEXTUAL FLUTUANTE ====
+    function showContextMenu(el, domWrapper) {
+      const rect = domWrapper.getBoundingClientRect();
+      const workspaceRect = workspace.getBoundingClientRect();
+      
+      // Posiciona acima do elemento
+      let top = rect.top - workspaceRect.top - 50;
+      let left = rect.left - workspaceRect.left + (rect.width / 2);
+
+      // Previne sair da tela
+      top = Math.max(10, top);
+
+      contextMenu.style.top = `${top}px`;
+      contextMenu.style.left = `${left}px`;
+      contextMenu.style.transform = `translateX(-50%)`;
+      contextMenu.classList.add('active');
+
+      // Atualiza painéis baseados no tipo
+      document.getElementById('ctx-text-tools').classList.toggle('hidden', el.type !== 'text');
+      
+      // Atualiza valores atuais no UI do menu
+      if (el.type === 'text') {
+        document.getElementById('ctx-font-size').value = el.fontSize;
+        document.getElementById('ctx-bold').classList.toggle('active', el.isBold);
+        document.getElementById('ctx-italic').classList.toggle('active', el.isItalic);
+      }
+      
+      if (el.color) {
+        document.getElementById('ctx-color').value = el.color;
+        document.getElementById('ctx-color-preview').style.backgroundColor = el.color;
+      }
+    }
+
+    function hideContextMenu() {
+      contextMenu.classList.remove('active');
+    }
+
+    function updateSelectedElement(props) {
+      if (state.selectedElementId) {
+        updateElementData(state.selectedElementId, props);
+        renderOverlayElements();
+      }
+    }
+
+    function toggleElementStyle(prop) {
+      if (state.selectedElementId) {
+        const el = getActivePageEdits().find(e => e.id === state.selectedElementId);
+        if (el) updateSelectedElement({ [prop]: !el[prop] });
+      }
+    }
+
+    function deleteSelectedElement() {
+      if (state.selectedElementId) {
+        state.edits[state.currentPage] = state.edits[state.currentPage].filter(e => e.id !== state.selectedElementId);
+        state.selectedElementId = null;
+        renderOverlayElements();
+      }
+    }
+
+    // ==== PAINEL LATERAL DE PÁGINAS ====
     function toggleDrawer(show) {
       const drawer = document.getElementById('pages-drawer');
       const backdrop = document.getElementById('drawer-backdrop');
@@ -816,6 +808,19 @@
       }
     }
 
+    async function addBlankPageToDoc(orientation) {
+      const size = orientation === 'portrait' ? [595.28, 841.89] : [841.89, 595.28];
+      state.pdfDocLib.addPage(size);
+      
+      const newBytes = await state.pdfDocLib.save();
+      await loadPdfData(newBytes);
+      
+      state.currentPage = state.totalPages; // Vai pra última página
+      await renderCurrentPage();
+      centerDocument();
+      renderThumbnailsDrawer();
+    }
+
     async function renderThumbnailsDrawer() {
       const container = document.getElementById('thumbnails-container');
       container.innerHTML = '';
@@ -824,7 +829,7 @@
         const wrapper = document.createElement('div');
         const isActive = i === state.currentPage;
         
-        wrapper.className = `p-2 rounded-xl flex flex-col gap-1.5 transition-colors cursor-pointer border ${isActive ? 'bg-white/10 border-white/20' : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.08]'}`;
+        wrapper.className = `p-2 rounded-xl flex flex-col gap-2 transition-colors cursor-pointer border ${isActive ? 'bg-blue-500/20 border-blue-500/50' : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.08]'}`;
         
         wrapper.onclick = async () => {
           state.currentPage = i;
@@ -837,14 +842,13 @@
         const canvasId = `thumb-page-${i}`;
 
         wrapper.innerHTML = `
-          <div class="flex items-center justify-between text-zinc-400 px-0.5">
-            <span class="text-[11px] font-semibold ${isActive ? 'text-white' : 'text-zinc-400'}">Pág ${i}</span>
-            <div class="flex items-center gap-1">
-              <button onclick="event.stopPropagation(); rotatePage(${i})" class="hover:text-white p-1 rounded" title="Girar 90°"><i class="ph-bold ph-arrows-clockwise"></i></button>
-              <button onclick="event.stopPropagation(); deletePage(${i})" class="hover:text-red-400 p-1 rounded" title="Excluir"><i class="ph-bold ph-trash"></i></button>
+          <div class="flex items-center justify-between text-zinc-400">
+            <span class="text-xs font-semibold ${isActive ? 'text-white' : 'text-zinc-400'}">Página ${i}</span>
+            <div class="flex items-center gap-1.5">
+              <button onclick="event.stopPropagation(); deletePage(${i})" class="hover:text-red-400 p-1.5 rounded-md hover:bg-red-500/20 transition-colors" title="Excluir Página"><i class="ph-bold ph-trash"></i></button>
             </div>
           </div>
-          <div class="w-full bg-white rounded-lg overflow-hidden shadow-inner border border-zinc-200">
+          <div class="w-full aspect-[1/1.4] bg-white rounded-lg flex items-center justify-center overflow-hidden pointer-events-none shadow-inner border border-zinc-200 relative">
              <canvas id="${canvasId}" class="w-full h-auto block"></canvas>
           </div>
         `;
@@ -854,11 +858,9 @@
             const canvas = document.getElementById(canvasId);
             if(!canvas) return;
             const ctx = canvas.getContext('2d');
-            
             const baseViewport = page.getViewport({ scale: 1 });
-            const thumbScale = 160 / baseViewport.width; 
+            const thumbScale = 180 / baseViewport.width; 
             const viewport = page.getViewport({ scale: thumbScale });
-            
             canvas.width = viewport.width;
             canvas.height = viewport.height;
             page.render({ canvasContext: ctx, viewport });
@@ -866,123 +868,101 @@
       }
     }
 
-    async function addNewBlankPage() {
-      state.pdfDocLib.addPage([595.28, 841.89]);
-      const newBytes = await state.pdfDocLib.save();
-      await loadPdfData(newBytes);
-      state.currentPage = state.totalPages;
-      await renderCurrentPage();
-      centerDocument();
-      renderThumbnailsDrawer();
-    }
-
-    async function rotatePage(pageNum) {
-      const page = state.pdfDocLib.getPage(pageNum - 1);
-      const currentRotation = page.getRotation().angle;
-      page.setRotation(PDFLib.degrees((currentRotation + 90) % 360));
-      
-      const newBytes = await state.pdfDocLib.save();
-      await loadPdfData(newBytes);
-    }
-
     async function deletePage(pageNum) {
-      if (state.totalPages <= 1) {
-        alert("O PDF precisa ter pelo menos 1 página.");
-        return;
-      }
+      if (state.totalPages <= 1) { alert("O PDF precisa ter pelo menos 1 página."); return; }
       if (!confirm(`Remover página ${pageNum}?`)) return;
 
       state.pdfDocLib.removePage(pageNum - 1);
       
+      // Shift edits
       for (let i = pageNum; i < state.totalPages; i++) {
         state.edits[i] = state.edits[i+1];
       }
       delete state.edits[state.totalPages];
 
       const newBytes = await state.pdfDocLib.save();
-      await loadPdfData(newBytes);
+      state.pdfJsDoc = await pdfjsLib.getDocument({ data: newBytes.slice(0) }).promise;
+      state.totalPages = state.pdfJsDoc.numPages;
+
+      if (state.currentPage > state.totalPages) state.currentPage = state.totalPages;
+
+      renderThumbnailsDrawer();
+      await renderCurrentPage();
     }
 
-    // ==== EXPORTAÇÃO FINAL DO ARQUIVO ====
+    // ========================================================================
+    // EXPORTAÇÃO FINAL PARA O PDF NATIVO VIA PDF-LIB
+    // ========================================================================
     async function exportFinalPDF() {
       if (!state.pdfDocLib) return;
-      document.getElementById('sync-status').innerText = "Gerando...";
+      document.getElementById('sync-status').innerText = "Gerando PDF...";
 
       try {
+        const helveticaFont = await state.pdfDocLib.embedFont(PDFLib.StandardFonts.Helvetica);
+        const helveticaBold = await state.pdfDocLib.embedFont(PDFLib.StandardFonts.HelveticaBold);
+        const helveticaOblique = await state.pdfDocLib.embedFont(PDFLib.StandardFonts.HelveticaOblique);
+        const helveticaBoldOblique = await state.pdfDocLib.embedFont(PDFLib.StandardFonts.HelveticaBoldOblique);
+
         for (let i = 1; i <= state.totalPages; i++) {
-          const edits = state.edits[i];
-          if (!edits || (edits.paths.length === 0 && edits.texts.length === 0 && edits.images.length === 0)) continue;
+          const elements = state.edits[i];
+          if (!elements || elements.length === 0) continue;
 
           const page = state.pdfDocLib.getPage(i - 1);
           const { width, height } = page.getSize();
+          
+          // Precisamos da escala original para mapear coordenadas HTML px para PDF points
+          const pdfJsPage = await state.pdfJsDoc.getPage(i);
+          const viewport = pdfJsPage.getViewport({ scale: 1 });
+          const scaleX = width / viewport.width;
+          const scaleY = height / viewport.height;
 
-          // Incorporar Traçados
-          if (edits.paths.length > 0) {
-            const offCanvas = document.createElement('canvas');
-            offCanvas.width = width * 2;
-            offCanvas.height = height * 2;
-            const offCtx = offCanvas.getContext('2d');
+          for (const el of elements) {
+            // Conversão de coordenadas (Atenção: PDF-lib tem origem Y no fundo esquerdo, HTML no topo esquerdo)
+            const pdfX = el.x * scaleX;
+            const pdfY = height - ((el.y + el.height) * scaleY);
+            const pdfW = el.width * scaleX;
+            const pdfH = el.height * scaleY;
 
-            const viewScale = (width * 2) / (pdfLayer.width / 2);
+            // Extrair RGB do Hex (#RRGGBB)
+            const rgb = hexToRgb(el.color || '#000000');
 
-            edits.paths.forEach(path => {
-              if (path.length < 2) return;
-              offCtx.beginPath();
-              offCtx.strokeStyle = path[0].c;
-              offCtx.lineWidth = (path[0].w || 3) * viewScale; 
-              offCtx.lineCap = 'round';
-              offCtx.lineJoin = 'round';
-              offCtx.moveTo(path[0].x * 2 * viewScale, path[0].y * 2 * viewScale);
-              for (let p = 1; p < path.length; p++) {
-                offCtx.lineTo(path[p].x * 2 * viewScale, path[p].y * 2 * viewScale);
-              }
-              offCtx.stroke();
-            });
-
-            const pngDataUrl = offCanvas.toDataURL('image/png');
-            const pngImage = await state.pdfDocLib.embedPng(pngDataUrl);
-            page.drawImage(pngImage, { x: 0, y: 0, width: width, height: height });
-          }
-
-          // Incorporar Textos
-          if (edits.texts.length > 0) {
-            const font = await state.pdfDocLib.embedFont(PDFLib.StandardFonts.Helvetica);
-            for (const txt of edits.texts) {
-              const pdfJsPage = await state.pdfJsDoc.getPage(i);
-              const viewport = pdfJsPage.getViewport({ scale: 1 });
-              const scaleX = width / viewport.width;
-              const scaleY = height / viewport.height;
-
-              const rgbRegex = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i;
-              const result = rgbRegex.exec(txt.color);
-              const r = result ? parseInt(result[1], 16) / 255 : 0;
-              const g = result ? parseInt(result[2], 16) / 255 : 0;
-              const b = result ? parseInt(result[3], 16) / 255 : 0;
-
-              page.drawText(txt.text, {
-                x: txt.x * scaleX,
-                y: height - (txt.y * scaleY) - 12,
-                size: 14,
-                font: font,
-                color: PDFLib.rgb(r, g, b)
+            if (el.type === 'rect') {
+              page.drawRectangle({
+                x: pdfX, y: pdfY, width: pdfW, height: pdfH,
+                color: PDFLib.rgb(rgb.r, rgb.g, rgb.b),
+                borderWidth: 0
               });
+            } 
+            else if (el.type === 'image') {
+              const imgBytes = await fetch(el.src).then(res => res.arrayBuffer());
+              let embeddedImg;
+              if (el.src.includes('png') || el.src.startsWith('data:image/png')) {
+                embeddedImg = await state.pdfDocLib.embedPng(imgBytes);
+              } else {
+                embeddedImg = await state.pdfDocLib.embedJpg(imgBytes);
+              }
+              page.drawImage(embeddedImg, { x: pdfX, y: pdfY, width: pdfW, height: pdfH });
             }
-          }
+            else if (el.type === 'text') {
+              let fontToUse = helveticaFont;
+              if (el.isBold && el.isItalic) fontToUse = helveticaBoldOblique;
+              else if (el.isBold) fontToUse = helveticaBold;
+              else if (el.isItalic) fontToUse = helveticaOblique;
 
-          // Incorporar Imagens
-          if (edits.images.length > 0) {
-            for (const imgData of edits.images) {
-              const pdfJsPage = await state.pdfJsDoc.getPage(i);
-              const viewport = pdfJsPage.getViewport({ scale: 1 });
-              const scaleX = width / viewport.width;
-              const scaleY = height / viewport.height;
+              // Em PDF-lib, o Y da fonte é a linha de base (baseline). Precisamos ajustar o offsetY.
+              // Simulando que a baseline fica próxima ao topo + tamanho da fonte.
+              const baselineY = height - (el.y * scaleY) - (el.fontSize * scaleY * 0.8);
 
-              const embeddedImg = await state.pdfDocLib.embedPng(imgData.src);
-              page.drawImage(embeddedImg, {
-                x: imgData.x * scaleX,
-                y: height - ((imgData.y + imgData.height) * scaleY),
-                width: imgData.width * scaleX,
-                height: imgData.height * scaleY
+              // Para alinhar o texto, precisaríamos medir a largura da string na fonte, mas para simplificar, 
+              // vamos desenhar a partir da esquerda respeitando o padding.
+              page.drawText(el.text, {
+                x: pdfX,
+                y: baselineY,
+                size: el.fontSize * scaleY, // Ajusta o tamanho da fonte proporcionalmente
+                font: fontToUse,
+                color: PDFLib.rgb(rgb.r, rgb.g, rgb.b),
+                lineHeight: (el.fontSize * 1.2) * scaleY,
+                maxWidth: pdfW // Quebra de linha automática do pdf-lib
               });
             }
           }
@@ -992,23 +972,23 @@
         const blob = new Blob([finalBytes], { type: 'application/pdf' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
-        link.download = `Editado_${state.filename}`;
+        link.download = state.filename;
         link.click();
 
         document.getElementById('sync-status').innerText = "Pronto";
       } catch (err) {
-        alert("Erro ao exportar PDF.");
+        alert("Erro ao exportar o PDF.");
         console.error(err);
-        document.getElementById('sync-status').innerText = "Erro";
       }
     }
 
-    // Auxiliar Hex to RGBA
-    function hexToRgba(hex, alpha) {
-      const r = parseInt(hex.slice(1, 3), 16);
-      const g = parseInt(hex.slice(3, 5), 16);
-      const b = parseInt(hex.slice(5, 7), 16);
-      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    function hexToRgb(hex) {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? {
+        r: parseInt(result[1], 16) / 255,
+        g: parseInt(result[2], 16) / 255,
+        b: parseInt(result[3], 16) / 255
+      } : { r: 0, g: 0, b: 0 };
     }
 
     initEditor();
