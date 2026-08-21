@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#09090b">
-  <title>Editor de PDF Pro</title>
+  <title>Editor de PDF Pro - Estilo Word</title>
 
   <!-- Bibliotecas: Supabase, PDF.js, PDF-lib, Tailwind, Phosphor Icons -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -12,7 +12,7 @@
   <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/@phosphor-icons/web"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Merriweather&family=Courier+Prime&family=Georgia&display=swap" rel="stylesheet">
 
   <script>
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -20,9 +20,13 @@
       darkMode: 'class',
       theme: {
         extend: {
-          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          fontFamily: { 
+            sans: ['Inter', 'sans-serif'],
+            serif: ['Georgia', 'serif'],
+            mono: ['Courier Prime', 'monospace']
+          },
           colors: {
-            matte: { bg: '#09090b', card: '#121214', border: '#27272a', text: '#fafafa', muted: '#a1a1aa', primary: '#3b82f6' }
+            matte: { bg: '#09090b', card: '#121214', border: '#27272a', text: '#fafafa', muted: '#a1a1aa', primary: '#2563eb' }
           }
         }
       }
@@ -31,15 +35,17 @@
 
   <style>
     body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #09090b; color: #fafafa; overflow: hidden; overscroll-behavior: none; }
-    .no-scrollbars::-webkit-scrollbar { display: none; }
-    .no-scrollbars { -ms-overflow-style: none; scrollbar-width: none; }
+    .custom-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
+    .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #27272a; border-radius: 99px; }
+    .custom-scroll::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
 
-    /* Área de Trabalho do PDF */
+    /* Área de Trabalho do Documento */
     #workspace {
       position: absolute;
-      top: 56px; /* Header */
+      top: 110px; /* Header + Ribbon Toolbar */
       bottom: 0;
-      left: 64px; /* Toolbar lateral */
+      left: 0;
       right: 0;
       overflow: hidden;
       background-color: #121214;
@@ -57,150 +63,145 @@
     }
 
     canvas { display: block; position: absolute; top: 0; left: 0; pointer-events: none; }
-    #overlay-layer { z-index: 10; position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+    #overlay-layer { z-index: 10; position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
 
-    /* Estilos dos Elementos Editáveis no Overlay */
-    .pdf-element {
+    /* Elementos Editáveis no Overlay */
+    .word-element {
       position: absolute;
-      cursor: grab;
+      cursor: move;
       user-select: none;
       box-sizing: border-box;
       transform-origin: 0 0;
+      pointer-events: auto;
     }
-    .pdf-element.selected {
-      outline: 2px solid #3b82f6;
+    .word-element.selected {
+      outline: 2px solid #2563eb;
       z-index: 50;
     }
-    .pdf-element:active { cursor: grabbing; }
 
-    /* Textos */
-    .pdf-text-content {
+    /* Conteúdo de Texto Estilo Word */
+    .word-text-content {
       width: 100%;
       height: 100%;
       outline: none;
       color: #000;
-      font-family: Arial, Helvetica, sans-serif; /* Padrão seguro para pdf-lib */
-      line-height: 1.2;
+      line-height: 1.3;
       overflow: hidden;
       white-space: pre-wrap;
       word-wrap: break-word;
+      padding: 2px;
     }
-    
-    /* Imagens e Retângulos */
-    .pdf-image-content { width: 100%; height: 100%; object-fit: fill; pointer-events: none; }
-    .pdf-rect-content { width: 100%; height: 100%; pointer-events: none; }
+    .word-text-content[contenteditable="true"] {
+      cursor: text;
+      user-select: text;
+      background: rgba(37, 99, 235, 0.03);
+    }
 
-    /* Alças de Redimensionamento (Resize Handles) */
+    /* Alças de Redimensionamento Word Style (8 Pontos) */
     .resize-handle {
       position: absolute;
-      width: 12px;
-      height: 12px;
-      background-color: #fff;
-      border: 2px solid #3b82f6;
-      border-radius: 50%;
+      width: 8px;
+      height: 8px;
+      background-color: #ffffff;
+      border: 1.5px solid #2563eb;
+      border-radius: 2px;
       display: none;
       z-index: 60;
     }
-    .pdf-element.selected .resize-handle { display: block; }
-    .handle-tl { top: -6px; left: -6px; cursor: nwse-resize; }
-    .handle-tr { top: -6px; right: -6px; cursor: nesw-resize; }
-    .handle-bl { bottom: -6px; left: -6px; cursor: nesw-resize; }
-    .handle-br { bottom: -6px; right: -6px; cursor: nwse-resize; }
+    .word-element.selected .resize-handle { display: block; }
+    .handle-nw { top: -4px; left: -4px; cursor: nwse-resize; }
+    .handle-n  { top: -4px; left: calc(50% - 4px); cursor: ns-resize; }
+    .handle-ne { top: -4px; right: -4px; cursor: nesw-resize; }
+    .handle-e  { top: calc(50% - 4px); right: -4px; cursor: ew-resize; }
+    .handle-se { bottom: -4px; right: -4px; cursor: nwse-resize; }
+    .handle-s  { bottom: -4px; left: calc(50% - 4px); cursor: ns-resize; }
+    .handle-sw { bottom: -4px; left: -4px; cursor: nesw-resize; }
+    .handle-w  { top: calc(50% - 4px); left: -4px; cursor: ew-resize; }
 
-    /* Menu Contextual Flutuante */
-    #context-menu {
+    /* Menu Flutuante de Ação Rápida no Elemento Selecionado */
+    .floating-element-menu {
       position: absolute;
-      display: none;
-      background: rgba(28, 28, 30, 0.95);
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 12px;
-      padding: 6px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-      z-index: 100;
+      top: -38px;
+      left: 0;
+      background: #1c1c1e;
+      border: 1px solid #27272a;
+      border-radius: 8px;
+      padding: 3px 6px;
+      display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 4px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      z-index: 70;
+      pointer-events: auto;
     }
-    #context-menu.active { display: flex; }
 
-    .ctx-btn {
-      padding: 6px;
-      border-radius: 6px;
+    /* Ribbon Tabs */
+    .ribbon-tab-btn {
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 600;
       color: #a1a1aa;
-      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+    }
+    .ribbon-tab-btn.active {
+      color: #3b82f6;
+      border-bottom-color: #3b82f6;
+      background: rgba(255,255,255,0.02);
+    }
+
+    .ribbon-tool-btn {
+      padding: 5px;
+      border-radius: 6px;
+      color: #d4d4d8;
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: all 0.2s;
+      transition: all 0.15s;
+      cursor: pointer;
     }
-    .ctx-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
-    .ctx-btn.active { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
-    
-    .ctx-input {
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.1);
-      color: #fff;
-      border-radius: 6px;
-      padding: 4px;
+    .ribbon-tool-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
+    .ribbon-tool-btn.active { background: rgba(37, 99, 235, 0.25); color: #60a5fa; }
+
+    /* Estilização da Tabela no PDF */
+    .word-table-content {
+      width: 100%;
+      height: 100%;
+      border-collapse: collapse;
+      background: white;
+    }
+    .word-table-content td, .word-table-content th {
+      border: 1px solid #000;
+      padding: 4px 6px;
       font-size: 12px;
-      text-align: center;
+      color: #000;
       outline: none;
     }
 
-    /* Toolbar Lateral */
-    .side-toolbar {
-      position: absolute;
-      top: 56px;
-      bottom: 0;
-      left: 0;
-      width: 64px;
-      background: #121214;
-      border-right: 1px solid #27272a;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding-top: 16px;
-      gap: 16px;
-      z-index: 40;
-    }
-    .tool-btn {
-      width: 44px;
-      height: 44px;
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #a1a1aa;
-      transition: all 0.2s;
-      cursor: pointer;
-    }
-    .tool-btn:hover { background: rgba(255,255,255,0.05); color: #fff; }
-    .tool-btn.active { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
-
     /* Drawer de Páginas */
-    #pages-drawer { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    #pages-drawer { transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
     .drawer-closed { transform: translateX(100%); }
     .drawer-open { transform: translateX(0); }
   </style>
 </head>
-<body class="antialiased text-white">
+<body class="antialiased text-white select-none">
 
   <!-- TELA INICIAL (ESTADO VAZIO) -->
   <div id="empty-state" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-matte-bg px-6">
-    <div class="w-20 h-20 rounded-[24px] bg-white/[0.02] border border-white/5 flex items-center justify-center text-zinc-500 mb-6 shadow-2xl">
-      <i class="ph-fill ph-file-pdf text-4xl text-blue-500/80"></i>
+    <div class="w-20 h-20 rounded-[24px] bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 mb-6 shadow-2xl">
+      <i class="ph-bold ph-file-doc text-4xl"></i>
     </div>
     <h2 class="text-xl font-bold text-white mb-2 text-center">Editor de PDF Profissional</h2>
-    <p class="text-sm text-zinc-400 mb-8 text-center max-w-sm leading-relaxed">Adicione textos, imagens, cubra informações sensíveis e gerencie páginas de forma fluida e direta.</p>
+    <p class="text-xs text-zinc-400 mb-8 text-center max-w-sm leading-relaxed">Sua suíte completa de edição de PDF com visual e ferramentas inspirados no Microsoft Word.</p>
     
-    <div class="flex flex-col sm:flex-row items-center gap-4 w-full max-w-sm">
-      <label class="w-full px-5 py-3.5 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-500 transition-colors cursor-pointer shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2">
-        <i class="ph-bold ph-folder-open text-lg"></i> Abrir Documento
+    <div class="flex flex-col sm:flex-row items-center gap-3 w-full max-w-sm">
+      <label class="w-full px-5 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition-colors cursor-pointer shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2">
+        <i class="ph-bold ph-folder-open text-base"></i> Abrir Documento PDF
         <input type="file" id="file-upload" accept="application/pdf" class="hidden" onchange="handleFileSelect(event)">
       </label>
 
-      <button onclick="createBlankPDF()" class="w-full px-5 py-3.5 rounded-xl bg-white/[0.05] border border-white/10 text-white font-bold text-sm hover:bg-white/[0.1] transition-colors flex items-center justify-center gap-2">
-        <i class="ph-bold ph-file-plus text-lg"></i> Criar em Branco
+      <button onclick="createBlankPDF()" class="w-full px-5 py-3.5 rounded-xl bg-white/[0.05] border border-white/10 text-white font-bold text-xs hover:bg-white/[0.1] transition-colors flex items-center justify-center gap-2">
+        <i class="ph-bold ph-file-plus text-base"></i> Criar em Branco (A4)
       </button>
     </div>
   </div>
@@ -208,118 +209,186 @@
   <!-- EDITOR PRINCIPAL -->
   <div id="editor-ui" class="hidden flex-col h-full w-full relative">
     
-    <!-- CABEÇALHO SUPERIOR -->
-    <header class="h-14 bg-matte-card border-b border-matte-border flex items-center justify-between px-4 shrink-0 absolute top-0 w-full z-40">
-      <div class="flex items-center gap-4">
-        <div class="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400">
-          <i class="ph-fill ph-file-pdf text-lg"></i>
-        </div>
-        <div>
-          <input type="text" id="header-filename" value="documento.pdf" onchange="state.filename = this.value" class="bg-transparent font-bold text-sm text-white focus:outline-none focus:border-b border-blue-500 truncate w-32 sm:w-64">
-          <div class="text-[10px] text-zinc-500 flex items-center gap-1">
-            <span id="sync-status">Alterações salvas localmente</span>
+    <!-- CABEÇALHO E RIBBON WORD STYLE -->
+    <header class="bg-matte-card border-b border-matte-border shrink-0 absolute top-0 w-full z-40">
+      
+      <!-- Linha 1: Título do Documento e Ações Globais -->
+      <div class="h-11 px-4 flex items-center justify-between border-b border-white/5">
+        <div class="flex items-center gap-3">
+          <div class="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400">
+            <i class="ph-bold ph-file-pdf text-base"></i>
           </div>
+          <input type="text" id="header-filename" value="documento.pdf" onchange="state.filename = this.value" class="bg-transparent font-bold text-xs text-white focus:outline-none focus:border-b border-blue-500 truncate w-40 sm:w-64">
+          <span id="sync-status" class="text-[10px] text-zinc-500 hidden sm:inline">Salvo localmente</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button onclick="toggleDrawer(true)" class="px-2.5 py-1 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 text-zinc-300 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+            <i class="ph-bold ph-files"></i> <span class="hidden sm:inline">Páginas</span>
+          </button>
+          <button onclick="exportFinalPDF()" class="px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-lg shadow-blue-500/20 flex items-center gap-1.5 transition-colors">
+            <i class="ph-bold ph-download-simple"></i> Exportar PDF
+          </button>
         </div>
       </div>
 
-      <div class="flex items-center gap-2">
-        <button onclick="toggleDrawer(true)" class="px-3 py-1.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 text-zinc-300 text-xs font-semibold flex items-center gap-1.5 transition-colors">
-          <i class="ph-bold ph-files"></i> <span class="hidden sm:inline">Páginas</span>
-        </button>
-        <button onclick="exportFinalPDF()" class="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-lg shadow-blue-500/20 flex items-center gap-1.5 transition-colors">
-          <i class="ph-bold ph-download-simple"></i> Exportar
-        </button>
+      <!-- Linha 2: Abas da Ribbon Word (Início, Inserir, Layout, Exibir) -->
+      <div class="flex items-center gap-1 px-2 border-b border-white/5 bg-matte-bg">
+        <button onclick="setRibbonTab('home')" id="tab-home" class="ribbon-tab-btn active">Início</button>
+        <button onclick="setRibbonTab('insert')" id="tab-insert" class="ribbon-tab-btn">Inserir</button>
+        <button onclick="setRibbonTab('layout')" id="tab-layout" class="ribbon-tab-btn">Layout da Página</button>
+        <button onclick="setRibbonTab('view')" id="tab-view" class="ribbon-tab-btn">Exibir</button>
+      </div>
+
+      <!-- Linha 3: Barra de Ferramentas da Ribbon Selecionada -->
+      <div id="ribbon-toolbar-container" class="h-12 px-3 flex items-center gap-3 overflow-x-auto custom-scroll text-xs">
+        
+        <!-- ABA: INÍCIO (Formatação de Texto) -->
+        <div id="panel-ribbon-home" class="flex items-center gap-2 shrink-0">
+          <!-- Fonte -->
+          <select id="ribbon-font-family" onchange="updateSelectedTextProp('fontFamily', this.value)" class="bg-white/[0.04] border border-white/10 rounded px-2 py-1 text-xs text-white focus:outline-none">
+            <option value="Arial">Arial</option>
+            <option value="Times New Roman">Times New Roman</option>
+            <option value="Courier New">Courier New</option>
+            <option value="Georgia">Georgia</option>
+            <option value="Verdana">Verdana</option>
+          </select>
+
+          <!-- Tamanho da Fonte -->
+          <input type="number" id="ribbon-font-size" value="14" min="8" max="96" onchange="updateSelectedTextProp('fontSize', parseInt(this.value))" class="w-12 bg-white/[0.04] border border-white/10 rounded p-1 text-xs text-center text-white focus:outline-none" title="Tamanho da Fonte (pt)">
+
+          <div class="w-px h-5 bg-white/10 mx-0.5"></div>
+
+          <!-- Estilos Básicos -->
+          <button onclick="toggleSelectedTextProp('isBold')" id="btn-bold" class="ribbon-tool-btn" title="Negrito (Ctrl+B)"><i class="ph-bold ph-text-b text-sm"></i></button>
+          <button onclick="toggleSelectedTextProp('isItalic')" id="btn-italic" class="ribbon-tool-btn" title="Itálico (Ctrl+I)"><i class="ph-bold ph-text-italic text-sm"></i></button>
+          <button onclick="toggleSelectedTextProp('isUnderline')" id="btn-underline" class="ribbon-tool-btn" title="Sublinhado"><i class="ph-bold ph-text-underline text-sm"></i></button>
+
+          <div class="w-px h-5 bg-white/10 mx-0.5"></div>
+
+          <!-- Cor do Texto e Destaque -->
+          <div class="relative w-6 h-6 rounded border border-white/20 overflow-hidden flex items-center justify-center" title="Cor do Texto">
+            <input type="color" id="ribbon-color" oninput="updateSelectedTextProp('color', this.value)" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+            <i class="ph-bold ph-text-color text-xs pointer-events-none" id="icon-color-preview"></i>
+          </div>
+
+          <div class="relative w-6 h-6 rounded border border-white/20 overflow-hidden flex items-center justify-center" title="Cor de Destaque / Grifador">
+            <input type="color" id="ribbon-bg-color" value="#ffff00" oninput="updateSelectedTextProp('bgColor', this.value)" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+            <i class="ph-bold ph-paint-bucket text-xs pointer-events-none" id="icon-bgcolor-preview"></i>
+          </div>
+
+          <div class="w-px h-5 bg-white/10 mx-0.5"></div>
+
+          <!-- Alinhamentos -->
+          <button onclick="updateSelectedTextProp('align', 'left')" class="ribbon-tool-btn" title="Alinhar à Esquerda"><i class="ph-bold ph-text-align-left text-sm"></i></button>
+          <button onclick="updateSelectedTextProp('align', 'center')" class="ribbon-tool-btn" title="Centralizar"><i class="ph-bold ph-text-align-center text-sm"></i></button>
+          <button onclick="updateSelectedTextProp('align', 'right')" class="ribbon-tool-btn" title="Alinhar à Direita"><i class="ph-bold ph-text-align-right text-sm"></i></button>
+          <button onclick="updateSelectedTextProp('align', 'justify')" class="ribbon-tool-btn" title="Justificado"><i class="ph-bold ph-text-align-justify text-sm"></i></button>
+
+          <div class="w-px h-5 bg-white/10 mx-0.5"></div>
+
+          <!-- Espaçamento -->
+          <select id="ribbon-line-height" onchange="updateSelectedTextProp('lineHeight', parseFloat(this.value))" class="bg-white/[0.04] border border-white/10 rounded px-1.5 py-1 text-xs text-white focus:outline-none" title="Espaçamento entre Linhas">
+            <option value="1.0">1.0</option>
+            <option value="1.2" selected>1.2</option>
+            <option value="1.5">1.5</option>
+            <option value="2.0">2.0</option>
+          </select>
+        </div>
+
+        <!-- ABA: INSERIR (Texto, Imagem, Formas, Tabelas, Máscara) -->
+        <div id="panel-ribbon-insert" class="hidden flex items-center gap-2 shrink-0">
+          <button onclick="addElement('text')" class="px-2.5 py-1 rounded bg-white/[0.05] hover:bg-white/[0.1] text-xs font-semibold flex items-center gap-1.5">
+            <i class="ph-bold ph-text-t text-blue-400 text-sm"></i> Caixa de Texto
+          </button>
+
+          <label class="px-2.5 py-1 rounded bg-white/[0.05] hover:bg-white/[0.1] text-xs font-semibold flex items-center gap-1.5 cursor-pointer">
+            <i class="ph-bold ph-image text-emerald-400 text-sm"></i> Imagem
+            <input type="file" accept="image/*" class="hidden" onchange="handleAddImage(event)">
+          </label>
+
+          <button onclick="addElement('rect')" class="px-2.5 py-1 rounded bg-white/[0.05] hover:bg-white/[0.1] text-xs font-semibold flex items-center gap-1.5">
+            <i class="ph-bold ph-square text-amber-400 text-sm"></i> Retângulo
+          </button>
+
+          <button onclick="addElement('circle')" class="px-2.5 py-1 rounded bg-white/[0.05] hover:bg-white/[0.1] text-xs font-semibold flex items-center gap-1.5">
+            <i class="ph-bold ph-circle text-purple-400 text-sm"></i> Círculo
+          </button>
+
+          <button onclick="addElement('whiteout')" class="px-2.5 py-1 rounded bg-white/[0.05] hover:bg-white/[0.1] text-xs font-semibold flex items-center gap-1.5" title="Cobrir ou ocultar conteúdo original do PDF">
+            <i class="ph-bold ph-square-half text-zinc-300 text-sm"></i> Apagador / Whiteout
+          </button>
+
+          <div class="w-px h-5 bg-white/10 mx-0.5"></div>
+
+          <button onclick="addElement('table')" class="px-2.5 py-1 rounded bg-white/[0.05] hover:bg-white/[0.1] text-xs font-semibold flex items-center gap-1.5">
+            <i class="ph-bold ph-table text-cyan-400 text-sm"></i> Tabela
+          </button>
+        </div>
+
+        <!-- ABA: LAYOUT DA PÁGINA -->
+        <div id="panel-ribbon-layout" class="hidden flex items-center gap-2 shrink-0">
+          <button onclick="addBlankPageToDoc('portrait')" class="px-2.5 py-1 rounded bg-white/[0.05] hover:bg-white/[0.1] text-xs font-semibold flex items-center gap-1.5">
+            <i class="ph-bold ph-file-plus text-sm"></i> + Página Retrato (A4)
+          </button>
+
+          <button onclick="addBlankPageToDoc('landscape')" class="px-2.5 py-1 rounded bg-white/[0.05] hover:bg-white/[0.1] text-xs font-semibold flex items-center gap-1.5">
+            <i class="ph-bold ph-rectangle text-sm"></i> + Página Paisagem (A4)
+          </button>
+        </div>
+
+        <!-- ABA: EXIBIR (Zoom e Mão) -->
+        <div id="panel-ribbon-view" class="hidden flex items-center gap-2 shrink-0">
+          <button onclick="setTool('select')" id="tool-select" class="ribbon-tool-btn active" title="Modo Seleção (V)"><i class="ph-bold ph-cursor text-sm"></i> Seleção</button>
+          <button onclick="setTool('pan')" id="tool-pan" class="ribbon-tool-btn" title="Modo Navegação / Mão (H)"><i class="ph-bold ph-hand-palm text-sm"></i> Mão</button>
+          
+          <div class="w-px h-5 bg-white/10 mx-0.5"></div>
+
+          <button onclick="zoomCanvas(1.2)" class="ribbon-tool-btn" title="Aumentar Zoom"><i class="ph-bold ph-magnifying-glass-plus text-sm"></i></button>
+          <span id="zoom-level" class="text-xs font-mono text-zinc-400">100%</span>
+          <button onclick="zoomCanvas(0.8)" class="ribbon-tool-btn" title="Diminuir Zoom"><i class="ph-bold ph-magnifying-glass-minus text-sm"></i></button>
+          <button onclick="centerDocument()" class="px-2 py-1 rounded bg-white/[0.05] text-xs text-zinc-300 font-bold">Centralizar</button>
+        </div>
+
       </div>
     </header>
 
-    <!-- BARRA DE FERRAMENTAS LATERAL -->
-    <nav class="side-toolbar">
-      <button onclick="setTool('select')" id="tool-select" class="tool-btn active" title="Selecionar & Mover (V)">
-        <i class="ph-bold ph-cursor text-xl"></i>
-      </button>
-      <button onclick="setTool('pan')" id="tool-pan" class="tool-btn" title="Navegar / Mão (H)">
-        <i class="ph-bold ph-hand-palm text-xl"></i>
-      </button>
-      
-      <div class="w-8 h-px bg-matte-border my-1"></div>
-
-      <button onclick="addElement('text')" class="tool-btn" title="Inserir Texto">
-        <i class="ph-bold ph-text-t text-xl"></i>
-      </button>
-      <label class="tool-btn cursor-pointer" title="Inserir Imagem">
-        <i class="ph-bold ph-image text-xl"></i>
-        <input type="file" accept="image/*" class="hidden" onchange="handleAddImage(event)">
-      </label>
-      <button onclick="addElement('whiteout')" class="tool-btn" title="Apagador / Retângulo Branco (Ocultar texto original)">
-        <i class="ph-bold ph-square text-xl"></i>
-      </button>
-      
-      <div class="flex-1"></div>
-      
-      <!-- Controles de Zoom -->
-      <div class="flex flex-col items-center gap-2 mb-4">
-        <button onclick="zoomCanvas(1.2)" class="p-2 text-zinc-400 hover:text-white"><i class="ph-bold ph-magnifying-glass-plus"></i></button>
-        <span id="zoom-level" class="text-[9px] font-mono text-zinc-500">100%</span>
-        <button onclick="zoomCanvas(0.8)" class="p-2 text-zinc-400 hover:text-white"><i class="ph-bold ph-magnifying-glass-minus"></i></button>
-      </div>
-    </nav>
-
-    <!-- WORKSPACE E MOTOR DE GESTOS -->
+    <!-- WORKSPACE E MOTOR DE RENDERIZAÇÃO -->
     <main id="workspace">
       <div id="document-container">
-        <!-- Renderização do PDF original -->
+        <!-- Renderização do PDF original base -->
         <canvas id="pdf-layer"></canvas>
-        <!-- Camada HTML com os elementos editáveis (Textos, Imagens, Formas) -->
+        <!-- Camada HTML com Objetos Editáveis Word-Style (Textos, Imagens, Formas, Tabelas) -->
         <div id="overlay-layer"></div>
       </div>
       
-      <!-- MENU CONTEXTUAL FLUTUANTE (Aparece ao selecionar elemento) -->
-      <div id="context-menu">
-        <!-- Controles de Texto -->
-        <div id="ctx-text-tools" class="flex items-center gap-1 hidden border-r border-white/10 pr-1 mr-1">
-          <input type="number" id="ctx-font-size" value="16" min="8" max="72" onchange="updateSelectedElement({fontSize: parseInt(this.value)})" class="ctx-input w-12" title="Tamanho da Fonte">
-          <button onclick="toggleElementStyle('isBold')" id="ctx-bold" class="ctx-btn" title="Negrito"><i class="ph-bold ph-text-b"></i></button>
-          <button onclick="toggleElementStyle('isItalic')" id="ctx-italic" class="ctx-btn" title="Itálico"><i class="ph-bold ph-text-italic"></i></button>
-          
-          <div class="w-px h-4 bg-white/10 mx-1"></div>
-          
-          <button onclick="updateSelectedElement({align: 'left'})" class="ctx-btn" title="Alinhar à Esquerda"><i class="ph-bold ph-text-align-left"></i></button>
-          <button onclick="updateSelectedElement({align: 'center'})" class="ctx-btn" title="Centralizar"><i class="ph-bold ph-text-align-center"></i></button>
-          <button onclick="updateSelectedElement({align: 'right'})" class="ctx-btn" title="Alinhar à Direita"><i class="ph-bold ph-text-align-right"></i></button>
+      <!-- MENU CONTEXTUAL FLUTUANTE (Aparece diretamente sobre o elemento selecionado) -->
+      <div id="context-menu" class="floating-element-menu hidden">
+        <button onclick="duplicateSelectedElement()" class="ribbon-tool-btn" title="Duplicar"><i class="ph-bold ph-copy text-xs"></i></button>
+        <button onclick="bringSelectedToFront()" class="ribbon-tool-btn" title="Trazer para Frente"><i class="ph-bold ph-stack-overflow text-xs"></i></button>
+        <button onclick="sendSelectedToBack()" class="ribbon-tool-btn" title="Enviar para Trás"><i class="ph-bold ph-stack text-xs"></i></button>
+
+        <!-- Controles para Tabela se selecionada -->
+        <div id="ctx-table-tools" class="hidden flex items-center gap-1 border-l border-white/10 pl-1 ml-1">
+          <button onclick="addTableRow()" class="ribbon-tool-btn text-cyan-400" title="+ Linha na Tabela"><i class="ph-bold ph-rows text-xs"></i></button>
+          <button onclick="addTableCol()" class="ribbon-tool-btn text-cyan-400" title="+ Coluna na Tabela"><i class="ph-bold ph-columns text-xs"></i></button>
         </div>
 
-        <!-- Cores (Aparece para texto e retângulos) -->
-        <div id="ctx-color-tools" class="flex items-center gap-2 px-1">
-          <div class="relative w-6 h-6 rounded-full overflow-hidden border border-white/20" title="Cor Principal">
-            <input type="color" id="ctx-color" oninput="updateSelectedElement({color: this.value})" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
-            <div id="ctx-color-preview" class="w-full h-full pointer-events-none bg-black"></div>
-          </div>
-          <!-- Botão Excluir Global -->
-          <div class="w-px h-4 bg-white/10 mx-1"></div>
-          <button onclick="deleteSelectedElement()" class="ctx-btn text-red-400 hover:text-red-300 hover:bg-red-500/10" title="Excluir (Del)"><i class="ph-bold ph-trash"></i></button>
-        </div>
+        <div class="w-px h-4 bg-white/10 mx-1"></div>
+        <button onclick="deleteSelectedElement()" class="ribbon-tool-btn text-red-400 hover:text-red-300" title="Excluir (Del)"><i class="ph-bold ph-trash text-xs"></i></button>
       </div>
     </main>
 
-    <!-- DRAWER LATERAL DE PÁGINAS (Fica à direita) -->
-    <div id="drawer-backdrop" onclick="toggleDrawer(false)" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 hidden transition-opacity"></div>
+    <!-- DRAWER LATERAL DE PÁGINAS -->
+    <div id="drawer-backdrop" onclick="toggleDrawer(false)" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 hidden transition-opacity"></div>
     <aside id="pages-drawer" class="fixed inset-y-0 right-0 w-72 bg-matte-card border-l border-matte-border z-50 drawer-closed flex flex-col shadow-2xl">
-      <div class="h-14 px-4 border-b border-matte-border flex items-center justify-between shrink-0">
-        <span class="text-sm font-bold text-white">Layout da Página</span>
-        <button onclick="toggleDrawer(false)" class="text-zinc-500 hover:text-white p-1 rounded-md hover:bg-white/5"><i class="ph-bold ph-x"></i></button>
-      </div>
-      
-      <div class="p-4 border-b border-matte-border grid grid-cols-2 gap-2">
-        <button onclick="addBlankPageToDoc('portrait')" class="py-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] text-xs font-semibold text-zinc-300 border border-white/5 flex flex-col items-center justify-center gap-1">
-          <i class="ph-bold ph-file-plus text-base"></i> Retrato A4
-        </button>
-        <button onclick="addBlankPageToDoc('landscape')" class="py-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] text-xs font-semibold text-zinc-300 border border-white/5 flex flex-col items-center justify-center gap-1">
-          <i class="ph-bold ph-rectangle text-base"></i> Paisagem A4
-        </button>
+      <div class="h-11 px-4 border-b border-matte-border flex items-center justify-between shrink-0">
+        <span class="text-xs font-bold text-white uppercase tracking-wider">Miniaturas das Páginas</span>
+        <button onclick="toggleDrawer(false)" class="text-zinc-500 hover:text-white p-1"><i class="ph-bold ph-x"></i></button>
       </div>
 
       <div id="thumbnails-container" class="flex-1 overflow-y-auto p-4 space-y-4 custom-scroll">
-        <!-- Miniaturas injetadas aqui -->
+        <!-- Injetado via JS -->
       </div>
     </aside>
 
@@ -327,11 +396,11 @@
 
   <script>
     // ========================================================================
-    // ESTADO GLOBAL DO EDITOR
+    // ESTADO GLOBAL DO EDITOR WORD-STYLE
     // ========================================================================
     let state = {
-      pdfDocLib: null,   // Instância manipulável (salvamento)
-      pdfJsDoc: null,    // Instância visual (renderização)
+      pdfDocLib: null,   // Instância pdf-lib manipulável
+      pdfJsDoc: null,    // Instância pdf.js visual
       filename: 'documento.pdf',
       currentPage: 1,
       totalPages: 0,
@@ -358,28 +427,14 @@
 
     function initEditor() {
       setupPanZoomEngine();
-      setupOverlayInteraction();
-      
-      // Atalhos de teclado
-      window.addEventListener('keydown', (e) => {
-        if (e.key === 'Delete' || e.key === 'Backspace') {
-          // Apenas deleta se não estiver editando um texto ativamente
-          if (document.activeElement.tagName !== 'DIV' && state.selectedElementId) {
-            deleteSelectedElement();
-          }
-        }
-        if (e.key === 'v' || e.key === 'V') setTool('select');
-        if (e.key === 'h' || e.key === 'H') setTool('pan');
-      });
+      setupKeyboardShortcuts();
     }
 
-    // ========================================================================
-    // GESTÃO DE ARQUIVOS (ABRIR, CRIAR)
-    // ========================================================================
+    // ==== GESTÃO DE ARQUIVOS (ABRIR, CRIAR EM BRANCO) ====
     async function createBlankPDF() {
       try {
         const pdfDoc = await PDFLib.PDFDocument.create();
-        pdfDoc.addPage([595.28, 841.89]); // A4 Portrait
+        pdfDoc.addPage([595.28, 841.89]); // A4 Retrato
         const pdfBytes = await pdfDoc.save();
         state.filename = "Novo_Documento.pdf";
         document.getElementById('header-filename').value = state.filename;
@@ -405,7 +460,7 @@
         state.pdfJsDoc = await pdfjsLib.getDocument({ data: typedArray }).promise;
         state.totalPages = state.pdfJsDoc.numPages;
 
-        for(let i=1; i<=state.totalPages; i++) {
+        for(let i = 1; i <= state.totalPages; i++) {
           if (!state.edits[i]) state.edits[i] = [];
         }
 
@@ -423,9 +478,7 @@
       }
     }
 
-    // ========================================================================
-    // RENDERIZAÇÃO DO PDF
-    // ========================================================================
+    // ==== RENDERIZAÇÃO DA PÁGINA (PDF.js) ====
     async function renderCurrentPage() {
       if (!state.pdfJsDoc) return;
       state.selectedElementId = null;
@@ -447,9 +500,389 @@
       renderOverlayElements();
     }
 
-    // ========================================================================
-    // MOTOR PAN & ZOOM (TELA E TOUCH)
-    // ========================================================================
+    // ==== CONTROLE DA RIBBON WORD ====
+    function setRibbonTab(tabName) {
+      document.querySelectorAll('.ribbon-tab-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById(`tab-${tabName}`).classList.add('active');
+
+      ['home', 'insert', 'layout', 'view'].forEach(p => {
+        document.getElementById(`panel-ribbon-${p}`).classList.add('hidden');
+      });
+      document.getElementById(`panel-ribbon-${tabName}`).classList.remove('hidden');
+    }
+
+    // ==== CRIAÇÃO DE ELEMENTOS NO DOCUMENTO ====
+    function getActivePageEdits() {
+      return state.edits[state.currentPage] || [];
+    }
+
+    function addElement(type) {
+      setTool('select');
+      const id = crypto.randomUUID();
+      
+      // Adiciona no centro visível
+      const centerX = (window.innerWidth / 2 - state.panX) / state.zoom - 100;
+      const centerY = (window.innerHeight / 2 - state.panY) / state.zoom - 50;
+
+      let el = { id, type, x: Math.max(20, centerX), y: Math.max(20, centerY), zIndex: state.edits[state.currentPage].length + 1 };
+
+      if (type === 'text') {
+        el = { 
+          ...el, width: 220, height: 60, text: 'Digite seu texto aqui...', 
+          fontSize: 14, fontFamily: 'Arial', color: '#000000', bgColor: 'transparent', 
+          align: 'left', isBold: false, isItalic: false, isUnderline: false, lineHeight: 1.2 
+        };
+      } else if (type === 'rect') {
+        el = { ...el, width: 150, height: 80, color: '#3b82f6', borderColor: '#1d4ed8', borderWidth: 1 };
+      } else if (type === 'circle') {
+        el = { ...el, width: 100, height: 100, color: '#10b981', borderColor: '#047857', borderWidth: 1 };
+      } else if (type === 'whiteout') {
+        el = { ...el, width: 180, height: 40, color: '#ffffff', type: 'rect' }; // Retângulo Branco Apagador
+      } else if (type === 'table') {
+        el = { 
+          ...el, width: 280, height: 100, rows: 2, cols: 2, 
+          data: [['Item', 'Valor'], ['Exemplo A', '100']] 
+        };
+      }
+
+      state.edits[state.currentPage].push(el);
+      state.selectedElementId = id;
+      renderOverlayElements();
+      updateRibbonFromSelected();
+    }
+
+    async function handleAddImage(e) {
+      const file = e.target.files[0];
+      if (!file || !file.type.startsWith('image/')) return;
+      
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const id = crypto.randomUUID();
+        const img = new Image();
+        img.onload = () => {
+          const ratio = img.width / img.height;
+          const w = 200;
+          const h = 200 / ratio;
+          
+          state.edits[state.currentPage].push({
+            id, type: 'image', src: evt.target.result,
+            x: 50, y: 50, width: w, height: h,
+            zIndex: state.edits[state.currentPage].length + 1
+          });
+          state.selectedElementId = id;
+          renderOverlayElements();
+        };
+        img.src = evt.target.result;
+      };
+      reader.readAsDataURL(file);
+      e.target.value = '';
+    }
+
+    // ==== RENDERIZAÇÃO E MANIPULAÇÃO DE ELEMENTOS ====
+    function renderOverlayElements() {
+      overlayLayer.innerHTML = '';
+      const elements = getActivePageEdits();
+
+      // Ordenar por Z-Index
+      elements.sort((a,b) => (a.zIndex || 0) - (b.zIndex || 0));
+
+      elements.forEach(el => {
+        const wrapper = document.createElement('div');
+        const isSelected = el.id === state.selectedElementId;
+        wrapper.className = `word-element ${isSelected ? 'selected' : ''}`;
+        wrapper.style.left = `${el.x}px`;
+        wrapper.style.top = `${el.y}px`;
+        wrapper.style.width = `${el.width}px`;
+        wrapper.style.height = `${el.height}px`;
+        wrapper.style.zIndex = el.zIndex || 1;
+
+        // Renderização específica do elemento
+        if (el.type === 'text') {
+          const div = document.createElement('div');
+          div.className = 'word-text-content';
+          div.style.fontFamily = el.fontFamily || 'Arial';
+          div.style.fontSize = `${el.fontSize}px`;
+          div.style.color = el.color;
+          div.style.backgroundColor = el.bgColor || 'transparent';
+          div.style.textAlign = el.align;
+          div.style.fontWeight = el.isBold ? 'bold' : 'normal';
+          div.style.fontStyle = el.isItalic ? 'italic' : 'normal';
+          div.style.textDecoration = el.isUnderline ? 'underline' : 'none';
+          div.style.lineHeight = el.lineHeight || 1.2;
+          div.innerText = el.text;
+          
+          // Edição direta de texto no clique/foco
+          div.ondblclick = () => {
+            div.contentEditable = true;
+            div.focus();
+          };
+          div.onblur = () => {
+            div.contentEditable = false;
+            updateElementData(el.id, { text: div.innerText });
+          };
+          wrapper.appendChild(div);
+        } 
+        else if (el.type === 'rect') {
+          const rect = document.createElement('div');
+          rect.style.width = '100%';
+          rect.style.height = '100%';
+          rect.style.backgroundColor = el.color;
+          if (el.borderColor) {
+            rect.style.border = `${el.borderWidth || 1}px solid ${el.borderColor}`;
+          }
+          wrapper.appendChild(rect);
+        }
+        else if (el.type === 'circle') {
+          const circle = document.createElement('div');
+          circle.style.width = '100%';
+          circle.style.height = '100%';
+          circle.style.borderRadius = '50%';
+          circle.style.backgroundColor = el.color;
+          if (el.borderColor) {
+            circle.style.border = `${el.borderWidth || 1}px solid ${el.borderColor}`;
+          }
+          wrapper.appendChild(circle);
+        }
+        else if (el.type === 'image') {
+          const img = document.createElement('img');
+          img.style.width = '100%';
+          img.style.height = '100%';
+          img.style.objectFit = 'fill';
+          img.style.pointerEvents = 'none';
+          img.src = el.src;
+          wrapper.appendChild(img);
+        }
+        else if (el.type === 'table') {
+          const table = document.createElement('table');
+          table.className = 'word-table-content';
+          
+          el.data.forEach((row, rIdx) => {
+            const tr = document.createElement('tr');
+            row.forEach((cellVal, cIdx) => {
+              const td = document.createElement('td');
+              td.contentEditable = true;
+              td.innerText = cellVal;
+              td.onblur = () => {
+                el.data[rIdx][cIdx] = td.innerText;
+              };
+              tr.appendChild(td);
+            });
+            table.appendChild(tr);
+          });
+          wrapper.appendChild(table);
+        }
+
+        // Adiciona 8 Alças de Redimensionamento se Selecionado (Word-Style)
+        if (isSelected) {
+          ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].forEach(pos => {
+            const handle = document.createElement('div');
+            handle.className = `resize-handle handle-${pos}`;
+            handle.onmousedown = (e) => startResize(e, el, pos);
+            wrapper.appendChild(handle);
+          });
+          showContextMenu(wrapper);
+        }
+
+        // Seleção e Arraste
+        wrapper.onmousedown = (e) => {
+          if (e.target.classList.contains('resize-handle') || e.target.contentEditable === "true") return;
+          e.stopPropagation();
+          if (state.selectedElementId !== el.id) {
+            state.selectedElementId = el.id;
+            renderOverlayElements();
+            updateRibbonFromSelected();
+          }
+          startDrag(e, el);
+        };
+
+        overlayLayer.appendChild(wrapper);
+      });
+
+      if (!state.selectedElementId) hideContextMenu();
+    }
+
+    function updateElementData(id, data) {
+      const el = getActivePageEdits().find(e => e.id === id);
+      if (el) Object.assign(el, data);
+    }
+
+    // ==== ARRASTE (DRAG) DE ELEMENTOS ====
+    function startDrag(e, el) {
+      let startX = e.clientX;
+      let startY = e.clientY;
+      let initialX = el.x;
+      let initialY = el.y;
+
+      function onMouseMove(ev) {
+        const dx = (ev.clientX - startX) / state.zoom;
+        const dy = (ev.clientY - startY) / state.zoom;
+        updateElementData(el.id, { x: initialX + dx, y: initialY + dy });
+        renderOverlayElements();
+      }
+      function onMouseUp() {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      }
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    }
+
+    // ==== REDIMENSIONAMENTO (RESIZE 8 DIREÇÕES) ====
+    function startResize(e, el, handle) {
+      e.stopPropagation();
+      let startX = e.clientX;
+      let startY = e.clientY;
+      let initialW = el.width;
+      let initialH = el.height;
+      let initialX = el.x;
+      let initialY = el.y;
+
+      function onMouseMove(ev) {
+        const dx = (ev.clientX - startX) / state.zoom;
+        const dy = (ev.clientY - startY) / state.zoom;
+
+        let newW = initialW, newH = initialH, newX = initialX, newY = initialY;
+
+        if (handle.includes('e')) newW = Math.max(20, initialW + dx);
+        if (handle.includes('s')) newH = Math.max(20, initialH + dy);
+        if (handle.includes('w')) { newW = Math.max(20, initialW - dx); newX = initialX + (initialW - newW); }
+        if (handle.includes('n')) { newH = Math.max(20, initialH - dy); newY = initialY + (initialH - newH); }
+
+        updateElementData(el.id, { x: newX, y: newY, width: newW, height: newH });
+        renderOverlayElements();
+      }
+      function onMouseUp() {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      }
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    }
+
+    // ==== MENU CONTEXTUAL FLUTUANTE ====
+    function showContextMenu(domWrapper) {
+      const rect = domWrapper.getBoundingClientRect();
+      const workspaceRect = workspace.getBoundingClientRect();
+      
+      let top = rect.top - workspaceRect.top - 42;
+      let left = rect.left - workspaceRect.left;
+
+      top = Math.max(10, top);
+
+      contextMenu.style.top = `${top}px`;
+      contextMenu.style.left = `${left}px`;
+      contextMenu.classList.remove('hidden');
+
+      const el = getActivePageEdits().find(e => e.id === state.selectedElementId);
+      document.getElementById('ctx-table-tools').classList.toggle('hidden', !el || el.type !== 'table');
+    }
+
+    function hideContextMenu() {
+      contextMenu.classList.add('hidden');
+    }
+
+    function deleteSelectedElement() {
+      if (state.selectedElementId) {
+        state.edits[state.currentPage] = state.edits[state.currentPage].filter(e => e.id !== state.selectedElementId);
+        state.selectedElementId = null;
+        renderOverlayElements();
+      }
+    }
+
+    function duplicateSelectedElement() {
+      if (!state.selectedElementId) return;
+      const el = getActivePageEdits().find(e => e.id === state.selectedElementId);
+      if (el) {
+        const copy = JSON.parse(JSON.stringify(el));
+        copy.id = crypto.randomUUID();
+        copy.x += 20;
+        copy.y += 20;
+        copy.zIndex = state.edits[state.currentPage].length + 1;
+        state.edits[state.currentPage].push(copy);
+        state.selectedElementId = copy.id;
+        renderOverlayElements();
+      }
+    }
+
+    function bringSelectedToFront() {
+      if (!state.selectedElementId) return;
+      const el = getActivePageEdits().find(e => e.id === state.selectedElementId);
+      if (el) {
+        const maxZ = Math.max(...getActivePageEdits().map(e => e.zIndex || 0), 0);
+        el.zIndex = maxZ + 1;
+        renderOverlayElements();
+      }
+    }
+
+    function sendSelectedToBack() {
+      if (!state.selectedElementId) return;
+      const el = getActivePageEdits().find(e => e.id === state.selectedElementId);
+      if (el) {
+        const minZ = Math.min(...getActivePageEdits().map(e => e.zIndex || 1), 1);
+        el.zIndex = Math.max(1, minZ - 1);
+        renderOverlayElements();
+      }
+    }
+
+    // ==== ATUALIZAÇÃO SINCRO DA RIBBON WORD ====
+    function updateRibbonFromSelected() {
+      if (!state.selectedElementId) return;
+      const el = getActivePageEdits().find(e => e.id === state.selectedElementId);
+      if (!el || el.type !== 'text') return;
+
+      document.getElementById('ribbon-font-family').value = el.fontFamily || 'Arial';
+      document.getElementById('ribbon-font-size').value = el.fontSize || 14;
+      document.getElementById('btn-bold').classList.toggle('active', !!el.isBold);
+      document.getElementById('btn-italic').classList.toggle('active', !!el.isItalic);
+      document.getElementById('btn-underline').classList.toggle('active', !!el.isUnderline);
+      document.getElementById('ribbon-color').value = el.color || '#000000';
+      document.getElementById('icon-color-preview').style.color = el.color || '#000000';
+    }
+
+    function updateSelectedTextProp(prop, val) {
+      if (state.selectedElementId) {
+        updateElementData(state.selectedElementId, { [prop]: val });
+        renderOverlayElements();
+        if (prop === 'color') document.getElementById('icon-color-preview').style.color = val;
+        if (prop === 'bgColor') document.getElementById('icon-bgcolor-preview').style.color = val;
+      }
+    }
+
+    function toggleSelectedTextProp(prop) {
+      if (state.selectedElementId) {
+        const el = getActivePageEdits().find(e => e.id === state.selectedElementId);
+        if (el && el.type === 'text') {
+          updateSelectedTextProp(prop, !el[prop]);
+          updateRibbonFromSelected();
+        }
+      }
+    }
+
+    // ==== MANIPULAÇÃO DE TABELAS ====
+    function addTableRow() {
+      if (!state.selectedElementId) return;
+      const el = getActivePageEdits().find(e => e.id === state.selectedElementId);
+      if (el && el.type === 'table') {
+        const newRow = new Array(el.cols).fill('Novo');
+        el.data.push(newRow);
+        el.rows++;
+        el.height += 30;
+        renderOverlayElements();
+      }
+    }
+
+    function addTableCol() {
+      if (!state.selectedElementId) return;
+      const el = getActivePageEdits().find(e => e.id === state.selectedElementId);
+      if (el && el.type === 'table') {
+        el.data.forEach(r => r.push('Novo'));
+        el.cols++;
+        el.width += 60;
+        renderOverlayElements();
+      }
+    }
+
+    // ==== MOTOR PAN & ZOOM ====
     let isPanning = false;
     let startPanX, startPanY;
 
@@ -461,8 +894,7 @@
           startPanY = e.clientY - state.panY;
           workspace.style.cursor = 'grabbing';
         } else {
-          // Deseleciona se clicar no fundo vazio
-          if (e.target === pdfLayer || e.target === overlayLayer) {
+          if (e.target === pdfLayer || e.target === overlayLayer || e.target === workspace) {
             state.selectedElementId = null;
             renderOverlayElements();
             hideContextMenu();
@@ -488,7 +920,6 @@
           const zoomDelta = e.deltaY < 0 ? 1.1 : 0.9;
           zoomCanvas(zoomDelta, e.clientX, e.clientY);
         } else {
-          // Panning com scroll normal
           state.panX -= e.deltaX;
           state.panY -= e.deltaY;
           applyTransform();
@@ -516,7 +947,6 @@
       
       document.getElementById('zoom-level').innerText = `${Math.round(state.zoom * 100)}%`;
       applyTransform();
-      updateContextMenuPosition();
     }
 
     function applyTransform() {
@@ -529,271 +959,32 @@
       const fitZoom = (wRect.width - 60) / (cRect.width / state.zoom);
       state.zoom = Math.min(fitZoom, 1.2);
       state.panX = (wRect.width - (cRect.width / state.zoom) * state.zoom) / 2;
-      state.panY = 30;
+      state.panY = 20;
       document.getElementById('zoom-level').innerText = `${Math.round(state.zoom * 100)}%`;
       applyTransform();
     }
 
     function setTool(tool) {
       state.activeTool = tool;
-      document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-      document.getElementById(`tool-${tool}`).classList.add('active');
+      document.querySelectorAll('#panel-ribbon-view .ribbon-tool-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById(`tool-${tool}`)?.classList.add('active');
       workspace.style.cursor = tool === 'pan' ? 'grab' : 'default';
       overlayLayer.style.pointerEvents = tool === 'pan' ? 'none' : 'auto';
     }
 
-    // ========================================================================
-    // SISTEMA DE ELEMENTOS HTML (TEXTOS, IMAGENS, FORMAS)
-    // ========================================================================
-    function getActivePageEdits() {
-      return state.edits[state.currentPage] || [];
-    }
-
-    function addElement(type) {
-      setTool('select');
-      const id = crypto.randomUUID();
-      const containerRect = container.getBoundingClientRect();
-      
-      // Adiciona no centro visível da tela
-      const centerX = (window.innerWidth / 2 - state.panX) / state.zoom;
-      const centerY = (window.innerHeight / 2 - state.panY) / state.zoom;
-
-      let el = { id, type, x: centerX, y: centerY };
-
-      if (type === 'text') {
-        el = { ...el, width: 200, height: 40, text: 'Digite seu texto', fontSize: 16, color: '#000000', align: 'left', isBold: false, isItalic: false };
-      } else if (type === 'whiteout') {
-        el = { ...el, width: 200, height: 50, color: '#ffffff', type: 'rect' }; // Retângulo branco
-      }
-
-      state.edits[state.currentPage].push(el);
-      state.selectedElementId = id;
-      renderOverlayElements();
-    }
-
-    async function handleAddImage(e) {
-      const file = e.target.files[0];
-      if (!file || !file.type.startsWith('image/')) return;
-      
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        const id = crypto.randomUUID();
-        const img = new Image();
-        img.onload = () => {
-          // Redimensiona proporcionalmente para caber na tela
-          const ratio = img.width / img.height;
-          const w = 200;
-          const h = 200 / ratio;
-          
-          state.edits[state.currentPage].push({
-            id, type: 'image', src: evt.target.result,
-            x: 50, y: 50, width: w, height: h
-          });
-          state.selectedElementId = id;
-          renderOverlayElements();
-        };
-        img.src = evt.target.result;
-      };
-      reader.readAsDataURL(file);
-      e.target.value = ''; // Reset input
-    }
-
-    function renderOverlayElements() {
-      overlayLayer.innerHTML = '';
-      const elements = getActivePageEdits();
-
-      elements.forEach(el => {
-        const wrapper = document.createElement('div');
-        wrapper.className = `pdf-element ${el.id === state.selectedElementId ? 'selected' : ''}`;
-        wrapper.style.left = `${el.x}px`;
-        wrapper.style.top = `${el.y}px`;
-        wrapper.style.width = `${el.width}px`;
-        wrapper.style.height = `${el.height}px`;
-
-        // Renderização Específica
-        if (el.type === 'text') {
-          const div = document.createElement('div');
-          div.className = 'pdf-text-content';
-          div.style.fontSize = `${el.fontSize}px`;
-          div.style.color = el.color;
-          div.style.textAlign = el.align;
-          div.style.fontWeight = el.isBold ? 'bold' : 'normal';
-          div.style.fontStyle = el.isItalic ? 'italic' : 'normal';
-          div.innerText = el.text;
-          
-          // Permite edição de texto fluida com duplo clique
-          div.ondblclick = () => {
-            div.contentEditable = true;
-            div.focus();
-            // Desabilita drag temporariamente
-            wrapper.onmousedown = null; 
-          };
-          div.onblur = () => {
-            div.contentEditable = false;
-            updateElementData(el.id, { text: div.innerText });
-            setupDragAndResize(wrapper, el); // Restaura drag
-          };
-          wrapper.appendChild(div);
-        } 
-        else if (el.type === 'rect') {
-          const rect = document.createElement('div');
-          rect.className = 'pdf-rect-content';
-          rect.style.backgroundColor = el.color;
-          wrapper.appendChild(rect);
-        }
-        else if (el.type === 'image') {
-          const img = document.createElement('img');
-          img.className = 'pdf-image-content';
-          img.src = el.src;
-          wrapper.appendChild(img);
-        }
-
-        // Adiciona alças de redimensionamento se estiver selecionado
-        if (el.id === state.selectedElementId) {
-          ['tl', 'tr', 'bl', 'br'].forEach(pos => {
-            const handle = document.createElement('div');
-            handle.className = `resize-handle handle-${pos}`;
-            handle.onmousedown = (e) => startResize(e, el, pos);
-            wrapper.appendChild(handle);
-          });
-          showContextMenu(el, wrapper);
-        }
-
-        // Lógica de Seleção e Arraste
-        wrapper.onmousedown = (e) => {
-          if (e.target.classList.contains('resize-handle') || e.target.contentEditable === "true") return;
-          e.stopPropagation();
-          if (state.selectedElementId !== el.id) {
-            state.selectedElementId = el.id;
-            renderOverlayElements();
+    function setupKeyboardShortcuts() {
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+          if (document.activeElement.tagName !== 'DIV' && document.activeElement.tagName !== 'TD' && state.selectedElementId) {
+            deleteSelectedElement();
           }
-          startDrag(e, el);
-        };
-
-        overlayLayer.appendChild(wrapper);
+        }
+        if (e.key === 'v' || e.key === 'V') setTool('select');
+        if (e.key === 'h' || e.key === 'H') setTool('pan');
       });
-
-      if (!state.selectedElementId) hideContextMenu();
     }
 
-    function updateElementData(id, data) {
-      const el = getActivePageEdits().find(e => e.id === id);
-      if (el) Object.assign(el, data);
-    }
-
-    // ==== MOTOR DE ARRASTE (DRAG) ====
-    function startDrag(e, el) {
-      let startX = e.clientX;
-      let startY = e.clientY;
-      let initialX = el.x;
-      let initialY = el.y;
-
-      function onMouseMove(ev) {
-        const dx = (ev.clientX - startX) / state.zoom;
-        const dy = (ev.clientY - startY) / state.zoom;
-        updateElementData(el.id, { x: initialX + dx, y: initialY + dy });
-        renderOverlayElements();
-      }
-      function onMouseUp() {
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
-      }
-      document.addEventListener('mousemove', onMouseMove);
-      document.addEventListener('mouseup', onMouseUp);
-    }
-
-    // ==== MOTOR DE REDIMENSIONAMENTO (RESIZE) ====
-    function startResize(e, el, handle) {
-      e.stopPropagation();
-      let startX = e.clientX;
-      let startY = e.clientY;
-      let initialW = el.width;
-      let initialH = el.height;
-      let initialX = el.x;
-      let initialY = el.y;
-
-      function onMouseMove(ev) {
-        const dx = (ev.clientX - startX) / state.zoom;
-        const dy = (ev.clientY - startY) / state.zoom;
-
-        let newW = initialW, newH = initialH, newX = initialX, newY = initialY;
-
-        if (handle.includes('r')) newW = Math.max(20, initialW + dx);
-        if (handle.includes('l')) { newW = Math.max(20, initialW - dx); newX = initialX + (initialW - newW); }
-        if (handle.includes('b')) newH = Math.max(20, initialH + dy);
-        if (handle.includes('t')) { newH = Math.max(20, initialH - dy); newY = initialY + (initialH - newH); }
-
-        updateElementData(el.id, { x: newX, y: newY, width: newW, height: newH });
-        renderOverlayElements();
-      }
-      function onMouseUp() {
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
-      }
-      document.addEventListener('mousemove', onMouseMove);
-      document.addEventListener('mouseup', onMouseUp);
-    }
-
-    // ==== MENU CONTEXTUAL FLUTUANTE ====
-    function showContextMenu(el, domWrapper) {
-      const rect = domWrapper.getBoundingClientRect();
-      const workspaceRect = workspace.getBoundingClientRect();
-      
-      // Posiciona acima do elemento
-      let top = rect.top - workspaceRect.top - 50;
-      let left = rect.left - workspaceRect.left + (rect.width / 2);
-
-      // Previne sair da tela
-      top = Math.max(10, top);
-
-      contextMenu.style.top = `${top}px`;
-      contextMenu.style.left = `${left}px`;
-      contextMenu.style.transform = `translateX(-50%)`;
-      contextMenu.classList.add('active');
-
-      // Atualiza painéis baseados no tipo
-      document.getElementById('ctx-text-tools').classList.toggle('hidden', el.type !== 'text');
-      
-      // Atualiza valores atuais no UI do menu
-      if (el.type === 'text') {
-        document.getElementById('ctx-font-size').value = el.fontSize;
-        document.getElementById('ctx-bold').classList.toggle('active', el.isBold);
-        document.getElementById('ctx-italic').classList.toggle('active', el.isItalic);
-      }
-      
-      if (el.color) {
-        document.getElementById('ctx-color').value = el.color;
-        document.getElementById('ctx-color-preview').style.backgroundColor = el.color;
-      }
-    }
-
-    function hideContextMenu() {
-      contextMenu.classList.remove('active');
-    }
-
-    function updateSelectedElement(props) {
-      if (state.selectedElementId) {
-        updateElementData(state.selectedElementId, props);
-        renderOverlayElements();
-      }
-    }
-
-    function toggleElementStyle(prop) {
-      if (state.selectedElementId) {
-        const el = getActivePageEdits().find(e => e.id === state.selectedElementId);
-        if (el) updateSelectedElement({ [prop]: !el[prop] });
-      }
-    }
-
-    function deleteSelectedElement() {
-      if (state.selectedElementId) {
-        state.edits[state.currentPage] = state.edits[state.currentPage].filter(e => e.id !== state.selectedElementId);
-        state.selectedElementId = null;
-        renderOverlayElements();
-      }
-    }
-
-    // ==== PAINEL LATERAL DE PÁGINAS ====
+    // ==== PAINEL DE PÁGINAS ====
     function toggleDrawer(show) {
       const drawer = document.getElementById('pages-drawer');
       const backdrop = document.getElementById('drawer-backdrop');
@@ -815,7 +1006,7 @@
       const newBytes = await state.pdfDocLib.save();
       await loadPdfData(newBytes);
       
-      state.currentPage = state.totalPages; // Vai pra última página
+      state.currentPage = state.totalPages;
       await renderCurrentPage();
       centerDocument();
       renderThumbnailsDrawer();
@@ -844,11 +1035,9 @@
         wrapper.innerHTML = `
           <div class="flex items-center justify-between text-zinc-400">
             <span class="text-xs font-semibold ${isActive ? 'text-white' : 'text-zinc-400'}">Página ${i}</span>
-            <div class="flex items-center gap-1.5">
-              <button onclick="event.stopPropagation(); deletePage(${i})" class="hover:text-red-400 p-1.5 rounded-md hover:bg-red-500/20 transition-colors" title="Excluir Página"><i class="ph-bold ph-trash"></i></button>
-            </div>
+            <button onclick="event.stopPropagation(); deletePage(${i})" class="hover:text-red-400 p-1.5 rounded-md hover:bg-red-500/20 transition-colors" title="Excluir Página"><i class="ph-bold ph-trash"></i></button>
           </div>
-          <div class="w-full aspect-[1/1.4] bg-white rounded-lg flex items-center justify-center overflow-hidden pointer-events-none shadow-inner border border-zinc-200 relative">
+          <div class="w-full aspect-[1/1.4] bg-white rounded-lg flex items-center justify-center overflow-hidden pointer-events-none shadow-inner border border-zinc-200">
              <canvas id="${canvasId}" class="w-full h-auto block"></canvas>
           </div>
         `;
@@ -874,7 +1063,6 @@
 
       state.pdfDocLib.removePage(pageNum - 1);
       
-      // Shift edits
       for (let i = pageNum; i < state.totalPages; i++) {
         state.edits[i] = state.edits[i+1];
       }
@@ -891,17 +1079,18 @@
     }
 
     // ========================================================================
-    // EXPORTAÇÃO FINAL PARA O PDF NATIVO VIA PDF-LIB
+    // EXPORTAÇÃO FINAL PARA PDF NATIVO VIA PDF-LIB
     // ========================================================================
     async function exportFinalPDF() {
       if (!state.pdfDocLib) return;
       document.getElementById('sync-status').innerText = "Gerando PDF...";
 
       try {
-        const helveticaFont = await state.pdfDocLib.embedFont(PDFLib.StandardFonts.Helvetica);
-        const helveticaBold = await state.pdfDocLib.embedFont(PDFLib.StandardFonts.HelveticaBold);
-        const helveticaOblique = await state.pdfDocLib.embedFont(PDFLib.StandardFonts.HelveticaOblique);
-        const helveticaBoldOblique = await state.pdfDocLib.embedFont(PDFLib.StandardFonts.HelveticaBoldOblique);
+        const fontHelvetica = await state.pdfDocLib.embedFont(PDFLib.StandardFonts.Helvetica);
+        const fontHelveticaBold = await state.pdfDocLib.embedFont(PDFLib.StandardFonts.HelveticaBold);
+        const fontHelveticaOblique = await state.pdfDocLib.embedFont(PDFLib.StandardFonts.HelveticaOblique);
+        const fontTimes = await state.pdfDocLib.embedFont(PDFLib.StandardFonts.TimesRoman);
+        const fontCourier = await state.pdfDocLib.embedFont(PDFLib.StandardFonts.Courier);
 
         for (let i = 1; i <= state.totalPages; i++) {
           const elements = state.edits[i];
@@ -910,20 +1099,20 @@
           const page = state.pdfDocLib.getPage(i - 1);
           const { width, height } = page.getSize();
           
-          // Precisamos da escala original para mapear coordenadas HTML px para PDF points
           const pdfJsPage = await state.pdfJsDoc.getPage(i);
           const viewport = pdfJsPage.getViewport({ scale: 1 });
           const scaleX = width / viewport.width;
           const scaleY = height / viewport.height;
 
+          // Ordenar elementos por Z-Index
+          elements.sort((a,b) => (a.zIndex || 0) - (b.zIndex || 0));
+
           for (const el of elements) {
-            // Conversão de coordenadas (Atenção: PDF-lib tem origem Y no fundo esquerdo, HTML no topo esquerdo)
             const pdfX = el.x * scaleX;
             const pdfY = height - ((el.y + el.height) * scaleY);
             const pdfW = el.width * scaleX;
             const pdfH = el.height * scaleY;
 
-            // Extrair RGB do Hex (#RRGGBB)
             const rgb = hexToRgb(el.color || '#000000');
 
             if (el.type === 'rect') {
@@ -932,7 +1121,16 @@
                 color: PDFLib.rgb(rgb.r, rgb.g, rgb.b),
                 borderWidth: 0
               });
-            } 
+            }
+            else if (el.type === 'circle') {
+              page.drawEllipse({
+                x: pdfX + pdfW / 2,
+                y: pdfY + pdfH / 2,
+                xScale: pdfW / 2,
+                yScale: pdfH / 2,
+                color: PDFLib.rgb(rgb.r, rgb.g, rgb.b)
+              });
+            }
             else if (el.type === 'image') {
               const imgBytes = await fetch(el.src).then(res => res.arrayBuffer());
               let embeddedImg;
@@ -944,25 +1142,48 @@
               page.drawImage(embeddedImg, { x: pdfX, y: pdfY, width: pdfW, height: pdfH });
             }
             else if (el.type === 'text') {
-              let fontToUse = helveticaFont;
-              if (el.isBold && el.isItalic) fontToUse = helveticaBoldOblique;
-              else if (el.isBold) fontToUse = helveticaBold;
-              else if (el.isItalic) fontToUse = helveticaOblique;
+              let fontToUse = fontHelvetica;
+              if (el.fontFamily === 'Times New Roman') fontToUse = fontTimes;
+              else if (el.fontFamily === 'Courier New') fontToUse = fontCourier;
+              else if (el.isBold) fontToUse = fontHelveticaBold;
+              else if (el.isItalic) fontToUse = fontHelveticaOblique;
 
-              // Em PDF-lib, o Y da fonte é a linha de base (baseline). Precisamos ajustar o offsetY.
-              // Simulando que a baseline fica próxima ao topo + tamanho da fonte.
-              const baselineY = height - (el.y * scaleY) - (el.fontSize * scaleY * 0.8);
+              const baselineY = height - (el.y * scaleY) - (el.fontSize * scaleY * 0.85);
 
-              // Para alinhar o texto, precisaríamos medir a largura da string na fonte, mas para simplificar, 
-              // vamos desenhar a partir da esquerda respeitando o padding.
               page.drawText(el.text, {
                 x: pdfX,
                 y: baselineY,
-                size: el.fontSize * scaleY, // Ajusta o tamanho da fonte proporcionalmente
+                size: el.fontSize * scaleY,
                 font: fontToUse,
                 color: PDFLib.rgb(rgb.r, rgb.g, rgb.b),
-                lineHeight: (el.fontSize * 1.2) * scaleY,
-                maxWidth: pdfW // Quebra de linha automática do pdf-lib
+                lineHeight: (el.fontSize * (el.lineHeight || 1.2)) * scaleY,
+                maxWidth: pdfW
+              });
+            }
+            else if (el.type === 'table') {
+              // Desenha tabela célula por célula
+              const cellW = pdfW / el.cols;
+              const cellH = pdfH / el.rows;
+
+              el.data.forEach((row, r) => {
+                row.forEach((cellText, c) => {
+                  const cx = pdfX + (c * cellW);
+                  const cy = pdfY + pdfH - ((r + 1) * cellH);
+
+                  page.drawRectangle({
+                    x: cx, y: cy, width: cellW, height: cellH,
+                    borderColor: PDFLib.rgb(0, 0, 0),
+                    borderWidth: 1
+                  });
+
+                  page.drawText(cellText, {
+                    x: cx + 4,
+                    y: cy + (cellH / 2) - 4,
+                    size: 10 * scaleY,
+                    font: fontHelvetica,
+                    color: PDFLib.rgb(0,0,0)
+                  });
+                });
               });
             }
           }
