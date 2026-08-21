@@ -48,7 +48,7 @@
     #workspace {
       position: absolute;
       top: 48px; /* Altura do Header */
-      bottom: 0; left: 240px; right: 0; /* Left reserva espaço pro painel lateral se aberto */
+      bottom: 0; left: 240px; right: 0;
       overflow: hidden;
       background-color: #121214;
       cursor: default;
@@ -56,34 +56,29 @@
 
     #workspace.is-panning { cursor: grabbing !important; }
     #workspace.is-drawing { cursor: crosshair !important; }
+    #workspace.is-highlighting { cursor: text !important; } /* Cursor estilo texto pro marca-texto */
 
-    /* Container de Transformação (Zoom/Pan aplicados via matriz CSS) */
     #transform-wrapper {
       position: absolute;
       transform-origin: 0 0;
-      /* Margem visual adicionada via cálculo de pan inicial */
     }
 
-    /* O Documento Lógico Base (1:1 com os Pontos do PDF) */
     #logical-document {
       position: relative;
       background: #ffffff;
       box-shadow: 0 4px 24px rgba(0,0,0,0.5);
-      /* Dimensões definidas via JS */
     }
 
-    /* Camadas do Documento Lógico */
     canvas.render-layer {
       position: absolute; top: 0; left: 0;
       pointer-events: none;
-      /* CSS width/height = 100%, Canvas width/height = High Res */
       width: 100%; height: 100%;
     }
 
     #overlay-layer {
       position: absolute; top: 0; left: 0;
       width: 100%; height: 100%;
-      pointer-events: auto; /* Permite interação com objetos */
+      pointer-events: auto;
     }
 
     /* =========================================================
@@ -94,14 +89,13 @@
       box-sizing: border-box;
       pointer-events: auto;
       cursor: move;
-      transform-origin: 0 0;
+      transform-origin: 50% 50%;
     }
 
     .pdf-object.selected {
-      outline: 1.5px solid #3b82f6; /* Azul Tailwind */
+      outline: 1.5px solid #3b82f6;
     }
 
-    /* Texto */
     .obj-text {
       width: 100%; height: 100%;
       outline: none;
@@ -113,7 +107,6 @@
       cursor: text;
     }
     
-    /* Alças de Redimensionamento */
     .resize-handle {
       position: absolute;
       width: 8px; height: 8px;
@@ -135,10 +128,10 @@
     .handle-w  { top: calc(50% - 4px); left: -4px; cursor: ew-resize; }
 
     /* =========================================================
-       MENU CONTEXTUAL INTELIGENTE
+       MENUS CONTEXTUAIS E DROPDOWNS
        ========================================================= */
     #context-menu {
-      position: fixed; /* Fixo em relação a janela pra não escalar com o zoom */
+      position: fixed;
       background: #1c1c1e;
       border: 1px solid #27272a;
       border-radius: 8px;
@@ -152,21 +145,32 @@
       pointer-events: none;
       transition: opacity 0.15s ease;
     }
-    #context-menu.visible {
-      opacity: 1;
-      pointer-events: auto;
-    }
+    #context-menu.visible { opacity: 1; pointer-events: auto; }
 
-    .ctx-btn {
-      padding: 4px; border-radius: 4px; color: #a1a1aa; cursor: pointer;
-    }
+    .ctx-btn { padding: 4px; border-radius: 4px; color: #a1a1aa; cursor: pointer; }
     .ctx-btn:hover { background: #27272a; color: #fff; }
     .ctx-btn.active { color: #3b82f6; background: rgba(59, 130, 246, 0.1); }
-    
     .ctx-divider { width: 1px; height: 16px; background: #3f3f46; margin: 0 4px; }
 
+    .dropdown-menu {
+      display: none;
+      position: absolute;
+      top: 100%; left: 0;
+      background: #1c1c1e;
+      border: 1px solid #27272a;
+      border-radius: 8px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+      z-index: 60;
+      min-width: 140px;
+      padding: 4px;
+      margin-top: 4px;
+    }
+    .dropdown-trigger:hover .dropdown-menu, .dropdown-menu:hover { display: flex; flex-direction: column; }
+    .dropdown-item { padding: 6px 8px; border-radius: 4px; color: #a1a1aa; font-size: 12px; display: flex; align-items: center; gap: 8px; cursor: pointer; text-align: left; }
+    .dropdown-item:hover { background: #27272a; color: #fff; }
+
     /* =========================================================
-       INTERFACE (SIDEBAR / HEADER)
+       INTERFACE E SIDEBAR
        ========================================================= */
     #sidebar {
       position: absolute;
@@ -180,12 +184,19 @@
       margin-bottom: 8px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.5);
     }
     .thumbnail.active { border-color: #3b82f6; }
+
+    /* Canvas de Assinatura */
+    #signature-canvas {
+      border: 1px dashed #3f3f46;
+      border-radius: 8px;
+      background: #121214;
+      cursor: crosshair;
+      touch-action: none;
+    }
   </style>
 </head>
 <body>
 
-  <!-- -->
-  <!-- ESTADO VAZIO -->
   <div id="empty-state" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-matte-bg px-6">
     <div class="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-zinc-500 mb-5 shadow-2xl">
       <i class="ph-fill ph-file-pdf text-3xl"></i>
@@ -203,7 +214,6 @@
     </div>
   </div>
 
-  <!-- EDITOR UI -->
   <div id="editor-ui" class="hidden h-full w-full relative">
     
     <!-- HEADER -->
@@ -212,22 +222,53 @@
         <span id="doc-title" class="text-xs font-bold text-zinc-200">documento.pdf</span>
         <div class="h-4 w-px bg-zinc-700"></div>
         
-        <!-- Ferramentas Globais (Não poluem o context menu) -->
+        <!-- BARRA DE FERRAMENTAS AVANÇADA -->
         <div class="flex items-center gap-1">
           <button onclick="App.setMode('select')" id="btn-mode-select" class="ctx-btn active" title="Selecionar (V)"><i class="ph-bold ph-cursor"></i></button>
-          <button onclick="App.setMode('draw')" id="btn-mode-draw" class="ctx-btn" title="Caneta Livre (D)"><i class="ph-bold ph-pencil-simple"></i></button>
+          
+          <div class="h-4 w-px bg-zinc-700 mx-1"></div>
+
+          <!-- Anotações Livres -->
+          <button onclick="App.setMode('draw')" id="btn-mode-draw" class="ctx-btn" title="Caneta (D)"><i class="ph-bold ph-pencil-simple"></i></button>
+          <button onclick="App.setMode('highlight')" id="btn-mode-highlight" class="ctx-btn" title="Marca-Texto"><i class="ph-bold ph-highlighter"></i></button>
           <button onclick="App.addTextObject()" class="ctx-btn" title="Inserir Texto (T)"><i class="ph-bold ph-text-t"></i></button>
-          <button onclick="App.addRectObject()" class="ctx-btn" title="Inserir Retângulo (R)"><i class="ph-bold ph-square"></i></button>
-          <button onclick="App.addWhiteoutObject()" class="ctx-btn" title="Apagador / Whiteout"><i class="ph-bold ph-eraser"></i></button>
-          <label class="ctx-btn cursor-pointer" title="Inserir Imagem (I)">
+          
+          <div class="h-4 w-px bg-zinc-700 mx-1"></div>
+
+          <!-- Formas Geométricas e Ocultação -->
+          <div class="relative dropdown-trigger">
+            <button class="ctx-btn flex items-center gap-1" title="Formas"><i class="ph-bold ph-shapes"></i> <i class="ph-bold ph-caret-down text-[10px]"></i></button>
+            <div class="dropdown-menu">
+              <button onclick="App.addRectObject()" class="dropdown-item"><i class="ph-bold ph-square text-sm"></i> Retângulo</button>
+              <button onclick="App.addCircleObject()" class="dropdown-item"><i class="ph-bold ph-circle text-sm"></i> Círculo</button>
+              <button onclick="App.addWhiteoutObject()" class="dropdown-item"><i class="ph-bold ph-eraser text-sm"></i> Ocultar (Whiteout)</button>
+            </div>
+          </div>
+
+          <!-- Carimbos -->
+          <div class="relative dropdown-trigger">
+            <button class="ctx-btn flex items-center gap-1" title="Carimbos"><i class="ph-bold ph-stamp"></i> <i class="ph-bold ph-caret-down text-[10px]"></i></button>
+            <div class="dropdown-menu">
+              <button onclick="App.addStampObject('APROVADO', '#10b981')" class="dropdown-item text-emerald-400 font-bold">APROVADO</button>
+              <button onclick="App.addStampObject('REJEITADO', '#ef4444')" class="dropdown-item text-red-400 font-bold">REJEITADO</button>
+              <button onclick="App.addStampObject('PAGO', '#3b82f6')" class="dropdown-item text-blue-400 font-bold">PAGO</button>
+              <button onclick="App.addStampObject('CONFIDENCIAL', '#f59e0b')" class="dropdown-item text-amber-400 font-bold">CONFIDENCIAL</button>
+            </div>
+          </div>
+
+          <div class="h-4 w-px bg-zinc-700 mx-1"></div>
+
+          <!-- Inserções Externas -->
+          <label class="ctx-btn cursor-pointer flex items-center" title="Inserir Imagem (I)">
             <i class="ph-bold ph-image"></i>
             <input type="file" accept="image/*" class="hidden" onchange="App.addImageObject(event)">
           </label>
+          <button onclick="App.UI.toggleSignatureModal(true)" class="ctx-btn" title="Assinatura Digital"><i class="ph-bold ph-signature"></i></button>
         </div>
       </div>
 
+      <!-- CONTROLES DE ZOOM E EXPORTAÇÃO -->
       <div class="flex items-center gap-3">
-        <!-- Controles de Zoom -->
         <div class="flex items-center gap-1 bg-black/50 rounded-lg p-1 border border-zinc-800">
           <button onclick="App.View.zoomOut()" class="ctx-btn"><i class="ph-bold ph-minus"></i></button>
           <span id="zoom-indicator" class="text-[11px] font-mono w-10 text-center text-zinc-400">100%</span>
@@ -237,7 +278,7 @@
           <button onclick="App.View.fitWidth()" class="ctx-btn text-[10px] font-bold px-2">Fit W</button>
         </div>
 
-        <button onclick="App.Export.savePDF()" class="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition-colors">
+        <button onclick="App.Export.savePDF()" class="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 transition-colors">
           <i class="ph-bold ph-download-simple"></i> Salvar PDF
         </button>
       </div>
@@ -247,7 +288,7 @@
     <aside id="sidebar">
       <div class="flex items-center justify-between p-3 border-b border-matte-border">
         <span class="text-xs font-bold text-zinc-400">Páginas</span>
-        <button onclick="App.addBlankPage()" class="text-blue-400 hover:text-blue-300 text-xs font-bold"><i class="ph-bold ph-plus"></i></button>
+        <button onclick="App.addBlankPage()" class="text-blue-400 hover:text-blue-300 text-xs font-bold" title="Nova Página em Branco"><i class="ph-bold ph-plus"></i></button>
       </div>
       <div id="thumbnails-container" class="flex-1 overflow-y-auto p-3 custom-scroll"></div>
     </aside>
@@ -256,57 +297,54 @@
     <main id="workspace">
       <div id="transform-wrapper">
         <div id="logical-document">
-          <!-- Renderização nativa do PDF -->
           <canvas id="pdf-render-canvas" class="render-layer"></canvas>
-          <!-- Traços de caneta -->
           <canvas id="draw-render-canvas" class="render-layer"></canvas>
-          <!-- Objetos Interativos -->
           <div id="overlay-layer"></div>
         </div>
       </div>
     </main>
 
-    <!-- MENU CONTEXTUAL INTELIGENTE FLUTUANTE -->
-    <div id="context-menu">
-      <!-- Injetado dinamicamente dependendo do objeto -->
-    </div>
-
+    <!-- MENU CONTEXTUAL FLUTUANTE -->
+    <div id="context-menu"></div>
   </div>
 
-  <!-- -->
+  <div id="signature-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4 hidden">
+    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-md shadow-2xl flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2"><i class="ph-bold ph-signature text-blue-400"></i> Criar Assinatura</h3>
+        <button onclick="App.UI.toggleSignatureModal(false)" class="text-zinc-500 hover:text-white"><i class="ph-bold ph-x"></i></button>
+      </div>
+      
+      <p class="text-xs text-zinc-400">Desenhe sua assinatura no quadro abaixo:</p>
+      
+      <canvas id="signature-canvas" width="400" height="200" class="w-full h-[200px]"></canvas>
+
+      <div class="flex items-center justify-between mt-2">
+        <button onclick="App.Signature.clear()" class="text-xs text-zinc-400 hover:text-white font-semibold">Limpar Quadro</button>
+        <button onclick="App.Signature.save()" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition-colors">
+          Inserir Assinatura
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script>
-    /**
-     * ARQUITETURA CORE DO EDITOR DE PDF
-     * Separação rigorosa entre Lógica (PDF Points), Viewport (Pixels/Escala) e Renderização.
-     */
     const App = {
       State: {
-        pdfDoc: null,      // Instância pdf-lib (dados brutos para exportação)
-        pdfJs: null,       // Instância pdf.js (renderização visual)
+        pdfDoc: null,
+        pdfJs: null,
         filename: 'doc.pdf',
         numPages: 0,
         currentPage: 1,
-        
-        // Dimensões lógicas da página atual (1:1 com pt do PDF)
         logicalWidth: 0,
         logicalHeight: 0,
-
-        // Interação
-        mode: 'select', // 'select' ou 'draw'
+        mode: 'select', // 'select', 'draw', 'highlight'
         selectedId: null,
-        
-        // Histórico por página: edits[pageNum] = { objects: [], paths: [] }
-        edits: {},
+        edits: {}, // { pageNum: { objects: [], paths: [] } }
         history: { past: [], future: [] }
       },
 
-      View: {
-        zoom: 1.0,
-        panX: 0,
-        panY: 0,
-        isPanning: false,
-        spacePressed: false
-      },
+      View: { zoom: 1.0, panX: 0, panY: 0, isPanning: false, spacePressed: false },
 
       UI: {
         workspace: document.getElementById('workspace'),
@@ -315,47 +353,37 @@
         pdfCanvas: document.getElementById('pdf-render-canvas'),
         drawCanvas: document.getElementById('draw-render-canvas'),
         overlay: document.getElementById('overlay-layer'),
-        ctxMenu: document.getElementById('context-menu')
+        ctxMenu: document.getElementById('context-menu'),
+        sigModal: document.getElementById('signature-modal'),
+        sigCanvas: document.getElementById('signature-canvas'),
+        
+        toggleSignatureModal(show) {
+          this.sigModal.classList.toggle('hidden', !show);
+          if (show) App.Signature.init();
+        }
       }
     };
 
-    // =========================================================
-    // 1. GERENCIAMENTO DE COORDENADAS
-    // =========================================================
+    // Coordenadas
     const Coords = {
-      // Converte evento de mouse (tela) para coordenada lógica (PDF point)
       screenToLogical(clientX, clientY) {
         const rect = App.UI.workspace.getBoundingClientRect();
-        // Mouse relativo ao workspace
-        const relX = clientX - rect.left;
-        const relY = clientY - rect.top;
-        
-        // Remove pan e zoom
-        const logicalX = (relX - App.View.panX) / App.View.zoom;
-        const logicalY = (relY - App.View.panY) / App.View.zoom;
+        const logicalX = ((clientX - rect.left) - App.View.panX) / App.View.zoom;
+        const logicalY = ((clientY - rect.top) - App.View.panY) / App.View.zoom;
         return { x: logicalX, y: logicalY };
       },
-
-      // Converte coordenada lógica para posição CSS absoluta na tela (útil pro context menu)
       logicalToScreen(logicalX, logicalY) {
         const rect = App.UI.workspace.getBoundingClientRect();
         const screenX = rect.left + App.View.panX + (logicalX * App.View.zoom);
         const screenY = rect.top + App.View.panY + (logicalY * App.View.zoom);
         return { x: screenX, y: screenY };
       },
-
-      // Pega o centro da área VISÍVEL em coordenadas lógicas
       getVisibleCenterLogical() {
         const rect = App.UI.workspace.getBoundingClientRect();
-        const centerX = rect.width / 2;
-        const centerY = rect.height / 2;
-        return this.screenToLogical(rect.left + centerX, rect.top + centerY);
+        return this.screenToLogical(rect.left + rect.width / 2, rect.top + rect.height / 2);
       }
     };
 
-    // =========================================================
-    // 2. ENQUADRAMENTO E ZOOM (VIEWPORT)
-    // =========================================================
     App.View.applyTransform = function() {
       App.UI.transformWrapper.style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.zoom})`;
       document.getElementById('zoom-indicator').innerText = `${Math.round(this.zoom * 100)}%`;
@@ -364,12 +392,10 @@
 
     App.View.fitPage = function() {
       const rect = App.UI.workspace.getBoundingClientRect();
-      const pad = 40; // margem segura
+      const pad = 40;
       const scaleX = (rect.width - pad) / App.State.logicalWidth;
       const scaleY = (rect.height - pad) / App.State.logicalHeight;
       this.zoom = Math.min(scaleX, scaleY);
-      
-      // Centraliza
       this.panX = (rect.width - (App.State.logicalWidth * this.zoom)) / 2;
       this.panY = (rect.height - (App.State.logicalHeight * this.zoom)) / 2;
       this.applyTransform();
@@ -388,16 +414,10 @@
       const rect = App.UI.workspace.getBoundingClientRect();
       const cX = cursorX - rect.left;
       const cY = cursorY - rect.top;
-
-      // Ponto lógico sob o cursor ANTES do zoom
       const logicalX = (cX - this.panX) / this.zoom;
       const logicalY = (cY - this.panY) / this.zoom;
 
-      // Limites de zoom (25% a 400%)
-      let newZoom = this.zoom * delta;
-      newZoom = Math.max(0.25, Math.min(newZoom, 4.0));
-
-      // Ajusta o Pan para que o ponto lógico continue sob o cursor
+      let newZoom = Math.max(0.25, Math.min(this.zoom * delta, 4.0));
       this.panX = cX - (logicalX * newZoom);
       this.panY = cY - (logicalY * newZoom);
       this.zoom = newZoom;
@@ -407,11 +427,7 @@
     App.View.zoomIn = function() { this.zoomToCursor(1.2, window.innerWidth/2, window.innerHeight/2); };
     App.View.zoomOut = function() { this.zoomToCursor(0.8, window.innerWidth/2, window.innerHeight/2); };
 
-    //    // =========================================================
-    // 3. EVENTOS GLOBAIS (PAN, ZOOM, SELEÇÃO)
-    // =========================================================
     function setupGlobalEvents() {
-      // Spacebar para Mãozinha
       window.addEventListener('keydown', (e) => {
         if (e.code === 'Space' && document.activeElement.tagName !== 'INPUT' && !document.activeElement.isContentEditable) {
           e.preventDefault();
@@ -419,19 +435,10 @@
           App.UI.workspace.classList.add('is-panning');
         }
         
-        // Atalhos de Ferramentas
         if (!document.activeElement.isContentEditable && document.activeElement.tagName !== 'INPUT') {
           if (e.key.toLowerCase() === 'v') App.setMode('select');
           if (e.key.toLowerCase() === 'd') App.setMode('draw');
-          if (e.key.toLowerCase() === 't') App.addTextObject();
-          if (e.key.toLowerCase() === 'r') App.addRectObject();
-          
-          // Delete / Backspace (Proteção)
-          if (e.key === 'Delete' || e.key === 'Backspace') {
-            App.Engine.deleteSelected();
-          }
-
-          // Undo / Redo
+          if (e.key === 'Delete' || e.key === 'Backspace') App.Engine.deleteSelected();
           if (e.ctrlKey && e.key.toLowerCase() === 'z') { e.preventDefault(); App.History.undo(); }
           if (e.ctrlKey && e.key.toLowerCase() === 'y') { e.preventDefault(); App.History.redo(); }
         }
@@ -444,27 +451,22 @@
         }
       });
 
-      // Roda do Mouse (Zoom + Pan vertical)
       App.UI.workspace.addEventListener('wheel', (e) => {
         e.preventDefault();
         if (e.ctrlKey) {
-          const delta = e.deltaY < 0 ? 1.1 : 0.9;
-          App.View.zoomToCursor(delta, e.clientX, e.clientY);
+          App.View.zoomToCursor(e.deltaY < 0 ? 1.1 : 0.9, e.clientX, e.clientY);
         } else {
-          // Pan via trackpad/scroll
           App.View.panX -= e.deltaX;
           App.View.panY -= e.deltaY;
           App.View.applyTransform();
         }
       }, { passive: false });
 
-      // Eventos de Mouse Base no Workspace
       let startPanX, startPanY;
       let isDrawing = false;
       let currentPath = [];
 
       App.UI.workspace.addEventListener('mousedown', (e) => {
-        // Pan com Botão do Meio ou Espaço
         if (e.button === 1 || App.View.spacePressed) {
           e.preventDefault();
           App.View.isPanning = true;
@@ -473,24 +475,24 @@
           return;
         }
 
-        // Se clicou no fundo vazio (não num objeto e não numa alça)
         if (e.target === App.UI.workspace || e.target === App.UI.overlay || e.target === App.UI.drawCanvas) {
-          
           if (App.State.mode === 'select') {
-            App.Engine.selectObject(null); // Desmarca
+            App.Engine.selectObject(null);
           } 
-          else if (App.State.mode === 'draw') {
+          else if (App.State.mode === 'draw' || App.State.mode === 'highlight') {
             isDrawing = true;
             const pt = Coords.screenToLogical(e.clientX, e.clientY);
+            const isHL = App.State.mode === 'highlight';
+            
             currentPath = [{ x: pt.x, y: pt.y }];
+            
             const ctx = App.UI.drawCanvas.getContext('2d');
             ctx.beginPath();
-            ctx.strokeStyle = '#ff0000';
-            ctx.lineWidth = 3;
+            // Marca texto é amarelo com opacidade, caneta é vermelho opaco (padrão)
+            ctx.strokeStyle = isHL ? 'rgba(250, 204, 21, 0.4)' : '#ef4444';
+            ctx.lineWidth = isHL ? 16 : 3;
             ctx.lineCap = 'round';
-            // Multiplica pelo devicePixelRatio (renderScale) pro canvas HQ
-            const scale = 2.0; 
-            ctx.moveTo(pt.x * scale, pt.y * scale);
+            ctx.moveTo(pt.x * 2.0, pt.y * 2.0); // 2.0 é o renderScale
           }
         }
       });
@@ -505,8 +507,7 @@
           const pt = Coords.screenToLogical(e.clientX, e.clientY);
           currentPath.push({ x: pt.x, y: pt.y });
           const ctx = App.UI.drawCanvas.getContext('2d');
-          const scale = 2.0;
-          ctx.lineTo(pt.x * scale, pt.y * scale);
+          ctx.lineTo(pt.x * 2.0, pt.y * 2.0);
           ctx.stroke();
         }
       });
@@ -515,7 +516,13 @@
         App.View.isPanning = false;
         if (isDrawing && currentPath.length > 1) {
           App.History.saveState();
-          App.State.edits[App.State.currentPage].paths.push({ points: currentPath, color: '#ff0000', width: 3 });
+          const isHL = App.State.mode === 'highlight';
+          App.State.edits[App.State.currentPage].paths.push({ 
+            points: currentPath, 
+            color: isHL ? 'rgba(250, 204, 21, 0.4)' : '#ef4444', 
+            width: isHL ? 16 : 3,
+            isHighlight: isHL
+          });
           isDrawing = false;
         }
       });
@@ -525,16 +532,17 @@
       this.State.mode = mode;
       document.querySelectorAll('header .ctx-btn').forEach(b => b.classList.remove('active'));
       document.getElementById(`btn-mode-${mode}`)?.classList.add('active');
-      this.UI.workspace.classList.toggle('is-drawing', mode === 'draw');
-      if (mode === 'draw') this.Engine.selectObject(null);
+      
+      this.UI.workspace.classList.remove('is-drawing', 'is-highlighting');
+      if (mode === 'draw') this.UI.workspace.classList.add('is-drawing');
+      if (mode === 'highlight') this.UI.workspace.classList.add('is-highlighting');
+      
+      if (mode !== 'select') this.Engine.selectObject(null);
     };
 
-    //    // =========================================================
-    // 4. CARREGAMENTO E RENDERIZAÇÃO DE PDF
-    // =========================================================
     App.createBlankPDF = async function() {
       const doc = await PDFLib.PDFDocument.create();
-      doc.addPage([595.28, 841.89]); // A4
+      doc.addPage([595.28, 841.89]); 
       const bytes = await doc.save();
       this.loadPdfBytes(bytes, 'Documento em Branco.pdf');
     };
@@ -554,7 +562,6 @@
       this.State.pdfJs = await pdfjsLib.getDocument({ data: bytes }).promise;
       this.State.numPages = this.State.pdfJs.numPages;
 
-      // Inicia state das páginas
       for (let i = 1; i <= this.State.numPages; i++) {
         if(!this.State.edits[i]) this.State.edits[i] = { objects: [], paths: [] };
       }
@@ -566,23 +573,19 @@
       await this.renderPage();
       this.View.fitPage();
       this.renderThumbnails();
-      App.History.saveState(); // Estado inicial
+      App.History.saveState();
     };
 
     App.renderPage = async function() {
       const page = await this.State.pdfJs.getPage(this.State.currentPage);
-      
-      // Define tamanho Lógico
       const viewportLogical = page.getViewport({ scale: 1 });
       this.State.logicalWidth = viewportLogical.width;
       this.State.logicalHeight = viewportLogical.height;
 
-      // Ajusta CSS do documento base
       this.UI.logicalDoc.style.width = `${this.State.logicalWidth}px`;
       this.UI.logicalDoc.style.height = `${this.State.logicalHeight}px`;
 
-      // Renderiza High Res (Escala 2.0)
-      const renderScale = window.devicePixelRatio || 2.0;
+      const renderScale = 2.0;
       const viewportRender = page.getViewport({ scale: renderScale });
       
       this.UI.pdfCanvas.width = viewportRender.width;
@@ -601,7 +604,6 @@
     App.renderThumbnails = async function() {
       const container = document.getElementById('thumbnails-container');
       container.innerHTML = '';
-      
       for (let i = 1; i <= this.State.numPages; i++) {
         const thumb = document.createElement('div');
         thumb.className = `thumbnail ${i === this.State.currentPage ? 'active' : ''}`;
@@ -615,19 +617,22 @@
       }
     };
 
-    //    // =========================================================
-    // 5. MOTOR DE OBJETOS LÓGICOS (DOM OVERLAY)
-    // =========================================================
+    App.addBlankPage = async function() {
+      this.State.pdfDoc.addPage([595.28, 841.89]);
+      const bytes = await this.State.pdfDoc.save();
+      this.loadPdfBytes(bytes, this.State.filename);
+      this.State.currentPage = this.State.numPages;
+      this.renderPage();
+      this.renderThumbnails();
+    };
+
     App.Engine = {
-      
-      // Redesenha caminhos (Draw)
       redrawPaths() {
         const ctx = App.UI.drawCanvas.getContext('2d');
-        const scale = window.devicePixelRatio || 2.0;
+        const scale = 2.0;
         ctx.clearRect(0, 0, App.UI.drawCanvas.width, App.UI.drawCanvas.height);
         
-        const paths = App.State.edits[App.State.currentPage].paths;
-        paths.forEach(p => {
+        App.State.edits[App.State.currentPage].paths.forEach(p => {
           if (p.points.length < 2) return;
           ctx.beginPath();
           ctx.strokeStyle = p.color;
@@ -642,7 +647,6 @@
         });
       },
 
-      // Renderiza Objetos DOM baseados no estado lógico
       renderOverlayObjects() {
         App.UI.overlay.innerHTML = '';
         const objects = App.State.edits[App.State.currentPage].objects;
@@ -651,14 +655,12 @@
           const wrapper = document.createElement('div');
           wrapper.className = `pdf-object ${obj.id === App.State.selectedId ? 'selected' : ''}`;
           wrapper.id = obj.id;
-          
-          // Posicionamento e Tamanho em PONTOS LÓGICOS (A escala do CSS resolve o zoom visual)
-          wrapper.style.left = `${obj.x}px`;
-          wrapper.style.top = `${obj.y}px`;
-          wrapper.style.width = `${obj.w}px`;
-          wrapper.style.height = `${obj.h}px`;
+          wrapper.style.left = `${obj.x}px`; wrapper.style.top = `${obj.y}px`;
+          wrapper.style.width = `${obj.w}px`; wrapper.style.height = `${obj.h}px`;
           wrapper.style.zIndex = obj.z || 10;
+          if (obj.rotation) wrapper.style.transform = `rotate(${obj.rotation}deg)`;
 
+          // Renderização Específica por Tipo
           if (obj.type === 'text') {
             const txt = document.createElement('div');
             txt.className = 'obj-text';
@@ -668,26 +670,27 @@
             txt.style.textAlign = obj.align || 'left';
             txt.style.fontWeight = obj.bold ? 'bold' : 'normal';
             txt.style.fontStyle = obj.italic ? 'italic' : 'normal';
-            txt.innerText = obj.text;
+            // Bordas e fundos são usados em carimbos
+            if (obj.bgColor) txt.style.backgroundColor = obj.bgColor;
+            if (obj.border) { txt.style.border = obj.border; txt.style.borderRadius = '4px'; txt.style.padding = '8px'; }
             
-            // Foco para edição
+            txt.innerText = obj.text;
             txt.ondblclick = () => { txt.contentEditable = true; txt.focus(); };
             txt.onblur = () => {
               txt.contentEditable = false;
-              if (obj.text !== txt.innerText) {
-                App.History.saveState();
-                obj.text = txt.innerText;
-              }
+              if (obj.text !== txt.innerText) { App.History.saveState(); obj.text = txt.innerText; }
             };
             wrapper.appendChild(txt);
           } 
           else if (obj.type === 'rect') {
             wrapper.style.backgroundColor = obj.fill || 'transparent';
             wrapper.style.border = `${obj.borderW || 1}px solid ${obj.color || '#000'}`;
-            if (obj.isWhiteout) {
-              wrapper.style.backgroundColor = '#ffffff';
-              wrapper.style.border = 'none';
-            }
+            if (obj.isWhiteout) { wrapper.style.backgroundColor = '#ffffff'; wrapper.style.border = 'none'; }
+          }
+          else if (obj.type === 'circle') {
+            wrapper.style.backgroundColor = obj.fill || 'transparent';
+            wrapper.style.border = `${obj.borderW || 1}px solid ${obj.color || '#000'}`;
+            wrapper.style.borderRadius = '50%';
           }
           else if (obj.type === 'image') {
             const img = document.createElement('img');
@@ -698,7 +701,7 @@
             wrapper.appendChild(img);
           }
 
-          // Se estiver selecionado, adiciona handles de resize
+          // Handles de Redimensionamento
           if (obj.id === App.State.selectedId) {
             ['nw','n','ne','e','se','s','sw','w'].forEach(dir => {
               const handle = document.createElement('div');
@@ -709,7 +712,6 @@
             App.ContextMenu.show(obj);
           }
 
-          // Inicia o Arraste (Drag)
           wrapper.onmousedown = (e) => {
             if (e.target.classList.contains('resize-handle') || e.target.contentEditable === "true") return;
             e.stopPropagation();
@@ -727,53 +729,38 @@
         if (!id) App.ContextMenu.hide();
       },
 
-      // Lógica de Arraste considerando Zoom
       startDrag(e, obj) {
-        let startX = e.clientX;
-        let startY = e.clientY;
-        let initialX = obj.x;
-        let initialY = obj.y;
+        let startX = e.clientX, startY = e.clientY;
+        let initialX = obj.x, initialY = obj.y;
         let hasMoved = false;
 
         const onMove = (ev) => {
           hasMoved = true;
-          const dx = (ev.clientX - startX) / App.View.zoom;
-          const dy = (ev.clientY - startY) / App.View.zoom;
-          obj.x = initialX + dx;
-          obj.y = initialY + dy;
-          
+          obj.x = initialX + (ev.clientX - startX) / App.View.zoom;
+          obj.y = initialY + (ev.clientY - startY) / App.View.zoom;
           const el = document.getElementById(obj.id);
-          if (el) {
-            el.style.left = `${obj.x}px`;
-            el.style.top = `${obj.y}px`;
-          }
+          if (el) { el.style.left = `${obj.x}px`; el.style.top = `${obj.y}px`; }
           App.ContextMenu.updatePosition();
         };
 
         const onUp = () => {
           window.removeEventListener('mousemove', onMove);
           window.removeEventListener('mouseup', onUp);
-          if (hasMoved) {
-            App.History.saveState(); // Salva estado apenas no final do movimento
-            this.renderOverlayObjects();
-          }
+          if (hasMoved) { App.History.saveState(); this.renderOverlayObjects(); }
         };
 
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
       },
 
-      // Lógica de Redimensionamento considerando Zoom
       startResize(e, obj, dir) {
         e.stopPropagation();
-        let startX = e.clientX;
-        let startY = e.clientY;
+        let startX = e.clientX, startY = e.clientY;
         let initialX = obj.x, initialY = obj.y, initialW = obj.w, initialH = obj.h;
 
         const onMove = (ev) => {
           const dx = (ev.clientX - startX) / App.View.zoom;
           const dy = (ev.clientY - startY) / App.View.zoom;
-          
           let newX = initialX, newY = initialY, newW = initialW, newH = initialH;
 
           if (dir.includes('e')) newW = Math.max(20, initialW + dx);
@@ -782,7 +769,6 @@
           if (dir.includes('n')) { newH = Math.max(20, initialH - dy); newY = initialY + (initialH - newH); }
 
           obj.x = newX; obj.y = newY; obj.w = newW; obj.h = newH;
-          
           const el = document.getElementById(obj.id);
           if (el) {
             el.style.left = `${obj.x}px`; el.style.top = `${obj.y}px`;
@@ -810,17 +796,10 @@
       }
     };
 
-    //    // =========================================================
-    // 6. MÉTODOS DE INSERÇÃO DE OBJETOS
-    // =========================================================
     App.addTextObject = function() {
       const center = Coords.getVisibleCenterLogical();
       App.History.saveState();
-      const obj = {
-        id: crypto.randomUUID(), type: 'text',
-        x: center.x - 50, y: center.y - 15, w: 120, h: 30,
-        text: 'Novo Texto', font: 'Helvetica', size: 14, color: '#000000', align: 'left', z: 50
-      };
+      const obj = { id: crypto.randomUUID(), type: 'text', x: center.x - 60, y: center.y - 15, w: 120, h: 30, text: 'Novo Texto', font: 'Helvetica', size: 14, color: '#000000', align: 'left', z: 50 };
       this.State.edits[this.State.currentPage].objects.push(obj);
       this.Engine.selectObject(obj.id);
     };
@@ -828,11 +807,15 @@
     App.addRectObject = function() {
       const center = Coords.getVisibleCenterLogical();
       App.History.saveState();
-      const obj = {
-        id: crypto.randomUUID(), type: 'rect',
-        x: center.x - 50, y: center.y - 50, w: 100, h: 100,
-        fill: 'transparent', color: '#3b82f6', borderW: 2, z: 40
-      };
+      const obj = { id: crypto.randomUUID(), type: 'rect', x: center.x - 50, y: center.y - 50, w: 100, h: 100, fill: 'transparent', color: '#3b82f6', borderW: 2, z: 40 };
+      this.State.edits[this.State.currentPage].objects.push(obj);
+      this.Engine.selectObject(obj.id);
+    };
+
+    App.addCircleObject = function() {
+      const center = Coords.getVisibleCenterLogical();
+      App.History.saveState();
+      const obj = { id: crypto.randomUUID(), type: 'circle', x: center.x - 50, y: center.y - 50, w: 100, h: 100, fill: 'transparent', color: '#ef4444', borderW: 2, z: 40 };
       this.State.edits[this.State.currentPage].objects.push(obj);
       this.Engine.selectObject(obj.id);
     };
@@ -840,46 +823,80 @@
     App.addWhiteoutObject = function() {
       const center = Coords.getVisibleCenterLogical();
       App.History.saveState();
-      const obj = {
-        id: crypto.randomUUID(), type: 'rect', isWhiteout: true,
-        x: center.x - 50, y: center.y - 15, w: 100, h: 30,
-        z: 30
+      const obj = { id: crypto.randomUUID(), type: 'rect', isWhiteout: true, x: center.x - 50, y: center.y - 15, w: 100, h: 30, z: 30 };
+      this.State.edits[this.State.currentPage].objects.push(obj);
+      this.Engine.selectObject(obj.id);
+    };
+
+    App.addImageObject = function(e, dataUrl = null) {
+      if (dataUrl) {
+        this._insertImage(dataUrl);
+        return;
+      }
+      const file = e.target.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = (evt) => this._insertImage(evt.target.result);
+      reader.readAsDataURL(file);
+      e.target.value = '';
+    };
+
+    App._insertImage = function(dataUrl) {
+      const img = new Image();
+      img.onload = () => {
+        const center = Coords.getVisibleCenterLogical();
+        const ratio = img.width / img.height;
+        const w = 150; const h = w / ratio;
+        App.History.saveState();
+        const obj = { id: crypto.randomUUID(), type: 'image', src: dataUrl, x: center.x - (w/2), y: center.y - (h/2), w: w, h: h, z: 20 };
+        this.State.edits[this.State.currentPage].objects.push(obj);
+        this.Engine.selectObject(obj.id);
+      };
+      img.src = dataUrl;
+    };
+
+    App.addStampObject = function(text, color) {
+      const center = Coords.getVisibleCenterLogical();
+      App.History.saveState();
+      const obj = { 
+        id: crypto.randomUUID(), type: 'text', 
+        x: center.x - 100, y: center.y - 30, w: 200, h: 60, 
+        text: text, font: 'Helvetica', size: 32, color: color, align: 'center', bold: true,
+        border: `4px solid ${color}`, rotation: -15, z: 60 
       };
       this.State.edits[this.State.currentPage].objects.push(obj);
       this.Engine.selectObject(obj.id);
     };
 
-    App.addImageObject = function(e) {
-      const file = e.target.files[0];
-      if(!file) return;
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        const img = new Image();
-        img.onload = () => {
-          const center = Coords.getVisibleCenterLogical();
-          const ratio = img.width / img.height;
-          const w = 150; const h = w / ratio;
-          App.History.saveState();
-          const obj = {
-            id: crypto.randomUUID(), type: 'image', src: evt.target.result,
-            x: center.x - (w/2), y: center.y - (h/2), w: w, h: h, z: 20
-          };
-          this.State.edits[this.State.currentPage].objects.push(obj);
-          this.Engine.selectObject(obj.id);
-        };
-        img.src = evt.target.result;
-      };
-      reader.readAsDataURL(file);
-      e.target.value = '';
+    App.Signature = {
+      isDrawing: false,
+      ctx: null,
+      init() {
+        const canvas = App.UI.sigCanvas;
+        this.ctx = canvas.getContext('2d');
+        this.clear();
+        
+        canvas.onmousedown = (e) => { this.isDrawing = true; this.ctx.beginPath(); this.ctx.moveTo(e.offsetX, e.offsetY); };
+        canvas.onmousemove = (e) => { if(this.isDrawing) { this.ctx.lineTo(e.offsetX, e.offsetY); this.ctx.stroke(); } };
+        canvas.onmouseup = canvas.onmouseout = () => this.isDrawing = false;
+      },
+      clear() {
+        this.ctx.clearRect(0, 0, App.UI.sigCanvas.width, App.UI.sigCanvas.height);
+        this.ctx.strokeStyle = '#000';
+        this.ctx.lineWidth = 3;
+        this.ctx.lineCap = 'round';
+      },
+      save() {
+        const dataUrl = App.UI.sigCanvas.toDataURL('image/png');
+        App.addImageObject(null, dataUrl);
+        App.UI.toggleSignatureModal(false);
+      }
     };
 
-    // =========================================================
-    // 7. MENU CONTEXTUAL INTELIGENTE
-    // =========================================================
     App.ContextMenu = {
       show(obj) {
         const menu = App.UI.ctxMenu;
-        menu.innerHTML = ''; // Clear
+        menu.innerHTML = ''; 
 
         if (obj.type === 'text') {
           menu.innerHTML = `
@@ -894,21 +911,20 @@
             <input type="color" value="${obj.color}" oninput="App.updateObj('color', this.value)" class="w-6 h-6 border-0 p-0 bg-transparent rounded cursor-pointer">
           `;
         } 
-        else if (obj.type === 'rect') {
+        else if (obj.type === 'rect' || obj.type === 'circle') {
            if(!obj.isWhiteout) {
              menu.innerHTML = `
                <input type="color" value="${obj.color}" oninput="App.updateObj('color', this.value)" class="w-6 h-6 border-0 p-0 bg-transparent rounded cursor-pointer" title="Cor da Borda">
                <input type="number" min="1" max="10" value="${obj.borderW}" onchange="App.updateObj('borderW', parseInt(this.value))" class="w-10 bg-black text-xs text-center border border-zinc-700 rounded px-1 outline-none text-white">
              `;
            } else {
-             menu.innerHTML = `<span class="text-[10px] text-zinc-400 px-2 font-bold uppercase">Apagador / Whiteout</span>`;
+             menu.innerHTML = `<span class="text-[10px] text-zinc-400 px-2 font-bold uppercase">Apagador</span>`;
            }
         }
         else if (obj.type === 'image') {
            menu.innerHTML = `<span class="text-[10px] text-zinc-400 px-2 font-bold uppercase">Imagem</span>`;
         }
 
-        // Ações comuns
         menu.innerHTML += `
           <div class="ctx-divider"></div>
           <button onclick="App.Engine.deleteSelected()" class="ctx-btn text-red-400 hover:text-red-300"><i class="ph-bold ph-trash"></i></button>
@@ -917,56 +933,35 @@
         menu.classList.add('visible');
         this.updatePosition();
       },
-
-      hide() {
-        App.UI.ctxMenu.classList.remove('visible');
-      },
-
+      hide() { App.UI.ctxMenu.classList.remove('visible'); },
       updatePosition() {
-        const obj = App.State.edits[App.State.currentPage].objects.find(o => o.id === App.State.selectedId);
+        const obj = App.State.edits[App.State.currentPage]?.objects.find(o => o.id === App.State.selectedId);
         if (!obj) return this.hide();
-
-        const menu = App.UI.ctxMenu;
         const screenPos = Coords.logicalToScreen(obj.x, obj.y);
-        
-        // Posiciona o menu flutuante acima do objeto
-        // O offset top considera a altura do menu e um padding visual.
         let topPos = screenPos.y - 40; 
-        
-        // Se bater no header, joga pra baixo do objeto
         if (topPos < 50) {
            const screenBottom = Coords.logicalToScreen(obj.x, obj.y + obj.h);
            topPos = screenBottom.y + 10;
         }
-
-        menu.style.left = `${screenPos.x}px`;
-        menu.style.top = `${topPos}px`;
+        App.UI.ctxMenu.style.left = `${screenPos.x}px`;
+        App.UI.ctxMenu.style.top = `${topPos}px`;
       }
     };
 
     App.updateObj = function(prop, val) {
       const obj = this.State.edits[this.State.currentPage].objects.find(o => o.id === this.State.selectedId);
-      if (obj) {
-        this.History.saveState();
-        obj[prop] = val;
-        this.Engine.renderOverlayObjects();
-      }
+      if (obj) { this.History.saveState(); obj[prop] = val; this.Engine.renderOverlayObjects(); }
     };
 
-    //    // =========================================================
-    // 8. HISTÓRICO (UNDO / REDO)
-    // =========================================================
     App.History = {
       saveState() {
-        const snapshot = JSON.stringify(App.State.edits);
-        App.State.history.past.push(snapshot);
-        App.State.history.future = []; // Limpa futuro ao fazer nova ação
-        if (App.State.history.past.length > 30) App.State.history.past.shift(); // Limite
+        App.State.history.past.push(JSON.stringify(App.State.edits));
+        App.State.history.future = [];
+        if (App.State.history.past.length > 30) App.State.history.past.shift();
       },
       undo() {
         if (App.State.history.past.length > 0) {
-          const current = JSON.stringify(App.State.edits);
-          App.State.history.future.push(current);
+          App.State.history.future.push(JSON.stringify(App.State.edits));
           App.State.edits = JSON.parse(App.State.history.past.pop());
           App.Engine.renderOverlayObjects();
           App.Engine.redrawPaths();
@@ -974,8 +969,7 @@
       },
       redo() {
         if (App.State.history.future.length > 0) {
-          const current = JSON.stringify(App.State.edits);
-          App.State.history.past.push(current);
+          App.State.history.past.push(JSON.stringify(App.State.edits));
           App.State.edits = JSON.parse(App.State.history.future.pop());
           App.Engine.renderOverlayObjects();
           App.Engine.redrawPaths();
@@ -983,27 +977,24 @@
       }
     };
 
-    // =========================================================
-    // 9. EXPORTAÇÃO PDF-LIB MATEMATICAMENTE FIEL
-    // =========================================================
     App.Export = {
       async savePDF() {
-        if (!App.State.pdfDoc) return;
+        if (!App.State.pdfDocLib) return;
         const btn = event.currentTarget;
         const oHtml = btn.innerHTML;
-        btn.innerHTML = `<i class="ph-bold ph-spinner animate-spin"></i> Gerando...`;
+        btn.innerHTML = `<i class="ph-bold ph-spinner animate-spin"></i> Exportando...`;
 
         try {
-          const fontHelvetica = await App.State.pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
-          const fontBold = await App.State.pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
-          const fontItalic = await App.State.pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaOblique);
+          const fontHelvetica = await App.State.pdfDocLib.embedFont(PDFLib.StandardFonts.Helvetica);
+          const fontBold = await App.State.pdfDocLib.embedFont(PDFLib.StandardFonts.HelveticaBold);
+          const fontItalic = await App.State.pdfDocLib.embedFont(PDFLib.StandardFonts.HelveticaOblique);
 
           for (let i = 1; i <= App.State.numPages; i++) {
-            const page = App.State.pdfDoc.getPage(i - 1);
+            const page = App.State.pdfDocLib.getPage(i - 1);
             const { width, height } = page.getSize();
             const edits = App.State.edits[i];
 
-            // A. Queimar Traços (Paths) gerando um PNG overlay por página
+            // A. Queimar Traços (Paths) gerando um PNG overlay (preserva transparência de marca-texto)
             if (edits.paths.length > 0) {
               const offCanvas = document.createElement('canvas');
               offCanvas.width = width * 2; offCanvas.height = height * 2;
@@ -1012,6 +1003,10 @@
               edits.paths.forEach(p => {
                 offCtx.beginPath();
                 offCtx.strokeStyle = p.color;
+                // Ajuste de opacidade para marca-texto
+                if(p.isHighlight) offCtx.globalAlpha = 0.4;
+                else offCtx.globalAlpha = 1.0;
+                
                 offCtx.lineWidth = p.width * 2;
                 offCtx.lineCap = 'round';
                 offCtx.moveTo(p.points[0].x * 2, p.points[0].y * 2);
@@ -1019,16 +1014,14 @@
                 offCtx.stroke();
               });
 
-              const pngImage = await App.State.pdfDoc.embedPng(offCanvas.toDataURL());
+              const pngImage = await App.State.pdfDocLib.embedPng(offCanvas.toDataURL());
               page.drawImage(pngImage, { x: 0, y: 0, width: width, height: height });
             }
 
-            // Ordena objetos por Z-Index antes de renderizar para respeitar camadas
             const sortedObjs = [...edits.objects].sort((a,b) => (a.z || 0) - (b.z || 0));
 
             // B. Queimar Objetos Lógicos
             for (const obj of sortedObjs) {
-              // Conversão de Y (PDF-lib tem 0,0 no canto inferior esquerdo)
               const pdfY = height - obj.y - obj.h;
 
               if (obj.type === 'rect') {
@@ -1036,39 +1029,50 @@
                    page.drawRectangle({ x: obj.x, y: pdfY, width: obj.w, height: obj.h, color: PDFLib.rgb(1,1,1) });
                 } else {
                    const rgb = this.hexToRgb(obj.color);
-                   page.drawRectangle({ 
-                     x: obj.x, y: pdfY, width: obj.w, height: obj.h, 
-                     borderColor: PDFLib.rgb(rgb.r, rgb.g, rgb.b), borderWidth: obj.borderW 
-                   });
+                   page.drawRectangle({ x: obj.x, y: pdfY, width: obj.w, height: obj.h, borderColor: PDFLib.rgb(rgb.r, rgb.g, rgb.b), borderWidth: obj.borderW });
                 }
               } 
+              else if (obj.type === 'circle') {
+                const rgb = this.hexToRgb(obj.color);
+                page.drawEllipse({
+                    x: obj.x + (obj.w / 2),
+                    y: pdfY + (obj.h / 2),
+                    xScale: obj.w / 2,
+                    yScale: obj.h / 2,
+                    borderColor: PDFLib.rgb(rgb.r, rgb.g, rgb.b),
+                    borderWidth: obj.borderW
+                });
+              }
               else if (obj.type === 'text') {
                 const rgb = this.hexToRgb(obj.color);
                 let f = fontHelvetica;
                 if(obj.bold) f = fontBold;
                 if(obj.italic) f = fontItalic;
 
-                // PDF-lib desenha texto a partir da linha de base (baseline), então ajustamos o Y
                 const baselineY = height - obj.y - (obj.size * 0.85);
-
-                page.drawText(obj.text, {
-                  x: obj.x + 2, y: baselineY, size: obj.size, font: f, color: PDFLib.rgb(rgb.r, rgb.g, rgb.b)
-                });
+                
+                // Se for um carimbo, aplicamos a rotação
+                const opts = { x: obj.x + 2, y: baselineY, size: obj.size, font: f, color: PDFLib.rgb(rgb.r, rgb.g, rgb.b) };
+                if (obj.rotation) {
+                    opts.rotate = PDFLib.degrees(obj.rotation);
+                    // Ajuste fino do centro de rotação (pdf-lib rotaciona a partir do canto)
+                    opts.x += obj.w / 2;
+                    opts.y += obj.h / 2;
+                }
+                
+                page.drawText(obj.text, opts);
               }
               else if (obj.type === 'image') {
                 const imgBytes = await fetch(obj.src).then(r => r.arrayBuffer());
-                let embedded;
-                if (obj.src.includes('png') || obj.src.startsWith('data:image/png')) {
-                  embedded = await App.State.pdfDoc.embedPng(imgBytes);
-                } else {
-                  embedded = await App.State.pdfDoc.embedJpg(imgBytes);
-                }
+                let embedded = obj.src.includes('png') || obj.src.startsWith('data:image/png') 
+                               ? await App.State.pdfDocLib.embedPng(imgBytes) 
+                               : await App.State.pdfDocLib.embedJpg(imgBytes);
                 page.drawImage(embedded, { x: obj.x, y: pdfY, width: obj.w, height: obj.h });
               }
             }
           }
 
-          const finalBytes = await App.State.pdfDoc.save();
+          const finalBytes = await App.State.pdfDocLib.save();
           const blob = new Blob([finalBytes], { type: 'application/pdf' });
           const link = document.createElement('a');
           link.href = URL.createObjectURL(blob);
@@ -1089,9 +1093,7 @@
       }
     };
 
-    // Iniciar App
     setupGlobalEvents();
-
   </script>
 </body>
 </html>
