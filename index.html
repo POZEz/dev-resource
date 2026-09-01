@@ -51,7 +51,7 @@
       box-shadow: 0 10px 25px rgba(0,0,0,0.5);
     }
 
-    /* Visão Compacta dos Cards (Quadrados Pequenos lado a lado) */
+    /* Visão Compacta dos Cards */
     .compact-mode #tools-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     }
@@ -93,16 +93,12 @@
       display: none !important;
     }
 
-    /* Animação do Menu Lateral Expansivo */
+    /* Animação do Menu Lateral */
     .sidebar-drawer {
       transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    .sidebar-closed {
-      transform: translateX(-100%);
-    }
-    .sidebar-open {
-      transform: translateX(0);
-    }
+    .sidebar-closed { transform: translateX(-100%); }
+    .sidebar-open { transform: translateX(0); }
   </style>
 </head>
 <body class="antialiased flex flex-col h-screen font-sans bg-matte-bg select-none overflow-hidden">
@@ -113,7 +109,7 @@
   <script>
     const SUPABASE_URL = 'https://zlsdlcvtcsrykfacjvhf.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_JnDv-fxHXPTzNaFX9n3Z0w_4mqt47Js';
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
     // Banco de Dados Local do Navegador para arquivos pesados
     let localFileDB = null;
@@ -126,38 +122,40 @@
     };
     dbReq.onsuccess = (e) => { localFileDB = e.target.result; };
 
-    // PortalDB Global para Módulos e iFrames
+    // PortalDB Global para o Hub e todos os iframes
     window.PortalDB = {
       supabase: supabase,
 
       async getSession() {
         try {
+          if (!supabase) return null;
           const { data, error } = await supabase.auth.getSession();
           if (error) throw error;
           return data?.session;
         } catch (error) {
+          console.error("Erro ao obter sessão:", error);
           return null;
         }
       },
 
       async login(email, password) {
+        if (!supabase) throw new Error("Supabase não carregado.");
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         return data.user;
       },
 
       async register(email, password) {
+        if (!supabase) throw new Error("Supabase não carregado.");
         const { data, error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
         return data.user;
       },
 
       async logout() {
-        await supabase.auth.signOut();
-        window.location.reload();
+        if (supabase) await supabase.auth.signOut();
       },
 
-      // Auxiliar para salvar arquivos pesados localmente
       async saveHeavyFileLocal(id, blob, metadata) {
         if (!localFileDB) return;
         const tx = localFileDB.transaction("heavy_files", "readwrite");
@@ -176,10 +174,9 @@
         });
       },
 
-      // Intermediação Gemini REST
       async callGeminiEdge(prompt, context = {}) {
         const session = await this.getSession();
-        if (!session) throw new Error("Acesso não autorizado.");
+        if (!session) throw new Error("Acesso não autorizado. Conecte sua conta.");
 
         const response = await fetch(`${SUPABASE_URL}/functions/v1/gemini-assist`, {
           method: 'POST',
@@ -200,15 +197,13 @@
     };
   </script>
 
-  <!-- ============================================================================
-       CABEÇALHO DINÂMICO (Alterna entre estado Home e estado Ferramenta)
-       ============================================================================ -->
+  <!-- CABEÇALHO DINÂMICO -->
   <header class="h-14 shrink-0 bg-matte-card border-b border-matte-border px-4 sm:px-6 flex items-center justify-between z-30">
     
-    <!-- ESTADO 1: HEADER DA PÁGINA INICIAL (HUB) -->
-    <div id="header-home-content" class="w-full flex items-center justify-between transition-opacity duration-300">
+    <!-- ESTADO 1: HEADER DA HOME -->
+    <div id="header-home-content" class="w-full flex items-center justify-between">
       <div class="flex items-center gap-2.5">
-        <button onclick="toggleSidebarMenu(true)" class="p-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 hover:text-white transition-colors" title="Abrir Menu Lateral">
+        <button onclick="toggleSidebarMenu(true)" class="p-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 hover:text-white transition-colors" title="Menu de Ferramentas">
           <i class="ph-bold ph-list text-lg"></i>
         </button>
 
@@ -219,14 +214,14 @@
           <div>
             <h1 class="text-sm font-bold text-white leading-tight">My Hub</h1>
             <div id="global-sync-badge" class="flex items-center gap-1 text-[9px] font-semibold text-zinc-400">
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-              <span>Pronto</span>
+              <span class="w-1.5 h-1.5 rounded-full bg-zinc-500"></span>
+              <span>Verificando...</span>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Ações do Cabeçalho -->
+      <!-- Ações da Direita -->
       <div class="flex items-center gap-1.5">
         <button onclick="openModule('Armazenamento', 'meus-dados.html')" class="p-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1.5" title="Armazenamento e Lixeira">
           <i class="ph-fill ph-database text-lg"></i>
@@ -242,13 +237,13 @@
       </div>
     </div>
 
-    <!-- ESTADO 2: HEADER DA FERRAMENTA ABERTA -->
-    <div id="header-module-content" class="hidden w-full flex items-center gap-3 transition-opacity duration-300">
+    <!-- ESTADO 2: HEADER DO MÓDULO ABERTO -->
+    <div id="header-module-content" class="hidden w-full flex items-center gap-3">
       <button onclick="closeModuleIframe()" class="px-3 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-matte-border text-white text-xs font-bold flex items-center gap-2 transition-colors">
         <i class="ph-bold ph-arrow-left text-sm"></i> Voltar ao My Hub
       </button>
       <div class="h-5 w-px bg-matte-border"></div>
-      <span id="active-module-title" class="text-sm font-bold text-zinc-300 truncate">Nome da Ferramenta</span>
+      <span id="active-module-title" class="text-sm font-bold text-zinc-300 truncate">Ferramenta</span>
     </div>
 
   </header>
@@ -256,7 +251,7 @@
   <!-- OVERLAY MASCARA DO MENU LATERAL -->
   <div id="sidebar-backdrop" onclick="toggleSidebarMenu(false)" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-40 hidden transition-opacity"></div>
 
-  <!-- MENU LATERAL EXPANSIVO / SIDEBAR NAV -->
+  <!-- MENU LATERAL DRAWER -->
   <aside id="sidebar-menu" class="sidebar-drawer sidebar-closed fixed top-0 left-0 bottom-0 w-72 bg-matte-card border-r border-matte-border z-50 flex flex-col custom-scroll shadow-2xl">
     
     <div class="h-14 px-4 border-b border-matte-border flex items-center justify-between shrink-0">
@@ -288,8 +283,8 @@
             <i id="chevron-cat-docs" class="ph-bold ph-caret-down text-zinc-500 transition-transform"></i>
           </button>
           <div id="cat-docs" class="hidden pl-6 pr-2 py-1.5 space-y-1 bg-black/20 border-t border-matte-border">
-            <button onclick="openModuleFromSidebar('01 — Editor de PDF', 'pdf.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Editor de PDF</button>
-            <button onclick="openModuleFromSidebar('10 — Editor de Documentos', 'documento.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Editor de Documentos</button>
+            <button onclick="openModuleFromSidebar('Editor de PDF', 'pdf.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Editor de PDF</button>
+            <button onclick="openModuleFromSidebar('Editor de Documentos', 'documento.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Editor de Documentos</button>
           </div>
         </div>
 
@@ -299,10 +294,10 @@
             <i id="chevron-cat-media" class="ph-bold ph-caret-down text-zinc-500 transition-transform"></i>
           </button>
           <div id="cat-media" class="hidden pl-6 pr-2 py-1.5 space-y-1 bg-black/20 border-t border-matte-border">
-            <button onclick="openModuleFromSidebar('03 — Editor de Imagens', 'imagem.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Editor de Imagens</button>
-            <button onclick="openModuleFromSidebar('12 — Editor de Vídeo', 'video.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Editor de Vídeo</button>
-            <button onclick="openModuleFromSidebar('13 — Editor de Áudio', 'audio.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Editor de Áudio</button>
-            <button onclick="openModuleFromSidebar('14 — Apresentações', 'apresentacao.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Apresentações</button>
+            <button onclick="openModuleFromSidebar('Editor de Imagens', 'imagem.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Editor de Imagens</button>
+            <button onclick="openModuleFromSidebar('Editor de Vídeo', 'video.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Editor de Vídeo</button>
+            <button onclick="openModuleFromSidebar('Editor de Áudio', 'audio.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Editor de Áudio</button>
+            <button onclick="openModuleFromSidebar('Apresentações', 'apresentacao.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Apresentações</button>
           </div>
         </div>
 
@@ -312,12 +307,12 @@
             <i id="chevron-cat-data" class="ph-bold ph-caret-down text-zinc-500 transition-transform"></i>
           </button>
           <div id="cat-data" class="hidden pl-6 pr-2 py-1.5 space-y-1 bg-black/20 border-t border-matte-border">
-            <button onclick="openModuleFromSidebar('05 — Tabelas e Dados', 'tabelas.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Tabelas & Dados</button>
-            <button onclick="openModuleFromSidebar('06 — Modelos de Dados', 'modelos.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Modelos de Dados</button>
+            <button onclick="openModuleFromSidebar('Tabelas e Dados', 'tabelas.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Tabelas & Dados</button>
+            <button onclick="openModuleFromSidebar('Modelos de Dados', 'modelos.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Modelos de Dados</button>
           </div>
         </div>
 
-        <button onclick="openModuleFromSidebar('11 — Editor CAD 2D', 'cad.html')" class="w-full p-2.5 rounded-xl border border-matte-border bg-white/[0.01] hover:bg-white/[0.04] text-zinc-300 hover:text-white font-semibold flex items-center justify-between transition-colors">
+        <button onclick="openModuleFromSidebar('Editor CAD 2D', 'cad.html')" class="w-full p-2.5 rounded-xl border border-matte-border bg-white/[0.01] hover:bg-white/[0.04] text-zinc-300 hover:text-white font-semibold flex items-center justify-between transition-colors">
           <div class="flex items-center gap-2"><i class="ph-bold ph-compass text-blue-400 text-sm"></i><span>Desenho CAD 2D</span></div>
           <span class="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 text-[9px] font-bold">Função</span>
         </button>
@@ -328,9 +323,9 @@
             <i id="chevron-cat-prod" class="ph-bold ph-caret-down text-zinc-500 transition-transform"></i>
           </button>
           <div id="cat-prod" class="hidden pl-6 pr-2 py-1.5 space-y-1 bg-black/20 border-t border-matte-border">
-            <button onclick="openModuleFromSidebar('07 — Controle Financeiro', 'financas.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Controle Financeiro</button>
-            <button onclick="openModuleFromSidebar('08 — Plano de Estudos', 'estudos.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Plano de Estudos</button>
-            <button onclick="openModuleFromSidebar('15 — Tarefas & Projetos', 'tarefas.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Tarefas & Projetos</button>
+            <button onclick="openModuleFromSidebar('Controle Financeiro', 'financas.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Controle Financeiro</button>
+            <button onclick="openModuleFromSidebar('Plano de Estudos', 'estudos.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Plano de Estudos</button>
+            <button onclick="openModuleFromSidebar('Tarefas & Projetos', 'tarefas.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Tarefas & Projetos</button>
           </div>
         </div>
 
@@ -340,11 +335,11 @@
             <i id="chevron-cat-utils" class="ph-bold ph-caret-down text-zinc-500 transition-transform"></i>
           </button>
           <div id="cat-utils" class="hidden pl-6 pr-2 py-1.5 space-y-1 bg-black/20 border-t border-matte-border">
-            <button onclick="openModuleFromSidebar('02 — Conversor de Arquivos', 'conversor.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Conversor de Arquivos</button>
+            <button onclick="openModuleFromSidebar('Conversor de Arquivos', 'conversor.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Conversor de Arquivos</button>
           </div>
         </div>
 
-        <button onclick="openModuleFromSidebar('04 — QR Code', 'qrcode.html')" class="w-full p-2.5 rounded-xl border border-matte-border bg-white/[0.01] hover:bg-white/[0.04] text-zinc-300 hover:text-white font-semibold flex items-center justify-between transition-colors">
+        <button onclick="openModuleFromSidebar('QR Code Hub', 'qrcode.html')" class="w-full p-2.5 rounded-xl border border-matte-border bg-white/[0.01] hover:bg-white/[0.04] text-zinc-300 hover:text-white font-semibold flex items-center justify-between transition-colors">
           <div class="flex items-center gap-2"><i class="ph-bold ph-qr-code text-emerald-400 text-sm"></i><span>QR Code Hub</span></div>
           <span class="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[9px] font-bold">Função</span>
         </button>
@@ -363,17 +358,17 @@
     </div>
   </aside>
 
-  <!-- ÁREA DE CONTEÚDO DINÂMICO (HOME E IFRAME) -->
+  <!-- ÁREA DE CONTEÚDO DINÂMICO -->
   <main class="flex-1 relative overflow-hidden flex flex-col bg-matte-bg">
     
-    <!-- PÁGINA INICIAL DO HUB -->
+    <!-- HOME VIEW -->
     <div id="home-view" class="h-full overflow-y-auto p-4 sm:p-6 custom-scroll">
       <div class="max-w-7xl mx-auto space-y-6">
         
         <!-- Busca Global -->
         <div class="relative">
           <i class="ph ph-magnifying-glass absolute left-3.5 top-3 text-zinc-500 text-sm"></i>
-          <input type="text" id="global-search-input" oninput="handleGlobalSearch(this.value)" placeholder="Pesquisar por nome ou ferramenta (ex: 'vendas')..." class="w-full bg-matte-card border border-matte-border rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500/50 shadow-lg">
+          <input type="text" id="global-search-input" oninput="handleGlobalSearch(this.value)" placeholder="Pesquisar por nome do documento (ex: 'relatório', 'contrato')..." class="w-full bg-matte-card border border-matte-border rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500/50 shadow-lg">
         </div>
 
         <!-- Painel de Resultados da Busca -->
@@ -389,7 +384,7 @@
         <div id="tools-grid-wrapper">
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-xs font-bold uppercase tracking-wider text-zinc-500">Ferramentas de Produtividade</h2>
-            <button onclick="toggleCompactMode()" id="btn-toggle-compact" class="px-2.5 py-1 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-400 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors" title="Alternar visão compacta em cards quadrados">
+            <button onclick="toggleCompactMode()" id="btn-toggle-compact" class="px-2.5 py-1 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-400 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors" title="Alternar visão compacta">
               <i id="compact-icon" class="ph ph-squares-four text-sm"></i>
               <span id="compact-label" class="text-[11px]">Quadrados</span>
             </button>
@@ -433,7 +428,7 @@
               <i class="ph-bold ph-table text-amber-400 text-2xl mb-2 block"></i>
               <div>
                 <h3 class="text-xs sm:text-sm font-bold text-white mb-1">Tabelas & Dados</h3>
-                <p class="text-[11px] text-zinc-400 leading-relaxed">Transformar texto bruto em tabelas e gráficos com IA.</p>
+                <p class="text-[11px] text-zinc-400 leading-relaxed">Limpeza, conversão e estruturação de planilhas.</p>
               </div>
             </div>
 
@@ -449,7 +444,7 @@
               <i class="ph-bold ph-wallet text-emerald-400 text-2xl mb-2 block"></i>
               <div>
                 <h3 class="text-xs sm:text-sm font-bold text-white mb-1">Controle Financeiro</h3>
-                <p class="text-[11px] text-zinc-400 leading-relaxed">Receitas, despesas, contas, metas e comparação mensal.</p>
+                <p class="text-[11px] text-zinc-400 leading-relaxed">Fluxo de caixa, receitas, despesas e metas mensais.</p>
               </div>
             </div>
 
@@ -514,7 +509,7 @@
       </div>
     </div>
 
-    <!-- WRAPPER DO MÓDULO (IFRAME) - 100% da tela sem navbars duplas -->
+    <!-- WRAPPER DO MÓDULO IFRAME -->
     <div id="module-iframe-wrapper" class="hidden flex-1 w-full h-full bg-matte-bg relative">
       <iframe id="module-iframe" class="w-full h-full border-none block"></iframe>
     </div>
@@ -552,14 +547,21 @@
     let isCompact = false;
 
     window.addEventListener('DOMContentLoaded', async () => {
+      // 1. Recupera sessão inicial
       const session = await PortalDB.getSession();
-      if (session) {
-        activeUser = session.user;
-      }
+      activeUser = session ? session.user : null;
       updateUserUI();
+
+      // 2. Registra listener em tempo real para mudanças de autenticação
+      if (supabase) {
+        supabase.auth.onAuthStateChange((event, session) => {
+          activeUser = session ? session.user : null;
+          updateUserUI();
+        });
+      }
     });
 
-    // ==== MODO COMPACTO (QUADRADOS X EXPANDIDO) ====
+    // ==== MODO COMPACTO ====
     function toggleCompactMode() {
       isCompact = !isCompact;
       const grid = document.getElementById('tools-grid');
@@ -579,12 +581,11 @@
       }
     }
 
-    // ==== NAVEGAÇÃO DE PÁGINAS E HEADER DINÂMICO ====
+    // ==== NAVEGAÇÃO E IFRAME ====
     function openModule(title, fileUrl) {
       document.getElementById('home-view').classList.add('hidden');
       document.getElementById('module-iframe-wrapper').classList.remove('hidden');
       
-      // Alternar estado do Header
       document.getElementById('header-home-content').classList.add('hidden');
       document.getElementById('header-module-content').classList.remove('hidden');
       document.getElementById('header-module-content').classList.add('flex');
@@ -597,7 +598,6 @@
       document.getElementById('module-iframe-wrapper').classList.add('hidden');
       document.getElementById('home-view').classList.remove('hidden');
       
-      // Restaurar estado do Header
       document.getElementById('header-module-content').classList.add('hidden');
       document.getElementById('header-module-content').classList.remove('flex');
       document.getElementById('header-home-content').classList.remove('hidden');
@@ -605,7 +605,7 @@
       document.getElementById('module-iframe').src = 'about:blank';
     }
 
-    // ==== DRAWER LATERAL (SIDEBAR) ====
+    // ==== DRAWER LATERAL ====
     function toggleSidebarMenu(show) {
       const menu = document.getElementById('sidebar-menu');
       const backdrop = document.getElementById('sidebar-backdrop');
@@ -646,13 +646,19 @@
     // ==== AUTENTICAÇÃO E ATUALIZAÇÃO DA UI ====
     function updateUserUI() {
       const sec = document.getElementById('user-auth-section');
+      const badge = document.getElementById('global-sync-badge');
+
       if (activeUser) {
         sec.innerHTML = `
-          <button onclick="PortalDB.logout()" class="p-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 transition-colors flex items-center gap-1.5 text-xs font-bold" title="Conectado: ${activeUser.email} (Clique para sair)">
+          <button onclick="handleLogout()" class="p-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 transition-colors flex items-center gap-1.5 text-xs font-bold" title="Conectado: ${activeUser.email} (Clique para desconectar)">
             <i class="ph-fill ph-user-circle text-lg text-blue-400"></i>
             <span class="w-2 h-2 rounded-full bg-blue-500"></span>
             <span class="hidden md:inline">${activeUser.email.split('@')[0]}</span>
           </button>
+        `;
+        badge.innerHTML = `
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+          <span>Nuvem Ativa</span>
         `;
       } else {
         sec.innerHTML = `
@@ -662,6 +668,16 @@
             <span class="hidden md:inline">Desconectado</span>
           </button>
         `;
+        badge.innerHTML = `
+          <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+          <span>Modo Local</span>
+        `;
+      }
+    }
+
+    async function handleLogout() {
+      if (confirm("Deseja realmente desconectar sua conta?")) {
+        await PortalDB.logout();
       }
     }
 
@@ -671,35 +687,81 @@
       e.preventDefault();
       const email = document.getElementById('auth-email').value.trim();
       const pass = document.getElementById('auth-pass').value;
+      const btn = document.getElementById('btn-auth-submit');
+      btn.innerText = "Processando...";
+      btn.disabled = true;
+
       try {
         let user;
-        try { user = await PortalDB.login(email, pass); } 
-        catch (err) { user = await PortalDB.register(email, pass); }
+        try {
+          user = await PortalDB.login(email, pass);
+        } catch (loginErr) {
+          // Se não encontrou credenciais ou falhou login, tenta cadastrar
+          if (loginErr.message.toLowerCase().includes("invalid login credentials")) {
+            user = await PortalDB.register(email, pass);
+            alert("Conta criada com sucesso! Se a confirmação de e-mail estiver ativada, verifique sua caixa de entrada.");
+          } else {
+            throw loginErr;
+          }
+        }
+
         activeUser = user;
         updateUserUI();
         toggleAuthModal(false);
-      } catch (err) { alert("Erro de autenticação: " + err.message); }
+      } catch (err) {
+        alert("Erro de autenticação: " + (err.message || err));
+      } finally {
+        btn.innerText = "Entrar / Cadastrar";
+        btn.disabled = false;
+      }
     }
 
-    // ==== BUSCA GLOBAL ====
+    // ==== BUSCA GLOBAL INTEGRADA COM USER_ARTIFACTS ====
     async function handleGlobalSearch(term) {
       const panel = document.getElementById('global-search-results-panel');
       const list = document.getElementById('global-search-items-list');
-      if (!term || term.trim().length < 2) { panel.classList.add('hidden'); return; }
+
+      if (!term || term.trim().length < 2) {
+        panel.classList.add('hidden');
+        return;
+      }
+
       panel.classList.remove('hidden');
       list.innerHTML = `<p class="text-xs text-zinc-500 py-2">Pesquisando registros...</p>`;
+
       try {
         const session = await PortalDB.getSession();
-        if (!session) { list.innerHTML = `<p class="text-xs text-zinc-500 py-2">Conecte sua conta para efetuar buscas globais na nuvem.</p>`; return; }
-        const { data } = await supabase.from('user_artifacts').select('*').eq('user_id', session.user.id).is('deleted_at', null).ilike('name', `%${term}%`).limit(8);
-        if (!data || data.length === 0) { list.innerHTML = `<p class="text-xs text-zinc-500 py-2">Nenhum registro encontrado para "${term}".</p>`; return; }
+        if (!session) {
+          list.innerHTML = `<p class="text-xs text-zinc-500 py-2">Conecte sua conta para pesquisar seus documentos na nuvem.</p>`;
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('user_artifacts')
+          .select('id, name, tool_type, created_at')
+          .eq('user_id', session.user.id)
+          .is('deleted_at', null)
+          .ilike('name', `%${term.trim()}%`)
+          .order('created_at', { ascending: false })
+          .limit(8);
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+          list.innerHTML = `<p class="text-xs text-zinc-500 py-2">Nenhum registro encontrado para "${term}".</p>`;
+          return;
+        }
+
         list.innerHTML = data.map(item => `
-          <div onclick="openModule('${item.name}', 'meus-dados.html')" class="p-2.5 rounded-xl border border-matte-border bg-white/[0.02] hover:bg-white/[0.05] cursor-pointer flex items-center justify-between text-xs">
+          <div onclick="openModule('${item.name}', 'meus-dados.html')" class="p-2.5 rounded-xl border border-matte-border bg-white/[0.02] hover:bg-white/[0.05] cursor-pointer flex items-center justify-between text-xs transition-colors">
             <span class="font-bold text-white truncate max-w-xs">${item.name}</span>
-            <span class="text-[10px] text-blue-400 font-bold uppercase">${item.tool_type}</span>
+            <span class="text-[10px] text-blue-400 font-bold uppercase tracking-wider">${item.tool_type}</span>
           </div>
         `).join('');
-      } catch (e) { list.innerHTML = `<p class="text-xs text-red-400 py-2">Erro ao pesquisar.</p>`; }
+
+      } catch (e) {
+        list.innerHTML = `<p class="text-xs text-red-400 py-2">Erro ao pesquisar: ${e.message}</p>`;
+      }
     }
 
     function clearGlobalSearch() {
