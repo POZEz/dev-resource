@@ -2,14 +2,15 @@
 <html lang="pt-BR" class="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Tabelas e Limpeza de Dados</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#09090b">
+  <title>Tabelas & Dados IA</title>
 
-  <!-- CDNs Supabase, SheetJS, Tailwind & Ícones -->
+  <!-- CDNs Supabase, Tailwind, Phosphor Icons -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <script src="supabase-client.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <script>
@@ -27,677 +28,429 @@
   </script>
 
   <style>
-    body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #09090b; color: #fafafa; -webkit-tap-highlight-color: transparent; }
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #09090b; color: #fafafa; overflow: hidden; }
     .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
     .custom-scroll::-webkit-scrollbar-track { background: transparent; }
     .custom-scroll::-webkit-scrollbar-thumb { background: #27272a; border-radius: 99px; }
     .custom-scroll::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
 
-    /* Estilização das Células Editáveis da Tabela */
-    .table-cell-input {
-      background: transparent;
-      border: 1px solid transparent;
-      width: 100%;
-      min-width: 100px;
-      padding: 0.375rem 0.5rem;
-      color: #fafafa;
-      border-radius: 0.375rem;
-      transition: all 0.15s ease;
-      white-space: pre-wrap;
+    td[contenteditable="true"]:focus, th[contenteditable="true"]:focus {
+      outline: 2px solid #3b82f6;
+      background: rgba(59, 130, 246, 0.08);
     }
-    .table-cell-input:focus {
-      background: rgba(255, 255, 255, 0.04);
-      border-color: #f59e0b; /* amber-500 */
-      outline: none;
-    }
-    
-    /* Popover Menu */
-    .popover-menu {
-      display: none;
-      position: absolute;
-      background: #1c1c1e;
-      border: 1px solid #27272a;
-      border-radius: 12px;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.8);
-      z-index: 60;
-      min-width: 160px;
-      padding: 6px;
-      flex-direction: column;
-      gap: 2px;
-    }
-    .popover-menu.active { display: flex; }
   </style>
 </head>
-<body class="antialiased flex flex-col h-screen font-sans bg-matte-bg select-none overflow-hidden">
+<body class="antialiased flex flex-col h-full bg-matte-bg font-sans select-none overflow-hidden">
 
-  <!-- CABEÇALHO DA APLICAÇÃO -->
-  <header class="h-16 shrink-0 bg-matte-card border-b border-matte-border px-4 sm:px-6 flex items-center justify-between z-30">
-    <div class="flex items-center gap-3">
-      <div class="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
-        <i class="ph-bold ph-magic-wand text-xl"></i>
+  <!-- CABEÇALHO DA FERRAMENTA -->
+  <header class="h-12 shrink-0 bg-matte-card border-b border-matte-border px-4 flex items-center justify-between z-20">
+    <div class="flex items-center gap-2">
+      <div class="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+        <i class="ph-bold ph-table text-sm"></i>
       </div>
-      <div>
-        <input type="text" id="dataset-name" value="Dataset Limpo" onchange="state.datasetName = this.value; triggerAutoSave();" class="bg-transparent font-bold text-sm text-white focus:outline-none focus:border-b border-amber-500 max-w-[180px] sm:max-w-xs truncate" placeholder="Nome da Tabela">
-        <div class="flex items-center gap-2 text-[10px] text-zinc-400">
-          <span id="sync-status"><i class="ph-fill ph-check-circle text-amber-400"></i> Pronto</span>
-          <span>•</span>
-          <span id="rows-count-badge">0 linhas, 0 colunas</span>
-        </div>
-      </div>
+      <input type="text" id="dataset-name" value="Tabela Sem Título" class="bg-transparent text-xs font-bold text-white focus:outline-none focus:border-b focus:border-blue-500 max-w-[180px] sm:max-w-xs truncate px-1 py-0.5">
     </div>
 
-    <!-- Ações e Integração com Nuvem -->
     <div class="flex items-center gap-2">
-      <button onclick="toggleDatasetsModal(true)" class="p-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 text-xs font-semibold flex items-center gap-1.5 transition-colors">
-        <i class="ph ph-folder text-base"></i>
-        <span class="hidden sm:inline">Meus Datasets</span>
+      <span id="sync-status" class="text-[10px] text-zinc-500 hidden sm:inline">Pronto</span>
+      <button onclick="saveToCloud()" class="px-3 py-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] border border-matte-border text-white text-xs font-semibold flex items-center gap-1.5 transition-colors">
+        <i class="ph-bold ph-cloud-arrow-up text-sm"></i>
+        <span>Salvar</span>
       </button>
-      <button id="btn-save-cloud" onclick="saveToCloud()" class="p-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-400 text-xs font-semibold flex items-center gap-1.5 transition-colors">
-        <i class="ph ph-cloud-arrow-up text-base"></i>
-        <span class="hidden sm:inline">Salvar</span>
-      </button>
-      
-      <!-- Exportações Profissionais -->
-      <div class="relative group">
-        <button onclick="togglePopover('export-menu')" class="px-3 py-2 rounded-xl bg-white text-black hover:bg-zinc-200 text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors">
+
+      <div class="relative">
+        <button onclick="toggleExportMenu()" class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm">
           <i class="ph-bold ph-download-simple text-sm"></i>
           <span>Exportar</span>
+          <i class="ph-bold ph-caret-down text-[10px]"></i>
         </button>
-        <div id="export-menu" class="popover-menu right-0 top-full mt-2">
-          <span class="text-[10px] text-zinc-500 font-bold uppercase px-2 py-1">Formatos</span>
-          <button onclick="exportCSV()" class="px-2 py-1.5 text-left text-xs text-zinc-300 hover:text-white hover:bg-white/[0.05] rounded-lg flex items-center gap-2">
-            <i class="ph-bold ph-file-csv text-amber-400"></i> Planilha (CSV)
+
+        <div id="export-dropdown" class="hidden absolute right-0 mt-1.5 w-40 bg-matte-card border border-matte-border rounded-xl shadow-2xl p-1 z-50 text-xs">
+          <button onclick="exportData('csv')" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/[0.06] text-zinc-300 hover:text-white flex items-center gap-2">
+            <i class="ph-bold ph-file-csv text-emerald-400"></i> Arquivo CSV
           </button>
-          <button onclick="exportXLSX()" class="px-2 py-1.5 text-left text-xs text-zinc-300 hover:text-white hover:bg-white/[0.05] rounded-lg flex items-center gap-2">
-            <i class="ph-bold ph-file-xls text-emerald-400"></i> Excel (XLSX)
+          <button onclick="exportData('json')" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/[0.06] text-zinc-300 hover:text-white flex items-center gap-2">
+            <i class="ph-bold ph-brackets-curly text-blue-400"></i> Formato JSON
           </button>
-          <button onclick="exportJSON()" class="px-2 py-1.5 text-left text-xs text-zinc-300 hover:text-white hover:bg-white/[0.05] rounded-lg flex items-center gap-2">
-            <i class="ph-bold ph-braces text-blue-400"></i> Array JSON
+          <button onclick="exportData('sql')" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/[0.06] text-zinc-300 hover:text-white flex items-center gap-2">
+            <i class="ph-bold ph-database text-purple-400"></i> Comandos SQL
           </button>
-          <button onclick="exportSQL()" class="px-2 py-1.5 text-left text-xs text-zinc-300 hover:text-white hover:bg-white/[0.05] rounded-lg flex items-center gap-2">
-            <i class="ph-bold ph-database text-purple-400"></i> Inserts SQL
+          <button onclick="exportData('clipboard')" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/[0.06] text-zinc-300 hover:text-white flex items-center gap-2 border-t border-matte-border mt-1 pt-1.5">
+            <i class="ph-bold ph-copy text-zinc-400"></i> Copiar TSV / Excel
           </button>
         </div>
       </div>
     </div>
   </header>
 
-  <!-- BARRA DE FERRAMENTAS DE DADOS (DATA WRANGLING) -->
-  <nav class="bg-matte-bg border-b border-matte-border px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0 z-20">
-    <div class="flex items-center gap-2 overflow-x-auto custom-scroll max-w-full">
-      <!-- Botão IA: O Coração da Ferramenta -->
-      <button onclick="toggleAiImportModal(true)" class="px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 font-bold text-xs flex items-center gap-1.5 transition-colors shrink-0 shadow-[0_0_15px_rgba(245,158,11,0.15)]">
-        <i class="ph-fill ph-sparkle text-sm"></i>
-        <span>Extrair Tabela de Texto (IA)</span>
-      </button>
-
-      <label class="px-2.5 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-matte-border text-zinc-300 font-medium text-xs flex items-center gap-1.5 cursor-pointer transition-colors shrink-0">
-        <i class="ph ph-upload-simple text-sm"></i> Importar CSV / Excel
-        <input type="file" id="file-import-input" accept=".csv, .xlsx, .xls" class="hidden" onchange="handleFileImport(event)">
-      </label>
-
-      <div class="h-4 w-px bg-matte-border mx-1 shrink-0"></div>
-
-      <!-- Operações de Dados -->
-      <div class="relative">
-        <button onclick="togglePopover('ops-menu')" class="px-2.5 py-1.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 text-xs font-medium flex items-center gap-1.5 transition-colors shrink-0">
-          <i class="ph ph-funnel text-sm text-blue-400"></i> Operações de Limpeza
-        </button>
-        <div id="ops-menu" class="popover-menu left-0 top-full mt-2">
-          <button onclick="DataOps.removeDuplicates()" class="px-2 py-1.5 text-left text-xs text-zinc-300 hover:text-white hover:bg-white/[0.05] rounded-lg flex items-center gap-2">
-            <i class="ph-bold ph-copy text-blue-400"></i> Remover Duplicatas
-          </button>
-          <button onclick="DataOps.removeEmptyRows()" class="px-2 py-1.5 text-left text-xs text-zinc-300 hover:text-white hover:bg-white/[0.05] rounded-lg flex items-center gap-2">
-            <i class="ph-bold ph-rows text-red-400"></i> Remover Linhas Vazias
-          </button>
-          <button onclick="DataOps.transpose()" class="px-2 py-1.5 text-left text-xs text-zinc-300 hover:text-white hover:bg-white/[0.05] rounded-lg flex items-center gap-2">
-            <i class="ph-bold ph-arrows-clockwise text-emerald-400"></i> Transpor (Inverter)
+  <!-- ÁREA DE COMANDO IA -->
+  <section class="p-3 sm:p-4 bg-[#121214]/60 border-b border-matte-border">
+    <div class="max-w-5xl mx-auto space-y-2">
+      <div class="flex items-center gap-2">
+        <div class="relative flex-1">
+          <i class="ph-fill ph-sparkle absolute left-3.5 top-3 text-amber-400 text-sm"></i>
+          <input type="text" id="ai-prompt-input" placeholder="Ex: 'Crie uma tabela com 5 modelos de carros, ano, preço e potência' ou 'Extraia dados do texto...'" class="w-full bg-black/40 border border-matte-border rounded-xl pl-9 pr-24 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500/50 shadow-inner" onkeydown="if(event.key==='Enter') generateWithAI()">
+          <button onclick="generateWithAI()" id="btn-ai-generate" class="absolute right-1.5 top-1.5 px-3 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300 text-xs font-bold flex items-center gap-1 transition-colors">
+            <i class="ph-bold ph-magic-wand"></i>
+            <span>Gerar</span>
           </button>
         </div>
       </div>
 
-      <button onclick="addColumn()" class="px-2.5 py-1.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-400 hover:text-white text-xs font-medium flex items-center gap-1 transition-colors shrink-0">
-        <i class="ph ph-plus text-xs"></i> Coluna
+      <!-- Presets de Prompts Rápidos -->
+      <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbars text-[11px] text-zinc-400">
+        <span class="text-zinc-600 font-semibold uppercase text-[9px] shrink-0">Sugestões:</span>
+        <button onclick="setPromptExample('Tabela de vendas com Produto, Categoria, Qtd, Preço Unitário e Total')" class="px-2 py-0.5 rounded-md bg-white/[0.02] hover:bg-white/[0.06] border border-white/5 shrink-0 transition-colors">📦 Vendas de Produtos</button>
+        <button onclick="setPromptExample('Tabela de controle de despesas mensais com Descrição, Categoria, Vencimento e Valor')" class="px-2 py-0.5 rounded-md bg-white/[0.02] hover:bg-white/[0.06] border border-white/5 shrink-0 transition-colors">💰 Despesas Mensais</button>
+        <button onclick="setPromptExample('Tabela de tarefas de sprint com Tarefa, Responsável, Status e Prazo')" class="px-2 py-0.5 rounded-md bg-white/[0.02] hover:bg-white/[0.06] border border-white/5 shrink-0 transition-colors">📋 Sprint Kanban</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- BARRA DE FERRAMENTAS & MANIPULAÇÃO DE DADOS -->
+  <div class="h-10 shrink-0 bg-matte-card/80 border-b border-matte-border px-4 flex items-center justify-between text-xs overflow-x-auto no-scrollbars">
+    <div class="flex items-center gap-1.5">
+      <button onclick="addRow()" class="px-2.5 py-1 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 hover:text-white flex items-center gap-1" title="Adicionar Linha">
+        <i class="ph-bold ph-plus text-xs text-blue-400"></i> Linha
       </button>
-      <button onclick="addRow()" class="px-2.5 py-1.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-400 hover:text-white text-xs font-medium flex items-center gap-1 transition-colors shrink-0">
-        <i class="ph ph-plus text-xs"></i> Linha
+      <button onclick="addColumn()" class="px-2.5 py-1 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 hover:text-white flex items-center gap-1" title="Adicionar Coluna">
+        <i class="ph-bold ph-plus text-xs text-blue-400"></i> Coluna
       </button>
       
-      <button onclick="clearTable()" class="px-2 py-1.5 rounded-xl hover:bg-red-500/10 text-red-400 text-xs transition-colors shrink-0" title="Limpar Tudo">
-        <i class="ph ph-trash text-sm"></i>
+      <div class="h-4 w-px bg-matte-border mx-1"></div>
+
+      <button onclick="transposeTable()" class="px-2.5 py-1 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 hover:text-white flex items-center gap-1" title="Inverter Linhas e Colunas">
+        <i class="ph-bold ph-arrows-clockwise text-xs text-amber-400"></i> Transpor
+      </button>
+      <button onclick="removeDuplicates()" class="px-2.5 py-1 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 hover:text-white flex items-center gap-1" title="Remover Registros Repetidos">
+        <i class="ph-bold ph-funnel text-xs text-indigo-400"></i> Sem Duplicatas
+      </button>
+      <button onclick="removeEmptyRows()" class="px-2.5 py-1 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 hover:text-white flex items-center gap-1" title="Eliminar Linhas Vazias">
+        <i class="ph-bold ph-broom text-xs text-emerald-400"></i> Limpar Vazios
       </button>
     </div>
 
-    <!-- Campo de Busca / Filtro -->
-    <div class="relative min-w-[200px] w-full sm:w-auto">
-      <i class="ph ph-magnifying-glass absolute left-3 top-2.5 text-zinc-500 text-xs"></i>
-      <input type="text" id="search-filter" oninput="state.searchQuery = this.value; renderTable();" placeholder="Filtrar dados..." class="w-full bg-white/[0.03] border border-matte-border rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500/50">
+    <div class="flex items-center gap-2 text-[11px] text-zinc-500">
+      <span id="table-stats">0 linhas &bull; 0 colunas</span>
+      <button onclick="resetTable()" class="text-red-400 hover:text-red-300 p-1" title="Limpar Tabela Inteira"><i class="ph-bold ph-trash"></i></button>
     </div>
-  </nav>
+  </div>
 
-  <!-- CONTAINER DA TABELA DE DADOS -->
-  <main class="flex-1 overflow-auto p-4 sm:p-6 custom-scroll relative bg-matte-bg" onclick="closeAllPopovers()">
-    
-    <!-- Estado Vazio -->
-    <div id="empty-state" class="hidden flex-col items-center justify-center text-center h-full max-w-md mx-auto my-auto py-12">
-      <div class="w-16 h-16 rounded-2xl bg-white/[0.02] border border-matte-border flex items-center justify-center text-zinc-500 mb-4 shadow-xl">
-        <i class="ph-fill ph-magic-wand text-3xl text-amber-500/80"></i>
-      </div>
-      <h3 class="text-base font-bold text-white mb-2">Canivete Suíço para Dados</h3>
-      <p class="text-xs text-zinc-400 mb-6 leading-relaxed">
-        Tem um texto bagunçado, lista de emails suja ou um PDF com dados? Cole na IA para transformar em tabela estruturada, ou importe um CSV para limpar e converter.
-      </p>
-      <button onclick="toggleAiImportModal(true)" class="px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-600 font-bold text-black text-xs transition-colors shadow-[0_8px_30px_rgba(245,158,11,0.2)] flex items-center gap-2">
-        <i class="ph-fill ph-sparkle text-base"></i> Extrair Dados com IA
-      </button>
-    </div>
-
-    <!-- Tabela Profissional -->
-    <div id="table-wrapper" class="w-full h-full border border-matte-border rounded-xl bg-matte-card shadow-2xl flex flex-col overflow-hidden">
-      <div class="flex-1 overflow-auto custom-scroll">
-        <table class="w-full text-left border-collapse text-xs whitespace-nowrap">
-          <thead class="bg-[#18181b] border-b border-matte-border text-zinc-400 font-bold uppercase tracking-wider select-none sticky top-0 z-10 shadow-sm" id="table-head">
-            <!-- Injetado via JS -->
+  <!-- VISUALIZADOR DA TABELA EDITÁVEL -->
+  <main class="flex-1 p-4 overflow-auto custom-scroll">
+    <div class="inline-block min-w-full align-middle">
+      <div class="border border-matte-border rounded-xl overflow-hidden shadow-2xl bg-matte-card">
+        <table id="dynamic-table" class="min-w-full divide-y divide-matte-border text-left text-xs">
+          <thead id="table-head" class="bg-white/[0.03]">
+            <!-- Cabeçalhos injetados dinamicamente -->
           </thead>
-          <tbody class="divide-y divide-matte-border" id="table-body">
-            <!-- Injetado via JS -->
+          <tbody id="table-body" class="divide-y divide-matte-border/50">
+            <!-- Linhas injetadas dinamicamente -->
           </tbody>
         </table>
       </div>
     </div>
-
   </main>
 
-  <!-- MODAL IA: EXTRAÇÃO E LIMPEZA DE TEXTO -->
-  <div id="modal-ai-import" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-2xl shadow-2xl flex flex-col gap-4">
-      <div class="flex items-center justify-between border-b border-matte-border pb-3">
-        <h3 class="text-sm font-bold text-white flex items-center gap-2">
-          <i class="ph-fill ph-sparkle text-amber-400 text-lg"></i> Extrair Dados e Criar Tabela
-        </h3>
-        <button onclick="toggleAiImportModal(false)" class="text-zinc-500 hover:text-white"><i class="ph ph-x text-base"></i></button>
-      </div>
-
-      <p class="text-xs text-zinc-400 leading-relaxed">
-        Cole qualquer texto desorganizado (lista de contatos, log de sistema, texto copiado de um PDF). A IA analisará o padrão e montará uma tabela limpa.
-      </p>
-
-      <textarea id="ai-raw-text" placeholder="Exemplo: \nJoão da Silva, jsilva@email.com, telefone 1199999999.\nMaria Oliveira contatou via maria@gmail.com, (21) 8888-8888." class="w-full bg-white/[0.02] border border-matte-border rounded-xl p-3 text-xs text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-amber-500 h-40 custom-scroll resize-none"></textarea>
-
-      <div class="flex items-center gap-2">
-        <i class="ph-bold ph-info text-zinc-500"></i>
-        <span class="text-[10px] text-zinc-500">Dica: Se a tabela for complexa, especifique as colunas desejadas (Ex: "Extrair apenas Nome e Email").</span>
-      </div>
-
-      <div class="flex items-center justify-end gap-2 pt-2 border-t border-matte-border">
-        <button onclick="toggleAiImportModal(false)" class="px-4 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-xs font-semibold text-zinc-300">Cancelar</button>
-        <button id="btn-process-ai" onclick="processTextWithAI()" class="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-xs font-bold text-black flex items-center gap-2 transition-colors">
-          <i class="ph-bold ph-magic-wand"></i> Estruturar Tabela
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL DATASETS SALVOS -->
-  <div id="modal-datasets" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-lg shadow-2xl flex flex-col max-h-[80vh]">
-      <div class="flex items-center justify-between border-b border-matte-border pb-3 mb-4">
-        <h3 class="text-sm font-bold text-white flex items-center gap-2">
-          <i class="ph ph-folder text-amber-400 text-lg"></i> Meus Datasets
-        </h3>
-        <button onclick="toggleDatasetsModal(false)" class="text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
-      </div>
-      <div id="datasets-list" class="flex-1 overflow-y-auto space-y-2 custom-scroll pr-1">
-        <p class="text-xs text-zinc-500 text-center py-6">Carregando datasets...</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- LÓGICA DA APLICAÇÃO -->
+  <!-- LÓGICA DE DADOS, MANIPULAÇÃO E INTEGRAÇÃO GEMINI IA -->
   <script>
-    const SUPABASE_URL = 'https://zlsdlcvtcsrykfacjvhf.supabase.co';
-    const SUPABASE_KEY = 'sb_publishable_JnDv-fxHXPTzNaFX9n3Z0w_4mqt47Js';
-    const dbClient = window.parent?.PortalDB?.supabase || window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-    let state = {
-      datasetId: null,
-      datasetName: 'Dataset Limpo',
-      columns: [],
-      rows: [],
-      sortColumn: null,
-      sortDirection: 'asc',
-      searchQuery: '',
-      userId: null,
-      autoSaveTimer: null
+    let tableData = {
+      headers: ["Item", "Categoria", "Quantidade", "Valor Unitário (R$)", "Total (R$)"],
+      rows: [
+        ["Notebook Pro", "Eletrônicos", "2", "4500.00", "9000.00"],
+        ["Mouse Sem Fio", "Acessórios", "5", "120.00", "600.00"],
+        ["Teclado Mecânico", "Acessórios", "3", "350.00", "1050.00"],
+        ["Monitor 27 pol", "Eletrônicos", "2", "1400.00", "2800.00"]
+      ]
     };
 
-    window.addEventListener('DOMContentLoaded', async () => {
-      await initSession();
-      loadFromLocalStorageCache();
+    const clientDB = window.PortalDB || (window.parent && window.parent.PortalDB) || null;
+
+    window.addEventListener('DOMContentLoaded', () => {
       renderTable();
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('#export-dropdown') && !e.target.closest('button[onclick="toggleExportMenu()"]')) {
+          document.getElementById('export-dropdown').classList.add('hidden');
+        }
+      });
     });
 
-    async function initSession() {
-      try {
-        const { data } = await dbClient.auth.getSession();
-        state.userId = data?.session?.user?.id || null;
-      } catch (e) { state.userId = null; }
-    }
-
-    // ==== POPOVERS GLOBALS ====
-    function togglePopover(id) {
-      event.stopPropagation();
-      const el = document.getElementById(id);
-      const isVisible = el.classList.contains('active');
-      closeAllPopovers();
-      if (!isVisible) el.classList.add('active');
-    }
-    function closeAllPopovers() {
-      document.querySelectorAll('.popover-menu').forEach(el => el.classList.remove('active'));
-    }
-
-    // ==== RENDERIZAÇÃO DA TABELA (DATA GRID) ====
+    // ==== RENDERIZAÇÃO DA TABELA ====
     function renderTable() {
-      const headEl = document.getElementById('table-head');
-      const bodyEl = document.getElementById('table-body');
-      const emptyEl = document.getElementById('empty-state');
-      const wrapperEl = document.getElementById('table-wrapper');
+      const thead = document.getElementById('table-head');
+      const tbody = document.getElementById('table-body');
 
-      if (state.columns.length === 0) {
-        wrapperEl.classList.add('hidden');
-        emptyEl.classList.remove('hidden');
-        emptyEl.classList.add('flex');
-        document.getElementById('rows-count-badge').innerText = '0 linhas, 0 colunas';
-        return;
-      }
+      // 1. Renderiza Cabeçalho
+      let headHTML = '<tr><th class="w-10 px-3 py-2 text-center text-[10px] text-zinc-600 font-mono">#</th>';
+      tableData.headers.forEach((h, colIndex) => {
+        headHTML += `
+          <th class="px-3 py-2 font-bold text-zinc-300 border-r border-matte-border/50 group relative">
+            <div class="flex items-center justify-between gap-1">
+              <span contenteditable="true" onblur="updateHeader(${colIndex}, this.innerText)" class="focus:outline-none flex-1 truncate">${h}</span>
+              <button onclick="deleteColumn(${colIndex})" class="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 text-xs transition-opacity p-0.5" title="Excluir Coluna">
+                <i class="ph-bold ph-x"></i>
+              </button>
+            </div>
+          </th>
+        `;
+      });
+      headHTML += '</tr>';
+      thead.innerHTML = headHTML;
 
-      emptyEl.classList.add('hidden');
-      emptyEl.classList.remove('flex');
-      wrapperEl.classList.remove('hidden');
-
-      // Cabeçalho
-      headEl.innerHTML = `
-        <tr>
-          <th class="p-2 w-12 text-center border-r border-zinc-800 text-zinc-600 bg-zinc-900/50">#</th>
-          ${state.columns.map((col, colIdx) => `
-            <th class="p-2 border-r border-zinc-800 min-w-[150px] group relative hover:bg-zinc-800/50 transition-colors">
-              <div class="flex items-center justify-between gap-2">
-                <input type="text" value="${escapeHtml(col)}" onchange="renameColumn(${colIdx}, this.value)" class="bg-transparent font-bold text-xs text-white focus:outline-none w-full truncate">
-                <div class="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onclick="sortDataBy('${col}')" class="hover:text-amber-400 text-zinc-500 p-1" title="Ordenar"><i class="ph-bold ph-arrows-down-up"></i></button>
-                  <button onclick="removeColumn(${colIdx})" class="hover:text-red-400 text-zinc-500 p-1" title="Remover Coluna"><i class="ph-bold ph-x"></i></button>
-                </div>
-              </div>
-            </th>
-          `).join('')}
-          <th class="p-2 w-10 text-center bg-zinc-900/50"><i class="ph-bold ph-gear text-zinc-600"></i></th>
-        </tr>
-      `;
-
-      // Filtro e Ordenação
-      let filteredRows = [...state.rows];
-
-      if (state.searchQuery) {
-        const q = state.searchQuery.toLowerCase();
-        filteredRows = filteredRows.filter(row => Object.values(row).some(val => String(val).toLowerCase().includes(q)));
-      }
-
-      if (state.sortColumn) {
-        filteredRows.sort((a, b) => {
-          let valA = a[state.sortColumn] ?? '';
-          let valB = b[state.sortColumn] ?? '';
-          const numA = Number(valA);
-          const numB = Number(valB);
-
-          if (!isNaN(numA) && !isNaN(numB) && valA !== '' && valB !== '') {
-            return state.sortDirection === 'asc' ? numA - numB : numB - numA;
-          }
-          return state.sortDirection === 'asc' ? String(valA).localeCompare(String(valB)) : String(valB).localeCompare(String(valA));
-        });
-      }
-
-      document.getElementById('rows-count-badge').innerText = `${filteredRows.length} linhas, ${state.columns.length} colunas`;
-
-      // Linhas
-      if (filteredRows.length === 0) {
-        bodyEl.innerHTML = `<tr><td colspan="${state.columns.length + 2}" class="p-6 text-center text-zinc-500">Nenhum registro encontrado.</td></tr>`;
-        return;
-      }
-
-      bodyEl.innerHTML = filteredRows.map((row, rowIdx) => `
-        <tr class="hover:bg-white/[0.02] transition-colors group">
-          <td class="p-2 text-center border-r border-matte-border text-zinc-600 text-[10px] font-mono bg-zinc-900/20">${rowIdx + 1}</td>
-          ${state.columns.map(col => `
-            <td class="p-0 border-r border-matte-border relative">
-              <textarea rows="1" oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'; updateCellValue(${rowIdx}, '${col}', this.value)" class="table-cell-input resize-none m-0 block custom-scroll">${escapeHtml(row[col] ?? '')}</textarea>
-            </td>
-          `).join('')}
-          <td class="p-1 text-center bg-zinc-900/20">
-            <button onclick="removeRow(${rowIdx})" class="p-1.5 rounded opacity-0 group-hover:opacity-100 hover:bg-red-500/10 text-zinc-500 hover:text-red-400 transition-all" title="Excluir Linha">
+      // 2. Renderiza Linhas
+      let bodyHTML = '';
+      tableData.rows.forEach((row, rowIndex) => {
+        bodyHTML += `<tr class="hover:bg-white/[0.015] group">`;
+        bodyHTML += `
+          <td class="px-2 py-2 text-center text-[10px] text-zinc-600 font-mono border-r border-matte-border/50">
+            <span class="group-hover:hidden">${rowIndex + 1}</span>
+            <button onclick="deleteRow(${rowIndex})" class="hidden group-hover:inline-block text-zinc-500 hover:text-red-400 p-0.5" title="Excluir Linha">
               <i class="ph-bold ph-trash"></i>
             </button>
           </td>
-        </tr>
-      `).join('');
+        `;
+        row.forEach((cell, colIndex) => {
+          bodyHTML += `
+            <td contenteditable="true" onblur="updateCell(${rowIndex}, ${colIndex}, this.innerText)" class="px-3 py-2 text-zinc-200 border-r border-matte-border/50 whitespace-nowrap">
+              ${cell}
+            </td>
+          `;
+        });
+        bodyHTML += '</tr>';
+      });
+      tbody.innerHTML = bodyHTML;
+
+      document.getElementById('table-stats').innerText = `${tableData.rows.length} linhas • ${tableData.headers.length} colunas`;
     }
 
-    // ==== EDIÇÃO ====
-    function updateCellValue(rowIndex, colName, value) {
-      state.rows[rowIndex][colName] = value;
-      triggerAutoSave();
+    function updateHeader(index, val) {
+      tableData.headers[index] = val.trim() || `Coluna ${index + 1}`;
     }
 
-    function renameColumn(colIdx, newName) {
-      const oldName = state.columns[colIdx];
-      if (!newName || oldName === newName) return;
-      state.columns[colIdx] = newName;
-      state.rows.forEach(row => { row[newName] = row[oldName]; delete row[oldName]; });
-      renderTable();
-      triggerAutoSave();
-    }
-
-    function addColumn() {
-      const name = prompt("Nome da nova coluna:", `Coluna ${state.columns.length + 1}`);
-      if (!name) return;
-      state.columns.push(name);
-      state.rows.forEach(row => row[name] = '');
-      renderTable();
-      triggerAutoSave();
-    }
-
-    function removeColumn(colIdx) {
-      const colName = state.columns[colIdx];
-      state.columns.splice(colIdx, 1);
-      state.rows.forEach(row => delete row[colName]);
-      renderTable();
-      triggerAutoSave();
+    function updateCell(row, col, val) {
+      if (tableData.rows[row]) {
+        tableData.rows[row][col] = val.trim();
+      }
     }
 
     function addRow() {
-      const newRow = {};
-      state.columns.forEach(col => newRow[col] = '');
-      state.rows.push(newRow);
-      renderTable();
-      triggerAutoSave();
-    }
-
-    function removeRow(rowIdx) {
-      state.rows.splice(rowIdx, 1);
-      renderTable();
-      triggerAutoSave();
-    }
-
-    function sortDataBy(colName) {
-      if (state.sortColumn === colName) state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
-      else { state.sortColumn = colName; state.sortDirection = 'asc'; }
+      const newRow = new Array(tableData.headers.length).fill('');
+      tableData.rows.push(newRow);
       renderTable();
     }
 
-    function clearTable() {
-      if (confirm("Deseja limpar todos os dados e colunas?")) {
-        state.columns = []; state.rows = [];
-        renderTable(); triggerAutoSave();
+    function addColumn() {
+      const colName = `Coluna ${tableData.headers.length + 1}`;
+      tableData.headers.push(colName);
+      tableData.rows.forEach(r => r.push(''));
+      renderTable();
+    }
+
+    function deleteRow(idx) {
+      tableData.rows.splice(idx, 1);
+      renderTable();
+    }
+
+    function deleteColumn(idx) {
+      if (tableData.headers.length <= 1) {
+        alert("A tabela precisa de pelo menos uma coluna.");
+        return;
       }
+      tableData.headers.splice(idx, 1);
+      tableData.rows.forEach(r => r.splice(idx, 1));
+      renderTable();
     }
 
-    // ==== DATA WRANGLING & OPERATIONS ====
-    const DataOps = {
-      removeDuplicates() {
-        closeAllPopovers();
-        if (state.rows.length === 0) return;
-        const initialCount = state.rows.length;
-        
-        // Usa stringify para comparar linhas inteiras
-        const uniqueKeys = new Set();
-        state.rows = state.rows.filter(row => {
-          const key = JSON.stringify(row);
-          if (uniqueKeys.has(key)) return false;
-          uniqueKeys.add(key);
-          return true;
-        });
+    // ==== OPERAÇÕES DE DADOS ====
+    function transposeTable() {
+      if (tableData.rows.length === 0) return;
+      const newHeaders = ['Registro', ...tableData.rows.map((_, i) => `Linha ${i + 1}`)];
+      const newRows = [];
 
-        const removed = initialCount - state.rows.length;
-        alert(`${removed} linhas duplicadas removidas.`);
-        renderTable(); triggerAutoSave();
-      },
-
-      removeEmptyRows() {
-        closeAllPopovers();
-        const initialCount = state.rows.length;
-        state.rows = state.rows.filter(row => Object.values(row).some(v => String(v).trim() !== ''));
-        const removed = initialCount - state.rows.length;
-        alert(`${removed} linhas vazias removidas.`);
-        renderTable(); triggerAutoSave();
-      },
-
-      transpose() {
-        closeAllPopovers();
-        if (state.rows.length === 0) return;
-        
-        const newCols = ['Categoria', ...state.rows.map((_, i) => `Linha ${i+1}`)];
-        const newRows = [];
-
-        state.columns.forEach(oldCol => {
-          const newRow = { 'Categoria': oldCol };
-          state.rows.forEach((oldRow, rIdx) => {
-            newRow[`Linha ${rIdx+1}`] = oldRow[oldCol] || '';
-          });
-          newRows.push(newRow);
-        });
-
-        state.columns = newCols;
-        state.rows = newRows;
-        renderTable(); triggerAutoSave();
+      for (let c = 0; c < tableData.headers.length; c++) {
+        const row = [tableData.headers[c]];
+        for (let r = 0; r < tableData.rows.length; r++) {
+          row.push(tableData.rows[r][c] || '');
+        }
+        newRows.push(row);
       }
-    };
 
-    // ==== INTEGRAÇÃO IA (EXTRAÇÃO DE DADOS) ====
-    function toggleAiImportModal(show) { 
-      closeAllPopovers();
-      document.getElementById('modal-ai-import').classList.toggle('hidden', !show); 
+      tableData.headers = newHeaders;
+      tableData.rows = newRows;
+      renderTable();
     }
 
-    async function processTextWithAI() {
-      const rawText = document.getElementById('ai-raw-text').value.trim();
-      if (!rawText) return;
+    function removeDuplicates() {
+      const seen = new Set();
+      tableData.rows = tableData.rows.filter(row => {
+        const key = JSON.stringify(row);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      renderTable();
+    }
 
-      const btn = document.getElementById('btn-process-ai');
-      const originalHtml = btn.innerHTML;
-      btn.innerHTML = '<div class="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div> Extraindo...';
+    function removeEmptyRows() {
+      tableData.rows = tableData.rows.filter(row => row.some(cell => cell && cell.trim() !== ''));
+      renderTable();
+    }
+
+    function resetTable() {
+      if (!confirm("Limpar toda a tabela?")) return;
+      tableData = { headers: ["Coluna 1", "Coluna 2"], rows: [["", ""]] };
+      renderTable();
+    }
+
+    function setPromptExample(text) {
+      document.getElementById('ai-prompt-input').value = text;
+      generateWithAI();
+    }
+
+    // ==== INTEGRAÇÃO GEMINI IA POR JSON ====
+    async function generateWithAI() {
+      const promptInput = document.getElementById('ai-prompt-input');
+      const prompt = promptInput.value.trim();
+      if (!prompt) return;
+
+      const btn = document.getElementById('btn-ai-generate');
+      const originalHTML = btn.innerHTML;
+      btn.innerHTML = `<i class="ph-bold ph-spinner animate-spin text-sm"></i> <span>Criando...</span>`;
       btn.disabled = true;
 
       try {
-        const systemPrompt = `Você é um engenheiro de dados especialista em Data Wrangling. Extraia e limpe as informações do texto desorganizado enviado e transforme rigorosamente em um JSON no formato: {"columns": ["Nome", "Email", ...], "rows": [{"Nome": "...", "Email": "..."}]}. Padronize os nomes das colunas e remova lixo. Retorne APENAS o JSON válido.`;
+        if (!clientDB) throw new Error("Sistema do Hub não conectado.");
 
-        // Usa a Edge Function Global se disponível, senão cai pro mock
-        let resultData;
-        if (window.parent?.PortalDB?.callGeminiEdge) {
-          const res = await window.parent.PortalDB.callGeminiEdge(rawText, { system: systemPrompt });
-          resultData = JSON.parse(res.candidates[0].content.parts[0].text);
+        const systemInstructions = `Você é um assistente estruturador de dados. O usuário fornecerá um comando ou texto desestruturado.
+Retorne ESTRITAMENTE um objeto JSON válido no seguinte formato:
+{
+  "title": "Título sugerido para a tabela",
+  "headers": ["Nome Coluna 1", "Nome Coluna 2", "Nome Coluna 3"],
+  "rows": [
+    ["Dado 1", "Dado 2", "Dado 3"],
+    ["Dado 4", "Dado 5", "Dado 6"]
+  ]
+}
+Não inclua explicações, comentários ou markdown adicional fora do bloco JSON.`;
+
+        const fullPrompt = `${systemInstructions}\n\nSolicitação do usuário: ${prompt}`;
+        const response = await clientDB.callGeminiEdge(fullPrompt, { context: "data_tables" });
+        
+        let rawText = response.text || response.candidates?.[0]?.content?.parts?.[0]?.text || (typeof response === 'string' ? response : JSON.stringify(response));
+
+        // Limpeza de marcação markdown ```json caso retorne
+        rawText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+
+        const parsed = JSON.parse(rawText);
+        if (parsed.headers && Array.isArray(parsed.headers) && parsed.rows && Array.isArray(parsed.rows)) {
+          tableData = {
+            headers: parsed.headers,
+            rows: parsed.rows
+          };
+          if (parsed.title) {
+            document.getElementById('dataset-name').value = parsed.title;
+          }
+          renderTable();
+          promptInput.value = '';
         } else {
-          throw new Error("API Indisponível"); // Fallback acionado propositalmente no preview se sem API
+          throw new Error("Formato de tabela inválido retornado pela IA.");
         }
 
-        if (resultData && Array.isArray(resultData.columns) && Array.isArray(resultData.rows)) {
-          state.columns = resultData.columns;
-          state.rows = resultData.rows;
-          renderTable();
-          toggleAiImportModal(false);
-          document.getElementById('ai-raw-text').value = '';
-          triggerAutoSave();
-        } else { throw new Error("JSON Inválido"); }
-
       } catch (err) {
-        alert("A IA demorou ou falhou. Executando processador heurístico local...");
-        fallbackLocalParse(rawText);
-        toggleAiImportModal(false);
+        alert("Erro ao processar com a IA: " + err.message);
       } finally {
-        btn.innerHTML = originalHtml;
+        btn.innerHTML = originalHTML;
         btn.disabled = false;
       }
     }
 
-    function fallbackLocalParse(text) {
-      const lines = text.split('\n').filter(l => l.trim().length > 0);
-      if (lines.length === 0) return;
-      const delimiter = lines[0].includes(';') ? ';' : lines[0].includes(',') ? ',' : '\t';
-      const parts = lines.map(l => l.split(delimiter).map(p => p.trim()));
-
-      state.columns = parts[0].map((_, i) => `Col ${i + 1}`);
-      state.rows = parts.map(rowParts => {
-        const obj = {};
-        state.columns.forEach((col, idx) => { obj[col] = rowParts[idx] || ''; });
-        return obj;
-      });
-      renderTable(); triggerAutoSave();
+    // ==== EXPORTAÇÃO E SINCRONIZAÇÃO ====
+    function toggleExportMenu() {
+      document.getElementById('export-dropdown').classList.toggle('hidden');
     }
 
-    // ==== IMPORTAÇÃO ====
-    function handleFileImport(e) {
-      const file = e.target.files[0];
-      if (!file) return;
+    function exportData(format) {
+      document.getElementById('export-dropdown').classList.add('hidden');
+      const filename = (document.getElementById('dataset-name').value.trim() || 'tabela').replace(/\s+/g, '_');
 
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        const data = new Uint8Array(evt.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
-
-        if (jsonData.length > 0) {
-          state.columns = jsonData[0].map((c, i) => String(c || `Col ${i}`).trim());
-          state.rows = jsonData.slice(1).map(rowArray => {
-            const rowObj = {};
-            state.columns.forEach((col, idx) => { rowObj[col] = String(rowArray[idx] ?? ''); });
-            return rowObj;
-          });
-          state.datasetName = file.name.replace(/\.[^/.]+$/, "");
-          document.getElementById('dataset-name').value = state.datasetName;
-          renderTable(); triggerAutoSave();
-        }
-      };
-      reader.readAsArrayBuffer(file);
+      if (format === 'csv') {
+        const csvContent = [
+          tableData.headers.map(h => `"${h.replace(/"/g, '""')}"`).join(','),
+          ...tableData.rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(','))
+        ].join('\n');
+        downloadFile(`${filename}.csv`, csvContent, 'text/csv;charset=utf-8;');
+      } 
+      else if (format === 'json') {
+        const jsonContent = tableData.rows.map(row => {
+          const obj = {};
+          tableData.headers.forEach((h, i) => obj[h] = row[i] || '');
+          return obj;
+        });
+        downloadFile(`${filename}.json`, JSON.stringify(jsonContent, null, 2), 'application/json');
+      }
+      else if (format === 'sql') {
+        const tableName = filename.toLowerCase();
+        const cols = tableData.headers.map(h => `"${h.toLowerCase().replace(/[^a-z0-9_]/g, '_')}"`).join(', ');
+        const sqlRows = tableData.rows.map(r => `(${r.map(c => `'${c.replace(/'/g, "''")}'`).join(', ')})`).join(',\n  ');
+        const sqlContent = `INSERT INTO "${tableName}" (${cols})\nVALUES\n  ${sqlRows};`;
+        downloadFile(`${filename}.sql`, sqlContent, 'text/plain');
+      }
+      else if (format === 'clipboard') {
+        const tsvContent = [
+          tableData.headers.join('\t'),
+          ...tableData.rows.map(r => r.join('\t'))
+        ].join('\n');
+        navigator.clipboard.writeText(tsvContent).then(() => {
+          alert("Dados copiados para a área de transferência no formato compatível com Excel / Sheets!");
+        });
+      }
     }
 
-    // ==== EXPORTAÇÃO (MULTIPLOS FORMATOS) ====
-    function exportCSV() {
-      if (!state.columns.length) return;
-      const ws = XLSX.utils.json_to_sheet(state.rows, { header: state.columns });
-      downloadBlob(XLSX.utils.sheet_to_csv(ws), `${state.datasetName}.csv`, 'text/csv');
-      closeAllPopovers();
-    }
-
-    function exportXLSX() {
-      if (!state.columns.length) return;
-      const ws = XLSX.utils.json_to_sheet(state.rows, { header: state.columns });
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Dados");
-      XLSX.writeFile(wb, `${state.datasetName}.xlsx`);
-      closeAllPopovers();
-    }
-
-    function exportJSON() {
-      if (!state.rows.length) return;
-      downloadBlob(JSON.stringify(state.rows, null, 2), `${state.datasetName}.json`, 'application/json');
-      closeAllPopovers();
-    }
-
-    function exportSQL() {
-      if (!state.rows.length) return;
-      const tableName = state.datasetName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase() || 'tabela';
-      const cols = state.columns.map(c => `"${c}"`).join(', ');
-      
-      let sql = `-- Gerado pelo Data Studio\nCREATE TABLE IF NOT EXISTS ${tableName} (${state.columns.map(c => `"${c}" TEXT`).join(', ')});\n\n`;
-      state.rows.forEach(r => {
-        const vals = state.columns.map(c => `'${String(r[c] || '').replace(/'/g, "''")}'`).join(', ');
-        sql += `INSERT INTO ${tableName} (${cols}) VALUES (${vals});\n`;
-      });
-      
-      downloadBlob(sql, `${state.datasetName}.sql`, 'text/plain');
-      closeAllPopovers();
-    }
-
-    function downloadBlob(content, filename, mimeType) {
-      const blob = new Blob([content], { type: mimeType });
+    function downloadFile(name, content, type) {
+      const blob = new Blob([content], { type });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = filename;
+      link.download = name;
       link.click();
     }
 
-    // ==== NUVEM E CACHE ====
-    function triggerAutoSave() {
-      updateSyncStatus("Salvando...");
-      clearTimeout(state.autoSaveTimer);
-      state.autoSaveTimer = setTimeout(() => {
-        saveToLocalStorageCache();
-        if (state.userId) saveToCloud();
-        else updateSyncStatus("Salvo no cache");
-      }, 1000);
-    }
-
-    function saveToLocalStorageCache() {
-      localStorage.setItem('dataset_active', JSON.stringify({
-        name: state.datasetName, data_json: { columns: state.columns, rows: state.rows }
-      }));
-    }
-
-    function loadFromLocalStorageCache() {
-      const cached = localStorage.getItem('dataset_active');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        state.datasetName = parsed.name || state.datasetName;
-        state.columns = parsed.data_json?.columns || [];
-        state.rows = parsed.data_json?.rows || [];
-        document.getElementById('dataset-name').value = state.datasetName;
-      }
-    }
-
     async function saveToCloud() {
-      if (!state.userId) return;
+      const syncStatus = document.getElementById('sync-status');
+      syncStatus.innerText = "Salvando...";
+      syncStatus.className = "text-[10px] text-amber-400";
+
       try {
-        const payload = {
-          user_id: state.userId,
-          name: state.datasetName,
-          tool_type: 'table',
-          data_json: { columns: state.columns, rows: state.rows }
-        };
-        if (state.datasetId) payload.id = state.datasetId;
-        const { data, error } = await dbClient.from('user_datasets').upsert(payload).select().single();
+        if (!clientDB) throw new Error("Supabase não disponível.");
+        const session = await clientDB.getSession();
+        if (!session) throw new Error("Conecte sua conta para salvar na nuvem.");
+
+        const tableName = document.getElementById('dataset-name').value.trim() || 'Tabela Sem Título';
+
+        const { error } = await clientDB.supabase
+          .from('user_artifacts')
+          .insert({
+            user_id: session.user.id,
+            name: tableName,
+            tool_type: 'tabelas',
+            data: tableData,
+            metadata: {
+              rowsCount: tableData.rows.length,
+              colsCount: tableData.headers.length
+            }
+          });
+
         if (error) throw error;
-        state.datasetId = data.id;
-        updateSyncStatus("Sincronizado");
-      } catch (err) { updateSyncStatus("Erro"); }
-    }
 
-    async function toggleDatasetsModal(show) {
-      const modal = document.getElementById('modal-datasets');
-      modal.classList.toggle('hidden', !show);
+        syncStatus.innerText = "Salvo na Nuvem";
+        syncStatus.className = "text-[10px] text-emerald-400";
+        setTimeout(() => { syncStatus.innerText = "Pronto"; syncStatus.className = "text-[10px] text-zinc-500"; }, 3000);
 
-      if (show && state.userId) {
-        const { data } = await dbClient.from('user_datasets').select('*').eq('tool_type', 'table').order('updated_at', { ascending: false });
-        const list = document.getElementById('datasets-list');
-        if (!data || data.length === 0) { list.innerHTML = `<p class="text-xs text-zinc-500 text-center py-6">Nenhuma tabela salva.</p>`; return; }
-        list.innerHTML = data.map(item => `
-          <div onclick="restoreDataset(${JSON.stringify(item).replace(/"/g, '&quot;')})" class="p-3 rounded-xl border border-matte-border bg-white/[0.02] hover:bg-white/[0.05] cursor-pointer flex justify-between">
-            <h4 class="text-xs font-bold text-white">${item.name}</h4>
-            <span class="text-[10px] text-zinc-500">${item.data_json?.rows?.length || 0} lin</span>
-          </div>
-        `).join('');
+      } catch (err) {
+        syncStatus.innerText = "Erro ao salvar";
+        syncStatus.className = "text-[10px] text-red-400";
+        alert(err.message);
       }
     }
-
-    function restoreDataset(item) {
-      state.datasetId = item.id;
-      state.datasetName = item.name;
-      state.columns = item.data_json?.columns || [];
-      state.rows = item.data_json?.rows || [];
-      document.getElementById('dataset-name').value = item.name;
-      renderTable(); toggleDatasetsModal(false);
-    }
-
-    function updateSyncStatus(msg) { document.getElementById('sync-status').innerHTML = `<i class="ph-fill ph-check-circle text-amber-400"></i> ${msg}`; }
-    function escapeHtml(str) { return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
   </script>
 </body>
 </html>
