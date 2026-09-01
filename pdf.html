@@ -133,6 +133,26 @@
     .dropdown-item { padding: 8px 12px; color: #a1a1aa; font-size: 12px; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 8px; }
     .dropdown-item:hover { background: #3f3f46; color: #fff; }
 
+    /* =========================================
+       RESIZER DE IMAGENS & QUEBRA DE PÁGINA
+       ========================================= */
+    #image-resizer {
+      position: absolute; border: 2px dashed #2563eb; pointer-events: none; z-index: 50; display: none;
+    }
+    .resizer-handle {
+      position: absolute; width: 12px; height: 12px; background: #2563eb; border: 2px solid #fff; border-radius: 50%; pointer-events: auto;
+    }
+    .resizer-handle.nw { top: -6px; left: -6px; cursor: nwse-resize; }
+    .resizer-handle.ne { top: -6px; right: -6px; cursor: nesw-resize; }
+    .resizer-handle.sw { bottom: -6px; left: -6px; cursor: nesw-resize; }
+    .resizer-handle.se { bottom: -6px; right: -6px; cursor: nwse-resize; }
+
+    .manual-page-break {
+      page-break-before: always; height: 40px; background: #09090b; 
+      margin: 40px -96px; border-top: 1px solid #3f3f46; border-bottom: 1px solid #3f3f46; 
+      display: flex; align-items: center; justify-content: center; user-select: none;
+      box-shadow: inset 0 4px 6px rgba(0,0,0,0.3), inset 0 -4px 6px rgba(0,0,0,0.3);
+    }
   </style>
 </head>
 <body class="text-sm font-sans flex flex-col h-screen">
@@ -310,6 +330,13 @@
           <p><br></p>
         </div>
 
+        <!-- Resizer de Imagens -->
+        <div id="image-resizer">
+          <div class="resizer-handle nw" data-pos="nw"></div>
+          <div class="resizer-handle ne" data-pos="ne"></div>
+          <div class="resizer-handle sw" data-pos="sw"></div>
+          <div class="resizer-handle se" data-pos="se"></div>
+        </div>
       </div>
     </main>
 
@@ -427,6 +454,7 @@
         
         await this.loadRecentDocs();
         this.setupEvents();
+        this.ImageResizer.init();
       },
 
       // --- GERENCIAMENTO DE ARQUIVOS ---
@@ -569,6 +597,78 @@
         }
       },
 
+      // --- REDIMENSIONAMENTO DE IMAGENS ---
+      ImageResizer: {
+        activeImg: null,
+        overlay: null,
+        init() {
+            this.overlay = document.getElementById('image-resizer');
+            
+            document.querySelectorAll('.resizer-handle').forEach(handle => {
+                handle.addEventListener('mousedown', (e) => this.startResize(e, handle.dataset.pos));
+            });
+
+            App.Elements.editor.addEventListener('click', (e) => {
+                if (e.target.tagName === 'IMG') {
+                    this.attach(e.target);
+                } else {
+                    this.detach();
+                }
+            });
+
+            // Atualizar posição ao digitar, rolar ou redimensionar
+            App.Elements.editor.addEventListener('input', () => this.updatePos());
+            App.Elements.workspace.addEventListener('scroll', () => this.updatePos());
+        },
+        attach(img) {
+            this.activeImg = img;
+            this.overlay.style.display = 'block';
+            this.updatePos();
+        },
+        detach() {
+            this.activeImg = null;
+            this.overlay.style.display = 'none';
+        },
+        updatePos() {
+            if (!this.activeImg) return;
+            const img = this.activeImg;
+            // Calculando offset relativo ao editor-page
+            this.overlay.style.width = img.offsetWidth + 'px';
+            this.overlay.style.height = img.offsetHeight + 'px';
+            this.overlay.style.top = img.offsetTop + 'px';
+            this.overlay.style.left = img.offsetLeft + 'px';
+        },
+        startResize(e, pos) {
+            e.preventDefault(); e.stopPropagation();
+            const startX = e.clientX;
+            const startW = this.activeImg.offsetWidth;
+
+            const onMove = (ev) => {
+                let newW = startW;
+                // Ajuste de largura baseado na posição do mouse e zoom
+                const deltaX = (ev.clientX - startX) / App.View.zoom;
+                
+                if (pos.includes('e')) newW = startW + deltaX;
+                if (pos.includes('w')) newW = startW - deltaX;
+                
+                if (newW > 50) { // Largura mínima
+                    this.activeImg.style.width = newW + 'px';
+                    this.activeImg.style.height = 'auto'; // Mantém proporção
+                    this.updatePos();
+                }
+            };
+
+            const onUp = () => {
+                window.removeEventListener('mousemove', onMove);
+                window.removeEventListener('mouseup', onUp);
+                App.saveCurrentDoc();
+            };
+
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('mouseup', onUp);
+        }
+      },
+
       // --- INSERÇÃO (PRIORIDADE 6, 7 e 8) ---
       Insert: {
         link() {
@@ -604,8 +704,11 @@
             App.Editor.exec('insertHTML', html);
         },
         pageBreak() {
-            // Emulando quebra de página visual forçada
-            const breakHtml = `<div style="page-break-after: always; height: 40px; margin: 20px 0; border-top: 2px dashed #3b82f6; text-align: center; color: #3b82f6; font-size: 10px; opacity: 0.5;">--- Quebra de Página Manual ---</div><p><br></p>`;
+            // Emulando quebra de página física (recorta o padding branco para mostrar o fundo escuro)
+            const breakHtml = `
+            <div class="manual-page-break" contenteditable="false">
+                <div style="background: #27272a; padding: 4px 12px; border-radius: 12px; font-size: 10px; color: #a1a1aa; font-family: Inter, sans-serif; font-weight: 600; letter-spacing: 0.5px;">Quebra de Página</div>
+            </div><p><br></p>`;
             App.Editor.exec('insertHTML', breakHtml);
         }
       },
@@ -794,6 +897,14 @@
             if (e.ctrlKey && e.key.toLowerCase() === 'k') {
                 e.preventDefault();
                 this.Insert.link();
+            }
+
+            // Excluir imagem selecionada via teclado
+            if ((e.key === 'Backspace' || e.key === 'Delete') && this.ImageResizer.activeImg) {
+                e.preventDefault();
+                this.ImageResizer.activeImg.remove();
+                this.ImageResizer.detach();
+                this.saveCurrentDoc();
             }
         });
       },
