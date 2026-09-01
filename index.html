@@ -4,13 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#09090b">
-  <title>Tabelas & Dados IA</title>
+  <title>My Hub</title>
 
-  <!-- CDNs Supabase, Tailwind, Phosphor Icons -->
+  <!-- CDN Supabase Oficial -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/@phosphor-icons/web"></script>
-  <script src="supabase-client.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <script>
@@ -28,428 +27,737 @@
   </script>
 
   <style>
-    body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #09090b; color: #fafafa; overflow: hidden; }
-    .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #09090b; color: #fafafa; -webkit-tap-highlight-color: transparent; }
+    .custom-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
     .custom-scroll::-webkit-scrollbar-track { background: transparent; }
     .custom-scroll::-webkit-scrollbar-thumb { background: #27272a; border-radius: 99px; }
     .custom-scroll::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
 
-    td[contenteditable="true"]:focus, th[contenteditable="true"]:focus {
-      outline: 2px solid #3b82f6;
-      background: rgba(59, 130, 246, 0.08);
+    /* Visual Normal Expandido dos Cards */
+    .module-card {
+      background-color: #121214;
+      border: 1px solid #27272a;
+      border-radius: 16px;
+      padding: 16px;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
     }
+    .module-card:hover {
+      border-color: #3b82f6;
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+
+    /* Visão Compacta dos Cards (Quadrados Pequenos) */
+    .compact-mode #tools-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+
+    @media (min-width: 640px) {
+      .compact-mode #tools-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+    }
+    @media (min-width: 768px) {
+      .compact-mode #tools-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+    }
+    @media (min-width: 1024px) {
+      .compact-mode #tools-grid { grid-template-columns: repeat(6, minmax(0, 1fr)) !important; }
+    }
+    @media (min-width: 1280px) {
+      .compact-mode #tools-grid { grid-template-columns: repeat(8, minmax(0, 1fr)) !important; }
+    }
+
+    .compact-mode .module-card {
+      padding: 12px;
+      border-radius: 12px;
+      aspect-ratio: 1 / 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    .compact-mode .module-card i {
+      font-size: 1.75rem !important;
+      margin-bottom: 6px !important;
+    }
+    .compact-mode .module-card h3 {
+      font-size: 0.75rem !important;
+      line-height: 1.1 !important;
+      margin-bottom: 0 !important;
+      text-align: center;
+    }
+    .compact-mode .module-card p {
+      display: none !important;
+    }
+
+    /* Animação do Menu Lateral Drawer */
+    .sidebar-drawer {
+      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .sidebar-closed { transform: translateX(-100%); }
+    .sidebar-open { transform: translateX(0); }
   </style>
 </head>
-<body class="antialiased flex flex-col h-full bg-matte-bg font-sans select-none overflow-hidden">
+<body class="antialiased flex flex-col h-screen font-sans bg-matte-bg select-none overflow-hidden">
 
-  <!-- CABEÇALHO DA FERRAMENTA -->
-  <header class="h-12 shrink-0 bg-matte-card border-b border-matte-border px-4 flex items-center justify-between z-20">
-    <div class="flex items-center gap-2">
-      <div class="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
-        <i class="ph-bold ph-table text-sm"></i>
-      </div>
-      <input type="text" id="dataset-name" value="Tabela Sem Título" class="bg-transparent text-xs font-bold text-white focus:outline-none focus:border-b focus:border-blue-500 max-w-[180px] sm:max-w-xs truncate px-1 py-0.5">
-    </div>
+  <script>
+    const SUPABASE_URL = 'https://zlsdlcvtcsrykfacjvhf.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_JnDv-fxHXPTzNaFX9n3Z0w_4mqt47Js';
+    const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
-    <div class="flex items-center gap-2">
-      <span id="sync-status" class="text-[10px] text-zinc-500 hidden sm:inline">Pronto</span>
-      <button onclick="saveToCloud()" class="px-3 py-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] border border-matte-border text-white text-xs font-semibold flex items-center gap-1.5 transition-colors">
-        <i class="ph-bold ph-cloud-arrow-up text-sm"></i>
-        <span>Salvar</span>
-      </button>
+    // Banco de Dados Local do Navegador para mídias pesadas
+    let localFileDB = null;
+    const dbReq = indexedDB.open("MyHubLocalMedia", 1);
+    dbReq.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains("heavy_files")) {
+        db.createObjectStore("heavy_files", { keyPath: "id" });
+      }
+    };
+    dbReq.onsuccess = (e) => { localFileDB = e.target.result; };
 
-      <div class="relative">
-        <button onclick="toggleExportMenu()" class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm">
-          <i class="ph-bold ph-download-simple text-sm"></i>
-          <span>Exportar</span>
-          <i class="ph-bold ph-caret-down text-[10px]"></i>
+    // PortalDB Global para o Hub e todos os iframes
+    window.PortalDB = {
+      supabase: supabase,
+
+      async getSession() {
+        try {
+          if (!supabase) return null;
+          const { data, error } = await supabase.auth.getSession();
+          if (error) throw error;
+          return data?.session;
+        } catch (error) {
+          console.error("Erro ao obter sessão:", error);
+          return null;
+        }
+      },
+
+      async login(email, password) {
+        if (!supabase) throw new Error("Supabase não inicializado.");
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        return data.user;
+      },
+
+      async register(email, password) {
+        if (!supabase) throw new Error("Supabase não inicializado.");
+        const { data, error } = await supabase.auth.signUp({ email, password });
+        if (error) throw error;
+        return data.user;
+      },
+
+      async logout() {
+        if (supabase) await supabase.auth.signOut();
+      },
+
+      async saveHeavyFileLocal(id, blob, metadata) {
+        if (!localFileDB) return;
+        const tx = localFileDB.transaction("heavy_files", "readwrite");
+        const store = tx.objectStore("heavy_files");
+        store.put({ id, blob, metadata, updated_at: new Date().toISOString() });
+      },
+
+      async getHeavyFileLocal(id) {
+        if (!localFileDB) return null;
+        return new Promise((resolve) => {
+          const tx = localFileDB.transaction("heavy_files", "readonly");
+          const store = tx.objectStore("heavy_files");
+          const req = store.get(id);
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => resolve(null);
+        });
+      },
+
+      async callGeminiEdge(prompt, context = {}) {
+        const session = await this.getSession();
+        if (!session) throw new Error("Acesso não autorizado. Conecte sua conta.");
+
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/gemini-assist`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({ prompt, context })
+        });
+
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error || "Erro ao consultar a IA.");
+        }
+
+        return await response.json();
+      }
+    };
+  </script>
+
+  <header class="h-14 shrink-0 bg-matte-card border-b border-matte-border px-4 sm:px-6 flex items-center justify-between z-30">
+    
+    <!-- ESTADO 1: HEADER DA HOME -->
+    <div id="header-home-content" class="w-full flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <button onclick="toggleSidebarMenu(true)" class="p-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 hover:text-white transition-colors" title="Menu de Ferramentas">
+          <i class="ph-bold ph-list text-lg"></i>
         </button>
 
-        <div id="export-dropdown" class="hidden absolute right-0 mt-1.5 w-40 bg-matte-card border border-matte-border rounded-xl shadow-2xl p-1 z-50 text-xs">
-          <button onclick="exportData('csv')" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/[0.06] text-zinc-300 hover:text-white flex items-center gap-2">
-            <i class="ph-bold ph-file-csv text-emerald-400"></i> Arquivo CSV
-          </button>
-          <button onclick="exportData('json')" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/[0.06] text-zinc-300 hover:text-white flex items-center gap-2">
-            <i class="ph-bold ph-brackets-curly text-blue-400"></i> Formato JSON
-          </button>
-          <button onclick="exportData('sql')" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/[0.06] text-zinc-300 hover:text-white flex items-center gap-2">
-            <i class="ph-bold ph-database text-purple-400"></i> Comandos SQL
-          </button>
-          <button onclick="exportData('clipboard')" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/[0.06] text-zinc-300 hover:text-white flex items-center gap-2 border-t border-matte-border mt-1 pt-1.5">
-            <i class="ph-bold ph-copy text-zinc-400"></i> Copiar TSV / Excel
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+            <i class="ph-bold ph-squares-four text-lg"></i>
+          </div>
+          <div>
+            <h1 class="text-sm font-bold text-white leading-tight">My Hub</h1>
+            <div id="global-sync-badge" class="flex items-center gap-1 text-[9px] font-semibold text-zinc-400">
+              <span class="w-1.5 h-1.5 rounded-full bg-zinc-500"></span>
+              <span>Verificando...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ações da Direita -->
+      <div class="flex items-center gap-1.5">
+        <button onclick="openModule('Armazenamento', 'meus-dados.html')" class="p-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1.5" title="Armazenamento e Lixeira">
+          <i class="ph-fill ph-database text-lg"></i>
+        </button>
+
+        <div id="user-auth-section" class="flex items-center">
+          <button onclick="toggleAuthModal(true)" id="btn-login-trigger" class="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-500 transition-colors flex items-center gap-1.5 text-xs font-bold" title="Desconectado - Clique para conectar ao Supabase">
+            <i class="ph-fill ph-user-circle text-lg text-red-500"></i>
+            <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+            <span class="hidden md:inline">Desconectado</span>
           </button>
         </div>
       </div>
     </div>
+
+    <!-- ESTADO 2: HEADER DO MÓDULO ABERTO -->
+    <div id="header-module-content" class="hidden w-full flex items-center gap-3">
+      <button onclick="closeModuleIframe()" class="px-3 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-matte-border text-white text-xs font-bold flex items-center gap-2 transition-colors">
+        <i class="ph-bold ph-arrow-left text-sm"></i> Voltar ao My Hub
+      </button>
+      <div class="h-5 w-px bg-matte-border"></div>
+      <span id="active-module-title" class="text-sm font-bold text-zinc-300 truncate">Ferramenta</span>
+    </div>
+
   </header>
 
-  <!-- ÁREA DE COMANDO IA -->
-  <section class="p-3 sm:p-4 bg-[#121214]/60 border-b border-matte-border">
-    <div class="max-w-5xl mx-auto space-y-2">
+  <div id="sidebar-backdrop" onclick="toggleSidebarMenu(false)" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-40 hidden transition-opacity"></div>
+
+  <!-- MENU LATERAL DRAWER -->
+  <aside id="sidebar-menu" class="sidebar-drawer sidebar-closed fixed top-0 left-0 bottom-0 w-72 bg-matte-card border-r border-matte-border z-50 flex flex-col custom-scroll shadow-2xl">
+    
+    <div class="h-14 px-4 border-b border-matte-border flex items-center justify-between shrink-0">
       <div class="flex items-center gap-2">
-        <div class="relative flex-1">
-          <i class="ph-fill ph-sparkle absolute left-3.5 top-3 text-amber-400 text-sm"></i>
-          <input type="text" id="ai-prompt-input" placeholder="Ex: 'Crie uma tabela com 5 modelos de carros, ano, preço e potência' ou 'Extraia dados do texto...'" class="w-full bg-black/40 border border-matte-border rounded-xl pl-9 pr-24 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500/50 shadow-inner" onkeydown="if(event.key==='Enter') generateWithAI()">
-          <button onclick="generateWithAI()" id="btn-ai-generate" class="absolute right-1.5 top-1.5 px-3 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300 text-xs font-bold flex items-center gap-1 transition-colors">
-            <i class="ph-bold ph-magic-wand"></i>
-            <span>Gerar</span>
+        <div class="w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+          <i class="ph-bold ph-squares-four text-base"></i>
+        </div>
+        <span class="font-bold text-sm text-white">Navegação</span>
+      </div>
+      <button onclick="toggleSidebarMenu(false)" class="p-1.5 text-zinc-500 hover:text-white rounded-lg hover:bg-white/[0.05]">
+        <i class="ph-bold ph-x text-base"></i>
+      </button>
+    </div>
+
+    <div class="flex-1 overflow-y-auto p-4 space-y-4 custom-scroll text-xs">
+      <div>
+        <button onclick="showHomeView()" class="w-full p-2.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 font-bold flex items-center gap-2.5 transition-colors">
+          <i class="ph-bold ph-house text-base"></i>
+          <span>Início</span>
+        </button>
+      </div>
+
+      <div class="space-y-2">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500 px-2">FERRAMENTAS</span>
+
+        <div class="border border-matte-border rounded-xl bg-white/[0.01] overflow-hidden">
+          <button onclick="toggleCategoryGroup('cat-docs')" class="w-full p-2.5 flex items-center justify-between text-zinc-300 hover:text-white font-semibold hover:bg-white/[0.03]">
+            <div class="flex items-center gap-2"><i class="ph-bold ph-file-text text-blue-400 text-sm"></i><span>Documentos</span></div>
+            <i id="chevron-cat-docs" class="ph-bold ph-caret-down text-zinc-500 transition-transform"></i>
           </button>
+          <div id="cat-docs" class="hidden pl-6 pr-2 py-1.5 space-y-1 bg-black/20 border-t border-matte-border">
+            <button onclick="openModuleFromSidebar('Editor de PDF', 'pdf.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Editor de PDF</button>
+            <button onclick="openModuleFromSidebar('Editor de Documentos', 'documento.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Editor de Documentos</button>
+          </div>
+        </div>
+
+        <div class="border border-matte-border rounded-xl bg-white/[0.01] overflow-hidden">
+          <button onclick="toggleCategoryGroup('cat-media')" class="w-full p-2.5 flex items-center justify-between text-zinc-300 hover:text-white font-semibold hover:bg-white/[0.03]">
+            <div class="flex items-center gap-2"><i class="ph-bold ph-play-circle text-indigo-400 text-sm"></i><span>Mídia</span></div>
+            <i id="chevron-cat-media" class="ph-bold ph-caret-down text-zinc-500 transition-transform"></i>
+          </button>
+          <div id="cat-media" class="hidden pl-6 pr-2 py-1.5 space-y-1 bg-black/20 border-t border-matte-border">
+            <button onclick="openModuleFromSidebar('Editor de Imagens', 'imagem.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Editor de Imagens</button>
+            <button onclick="openModuleFromSidebar('Editor de Vídeo', 'video.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Editor de Vídeo</button>
+            <button onclick="openModuleFromSidebar('Editor de Áudio', 'audio.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Editor de Áudio</button>
+            <button onclick="openModuleFromSidebar('Apresentações', 'apresentacao.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Apresentações</button>
+          </div>
+        </div>
+
+        <div class="border border-matte-border rounded-xl bg-white/[0.01] overflow-hidden">
+          <button onclick="toggleCategoryGroup('cat-data')" class="w-full p-2.5 flex items-center justify-between text-zinc-300 hover:text-white font-semibold hover:bg-white/[0.03]">
+            <div class="flex items-center gap-2"><i class="ph-bold ph-table text-amber-400 text-sm"></i><span>Dados</span></div>
+            <i id="chevron-cat-data" class="ph-bold ph-caret-down text-zinc-500 transition-transform"></i>
+          </button>
+          <div id="cat-data" class="hidden pl-6 pr-2 py-1.5 space-y-1 bg-black/20 border-t border-matte-border">
+            <button onclick="openModuleFromSidebar('Tabelas e Dados', 'tabelas.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Tabelas & Dados</button>
+            <button onclick="openModuleFromSidebar('Modelos de Dados', 'modelos.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Modelos de Dados</button>
+          </div>
+        </div>
+
+        <button onclick="openModuleFromSidebar('Editor CAD 2D', 'cad.html')" class="w-full p-2.5 rounded-xl border border-matte-border bg-white/[0.01] hover:bg-white/[0.04] text-zinc-300 hover:text-white font-semibold flex items-center justify-between transition-colors">
+          <div class="flex items-center gap-2"><i class="ph-bold ph-compass text-blue-400 text-sm"></i><span>Desenho CAD 2D</span></div>
+          <span class="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 text-[9px] font-bold">Função</span>
+        </button>
+
+        <div class="border border-matte-border rounded-xl bg-white/[0.01] overflow-hidden">
+          <button onclick="toggleCategoryGroup('cat-prod')" class="w-full p-2.5 flex items-center justify-between text-zinc-300 hover:text-white font-semibold hover:bg-white/[0.03]">
+            <div class="flex items-center gap-2"><i class="ph-bold ph-check-square-offset text-emerald-400 text-sm"></i><span>Produtividade</span></div>
+            <i id="chevron-cat-prod" class="ph-bold ph-caret-down text-zinc-500 transition-transform"></i>
+          </button>
+          <div id="cat-prod" class="hidden pl-6 pr-2 py-1.5 space-y-1 bg-black/20 border-t border-matte-border">
+            <button onclick="openModuleFromSidebar('Controle Financeiro', 'financas.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Controle Financeiro</button>
+            <button onclick="openModuleFromSidebar('Plano de Estudos', 'estudos.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Plano de Estudos</button>
+            <button onclick="openModuleFromSidebar('Tarefas & Projetos', 'tarefas.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Tarefas & Projetos</button>
+          </div>
+        </div>
+
+        <div class="border border-matte-border rounded-xl bg-white/[0.01] overflow-hidden">
+          <button onclick="toggleCategoryGroup('cat-utils')" class="w-full p-2.5 flex items-center justify-between text-zinc-300 hover:text-white font-semibold hover:bg-white/[0.03]">
+            <div class="flex items-center gap-2"><i class="ph-bold ph-wrench text-cyan-400 text-sm"></i><span>Utilidades</span></div>
+            <i id="chevron-cat-utils" class="ph-bold ph-caret-down text-zinc-500 transition-transform"></i>
+          </button>
+          <div id="cat-utils" class="hidden pl-6 pr-2 py-1.5 space-y-1 bg-black/20 border-t border-matte-border">
+            <button onclick="openModuleFromSidebar('Conversor de Arquivos', 'conversor.html')" class="w-full text-left py-1.5 px-2 rounded hover:bg-white/[0.05] text-zinc-400 hover:text-white truncate">Conversor de Arquivos</button>
+          </div>
+        </div>
+
+        <button onclick="openModuleFromSidebar('QR Code Hub', 'qrcode.html')" class="w-full p-2.5 rounded-xl border border-matte-border bg-white/[0.01] hover:bg-white/[0.04] text-zinc-300 hover:text-white font-semibold flex items-center justify-between transition-colors">
+          <div class="flex items-center gap-2"><i class="ph-bold ph-qr-code text-emerald-400 text-sm"></i><span>QR Code Hub</span></div>
+          <span class="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[9px] font-bold">Função</span>
+        </button>
+      </div>
+
+      <div class="space-y-2 pt-2 border-t border-matte-border">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500 px-2">CONTA</span>
+        <button onclick="toggleAuthModal(true); toggleSidebarMenu(false);" class="w-full p-2.5 rounded-xl border border-matte-border bg-white/[0.01] hover:bg-white/[0.04] text-zinc-300 hover:text-white font-semibold flex items-center gap-2 transition-colors">
+          <i class="ph-bold ph-user-circle text-blue-400 text-sm"></i><span>Perfil / Conectar</span>
+        </button>
+        <button onclick="openModuleFromSidebar('Armazenamento', 'meus-dados.html')" class="w-full p-2.5 rounded-xl border border-matte-border bg-white/[0.01] hover:bg-white/[0.04] text-zinc-300 hover:text-white font-semibold flex items-center gap-2 transition-colors">
+          <i class="ph-fill ph-database text-purple-400 text-sm"></i><span>Armazenamento</span>
+        </button>
+      </div>
+
+    </div>
+  </aside>
+
+  <main class="flex-1 relative overflow-hidden flex flex-col bg-matte-bg">
+    
+    <!-- HOME VIEW -->
+    <div id="home-view" class="h-full overflow-y-auto p-4 sm:p-6 custom-scroll">
+      <div class="max-w-7xl mx-auto space-y-6">
+        
+        <!-- Busca Global -->
+        <div class="relative">
+          <i class="ph ph-magnifying-glass absolute left-3.5 top-3 text-zinc-500 text-sm"></i>
+          <input type="text" id="global-search-input" oninput="handleGlobalSearch(this.value)" placeholder="Pesquisar por nome do documento (ex: 'relatório', 'contrato')..." class="w-full bg-matte-card border border-matte-border rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500/50 shadow-lg">
+        </div>
+
+        <!-- Painel de Resultados da Busca -->
+        <section id="global-search-results-panel" class="hidden bg-matte-card border border-blue-500/30 rounded-2xl p-4 flex flex-col gap-2">
+          <div class="flex items-center justify-between border-b border-matte-border pb-2">
+            <h3 class="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5"><i class="ph-bold ph-magnifying-glass"></i> Resultados da Busca</h3>
+            <button onclick="clearGlobalSearch()" class="text-xs text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
+          </div>
+          <div id="global-search-items-list" class="space-y-1.5 max-h-60 overflow-y-auto custom-scroll pr-1"></div>
+        </section>
+
+        <!-- Grid de Ferramentas -->
+        <div id="tools-grid-wrapper">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-zinc-500">Ferramentas de Produtividade</h2>
+            <button onclick="toggleCompactMode()" id="btn-toggle-compact" class="px-2.5 py-1 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-400 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors" title="Alternar visão compacta">
+              <i id="compact-icon" class="ph ph-squares-four text-sm"></i>
+              <span id="compact-label" class="text-[11px]">Quadrados</span>
+            </button>
+          </div>
+
+          <div id="tools-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+
+            <div onclick="openModule('Editor de PDF', 'pdf.html')" class="module-card">
+              <i class="ph-bold ph-file-pdf text-red-400 text-2xl mb-2 block"></i>
+              <div>
+                <h3 class="text-xs sm:text-sm font-bold text-white mb-1">Editor de PDF</h3>
+                <p class="text-[11px] text-zinc-400 leading-relaxed">Visualizar, assinar, cortar, unir e exportar PDFs.</p>
+              </div>
+            </div>
+
+            <div onclick="openModule('Conversor de Arquivos', 'conversor.html')" class="module-card">
+              <i class="ph-bold ph-arrows-clockwise text-blue-400 text-2xl mb-2 block"></i>
+              <div>
+                <h3 class="text-xs sm:text-sm font-bold text-white mb-1">Conversor de Arquivos</h3>
+                <p class="text-[11px] text-zinc-400 leading-relaxed">Conversão entre PDF, PNG, JPG, WebP, SVG, TXT e DOCX.</p>
+              </div>
+            </div>
+
+            <div onclick="openModule('Editor de Imagens', 'imagem.html')" class="module-card">
+              <i class="ph-bold ph-image text-indigo-400 text-2xl mb-2 block"></i>
+              <div>
+                <h3 class="text-xs sm:text-sm font-bold text-white mb-1">Editor de Imagens</h3>
+                <p class="text-[11px] text-zinc-400 leading-relaxed">Cortar, redimensionar, remover fundo e presets sociais.</p>
+              </div>
+            </div>
+
+            <div onclick="openModule('QR Code Hub', 'qrcode.html')" class="module-card">
+              <i class="ph-bold ph-qr-code text-emerald-400 text-2xl mb-2 block"></i>
+              <div>
+                <h3 class="text-xs sm:text-sm font-bold text-white mb-1">QR Code Hub</h3>
+                <p class="text-[11px] text-zinc-400 leading-relaxed">Gerar, personalizar e escanear QR Codes via câmera.</p>
+              </div>
+            </div>
+
+            <div onclick="openModule('Tabelas e Dados', 'tabelas.html')" class="module-card">
+              <i class="ph-bold ph-table text-amber-400 text-2xl mb-2 block"></i>
+              <div>
+                <h3 class="text-xs sm:text-sm font-bold text-white mb-1">Tabelas & Dados</h3>
+                <p class="text-[11px] text-zinc-400 leading-relaxed">Limpeza, conversão e estruturação de planilhas com IA.</p>
+              </div>
+            </div>
+
+            <div onclick="openModule('Modelos de Dados', 'modelos.html')" class="module-card">
+              <i class="ph-bold ph-squares-four text-cyan-400 text-2xl mb-2 block"></i>
+              <div>
+                <h3 class="text-xs sm:text-sm font-bold text-white mb-1">Modelos de Dados</h3>
+                <p class="text-[11px] text-zinc-400 leading-relaxed">10 templates com indicadores e gráficos automáticos.</p>
+              </div>
+            </div>
+
+            <div onclick="openModule('Controle Financeiro', 'financas.html')" class="module-card">
+              <i class="ph-bold ph-wallet text-emerald-400 text-2xl mb-2 block"></i>
+              <div>
+                <h3 class="text-xs sm:text-sm font-bold text-white mb-1">Controle Financeiro</h3>
+                <p class="text-[11px] text-zinc-400 leading-relaxed">Fluxo de caixa, receitas, despesas e metas mensais.</p>
+              </div>
+            </div>
+
+            <div onclick="openModule('Plano de Estudos', 'estudos.html')" class="module-card">
+              <i class="ph-bold ph-student text-blue-400 text-2xl mb-2 block"></i>
+              <div>
+                <h3 class="text-xs sm:text-sm font-bold text-white mb-1">Plano de Estudos</h3>
+                <p class="text-[11px] text-zinc-400 leading-relaxed">Cronograma inteligente, matérias e cronômetro.</p>
+              </div>
+            </div>
+
+            <div onclick="openModule('Editor de Documentos', 'documento.html')" class="module-card">
+              <i class="ph-bold ph-file-text text-blue-400 text-2xl mb-2 block"></i>
+              <div>
+                <h3 class="text-xs sm:text-sm font-bold text-white mb-1">Editor de Documentos</h3>
+                <p class="text-[11px] text-zinc-400 leading-relaxed">Word simplificado estilo A4 com exportação PDF/DOCX.</p>
+              </div>
+            </div>
+
+            <div onclick="openModule('Editor CAD 2D', 'cad.html')" class="module-card">
+              <i class="ph-bold ph-compass text-blue-400 text-2xl mb-2 block"></i>
+              <div>
+                <h3 class="text-xs sm:text-sm font-bold text-white mb-1">Editor CAD 2D</h3>
+                <p class="text-[11px] text-zinc-400 leading-relaxed">Desenhos técnicos, croquis, cotas e exportação DXF.</p>
+              </div>
+            </div>
+
+            <div onclick="openModule('Editor de Vídeo', 'video.html')" class="module-card">
+              <i class="ph-bold ph-film-strip text-red-400 text-2xl mb-2 block"></i>
+              <div>
+                <h3 class="text-xs sm:text-sm font-bold text-white mb-1">Editor de Vídeo</h3>
+                <p class="text-[11px] text-zinc-400 leading-relaxed">Cortar, juntar, redes sociais e extrair áudio.</p>
+              </div>
+            </div>
+
+            <div onclick="openModule('Editor de Áudio', 'audio.html')" class="module-card">
+              <i class="ph-bold ph-waveform text-purple-400 text-2xl mb-2 block"></i>
+              <div>
+                <h3 class="text-xs sm:text-sm font-bold text-white mb-1">Editor de Áudio</h3>
+                <p class="text-[11px] text-zinc-400 leading-relaxed">Waveform, cortes, normalização e remoção de silêncio.</p>
+              </div>
+            </div>
+
+            <div onclick="openModule('Apresentações', 'apresentacao.html')" class="module-card">
+              <i class="ph-bold ph-presentation text-blue-400 text-2xl mb-2 block"></i>
+              <div>
+                <h3 class="text-xs sm:text-sm font-bold text-white mb-1">Apresentações</h3>
+                <p class="text-[11px] text-zinc-400 leading-relaxed">Criador de slides visuais com gerador IA e PPTX.</p>
+              </div>
+            </div>
+
+            <div onclick="openModule('Tarefas & Projetos', 'tarefas.html')" class="module-card">
+              <i class="ph-bold ph-check-square-offset text-blue-400 text-2xl mb-2 block"></i>
+              <div>
+                <h3 class="text-xs sm:text-sm font-bold text-white mb-1">Tarefas & Projetos</h3>
+                <p class="text-[11px] text-zinc-400 leading-relaxed">Quadro Kanban, lista, subtarefas, prioridades e progresso.</p>
+              </div>
+            </div>
+
+          </div>
         </div>
       </div>
+    </div>
 
-      <!-- Presets de Prompts Rápidos -->
-      <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbars text-[11px] text-zinc-400">
-        <span class="text-zinc-600 font-semibold uppercase text-[9px] shrink-0">Sugestões:</span>
-        <button onclick="setPromptExample('Tabela de vendas com Produto, Categoria, Qtd, Preço Unitário e Total')" class="px-2 py-0.5 rounded-md bg-white/[0.02] hover:bg-white/[0.06] border border-white/5 shrink-0 transition-colors">📦 Vendas de Produtos</button>
-        <button onclick="setPromptExample('Tabela de controle de despesas mensais com Descrição, Categoria, Vencimento e Valor')" class="px-2 py-0.5 rounded-md bg-white/[0.02] hover:bg-white/[0.06] border border-white/5 shrink-0 transition-colors">💰 Despesas Mensais</button>
-        <button onclick="setPromptExample('Tabela de tarefas de sprint com Tarefa, Responsável, Status e Prazo')" class="px-2 py-0.5 rounded-md bg-white/[0.02] hover:bg-white/[0.06] border border-white/5 shrink-0 transition-colors">📋 Sprint Kanban</button>
+    <!-- WRAPPER DO MÓDULO IFRAME -->
+    <div id="module-iframe-wrapper" class="hidden flex-1 w-full h-full bg-matte-bg relative">
+      <iframe id="module-iframe" class="w-full h-full border-none block"></iframe>
+    </div>
+
+  </main>
+
+  <div id="modal-auth" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-matte-card border border-matte-border rounded-2xl p-6 w-full max-w-sm shadow-2xl flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-matte-border pb-3">
+        <h3 class="text-sm font-bold text-white">Conectar Conta Supabase</h3>
+        <button onclick="toggleAuthModal(false)" class="text-zinc-500 hover:text-white"><i class="ph ph-x"></i></button>
       </div>
-    </div>
-  </section>
 
-  <!-- BARRA DE FERRAMENTAS & MANIPULAÇÃO DE DADOS -->
-  <div class="h-10 shrink-0 bg-matte-card/80 border-b border-matte-border px-4 flex items-center justify-between text-xs overflow-x-auto no-scrollbars">
-    <div class="flex items-center gap-1.5">
-      <button onclick="addRow()" class="px-2.5 py-1 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 hover:text-white flex items-center gap-1" title="Adicionar Linha">
-        <i class="ph-bold ph-plus text-xs text-blue-400"></i> Linha
-      </button>
-      <button onclick="addColumn()" class="px-2.5 py-1 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 hover:text-white flex items-center gap-1" title="Adicionar Coluna">
-        <i class="ph-bold ph-plus text-xs text-blue-400"></i> Coluna
-      </button>
-      
-      <div class="h-4 w-px bg-matte-border mx-1"></div>
+      <form onsubmit="handleAuthSubmit(event)" class="space-y-3">
+        <div>
+          <label class="text-[11px] font-semibold text-zinc-400 block mb-1">E-mail</label>
+          <input type="email" id="auth-email" required placeholder="seu@email.com" class="w-full bg-white/[0.03] border border-matte-border rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-blue-500">
+        </div>
+        <div>
+          <label class="text-[11px] font-semibold text-zinc-400 block mb-1">Senha (Mínimo 6 caracteres)</label>
+          <input type="password" id="auth-pass" required minlength="6" placeholder="Sua senha..." class="w-full bg-white/[0.03] border border-matte-border rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-blue-500">
+        </div>
 
-      <button onclick="transposeTable()" class="px-2.5 py-1 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 hover:text-white flex items-center gap-1" title="Inverter Linhas e Colunas">
-        <i class="ph-bold ph-arrows-clockwise text-xs text-amber-400"></i> Transpor
-      </button>
-      <button onclick="removeDuplicates()" class="px-2.5 py-1 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 hover:text-white flex items-center gap-1" title="Remover Registros Repetidos">
-        <i class="ph-bold ph-funnel text-xs text-indigo-400"></i> Sem Duplicatas
-      </button>
-      <button onclick="removeEmptyRows()" class="px-2.5 py-1 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-matte-border text-zinc-300 hover:text-white flex items-center gap-1" title="Eliminar Linhas Vazias">
-        <i class="ph-bold ph-broom text-xs text-emerald-400"></i> Limpar Vazios
-      </button>
-    </div>
-
-    <div class="flex items-center gap-2 text-[11px] text-zinc-500">
-      <span id="table-stats">0 linhas &bull; 0 colunas</span>
-      <button onclick="resetTable()" class="text-red-400 hover:text-red-300 p-1" title="Limpar Tabela Inteira"><i class="ph-bold ph-trash"></i></button>
+        <button type="submit" id="btn-auth-submit" class="w-full py-2.5 rounded-xl bg-white text-black font-bold text-xs hover:bg-zinc-200 transition-colors shadow-lg mt-2">
+          Entrar / Cadastrar
+        </button>
+      </form>
     </div>
   </div>
 
-  <!-- VISUALIZADOR DA TABELA EDITÁVEL -->
-  <main class="flex-1 p-4 overflow-auto custom-scroll">
-    <div class="inline-block min-w-full align-middle">
-      <div class="border border-matte-border rounded-xl overflow-hidden shadow-2xl bg-matte-card">
-        <table id="dynamic-table" class="min-w-full divide-y divide-matte-border text-left text-xs">
-          <thead id="table-head" class="bg-white/[0.03]">
-            <!-- Cabeçalhos injetados dinamicamente -->
-          </thead>
-          <tbody id="table-body" class="divide-y divide-matte-border/50">
-            <!-- Linhas injetadas dinamicamente -->
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </main>
-
-  <!-- LÓGICA DE DADOS, MANIPULAÇÃO E INTEGRAÇÃO GEMINI IA -->
   <script>
-    let tableData = {
-      headers: ["Item", "Categoria", "Quantidade", "Valor Unitário (R$)", "Total (R$)"],
-      rows: [
-        ["Notebook Pro", "Eletrônicos", "2", "4500.00", "9000.00"],
-        ["Mouse Sem Fio", "Acessórios", "5", "120.00", "600.00"],
-        ["Teclado Mecânico", "Acessórios", "3", "350.00", "1050.00"],
-        ["Monitor 27 pol", "Eletrônicos", "2", "1400.00", "2800.00"]
-      ]
-    };
+    let activeUser = null;
+    let isCompact = false;
 
-    const clientDB = window.PortalDB || (window.parent && window.parent.PortalDB) || null;
+    window.addEventListener('DOMContentLoaded', async () => {
+      // 1. Recupera sessão inicial
+      const session = await PortalDB.getSession();
+      activeUser = session ? session.user : null;
+      updateUserUI();
 
-    window.addEventListener('DOMContentLoaded', () => {
-      renderTable();
-      document.addEventListener('click', (e) => {
-        if (!e.target.closest('#export-dropdown') && !e.target.closest('button[onclick="toggleExportMenu()"]')) {
-          document.getElementById('export-dropdown').classList.add('hidden');
-        }
-      });
+      // 2. Registra listener em tempo real para mudanças de autenticação
+      if (supabase) {
+        supabase.auth.onAuthStateChange((event, session) => {
+          activeUser = session ? session.user : null;
+          updateUserUI();
+        });
+      }
     });
 
-    // ==== RENDERIZAÇÃO DA TABELA ====
-    function renderTable() {
-      const thead = document.getElementById('table-head');
-      const tbody = document.getElementById('table-body');
+    // ==== MODO COMPACTO ====
+    function toggleCompactMode() {
+      isCompact = !isCompact;
+      const grid = document.getElementById('tools-grid');
+      const btnIcon = document.getElementById('compact-icon');
+      const btnLabel = document.getElementById('compact-label');
 
-      // 1. Renderiza Cabeçalho
-      let headHTML = '<tr><th class="w-10 px-3 py-2 text-center text-[10px] text-zinc-600 font-mono">#</th>';
-      tableData.headers.forEach((h, colIndex) => {
-        headHTML += `
-          <th class="px-3 py-2 font-bold text-zinc-300 border-r border-matte-border/50 group relative">
-            <div class="flex items-center justify-between gap-1">
-              <span contenteditable="true" onblur="updateHeader(${colIndex}, this.innerText)" class="focus:outline-none flex-1 truncate">${h}</span>
-              <button onclick="deleteColumn(${colIndex})" class="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 text-xs transition-opacity p-0.5" title="Excluir Coluna">
-                <i class="ph-bold ph-x"></i>
-              </button>
-            </div>
-          </th>
+      grid.parentElement.classList.toggle('compact-mode', isCompact);
+      
+      if (isCompact) {
+        btnIcon.className = "ph-bold ph-rows text-sm text-blue-400";
+        btnLabel.innerText = "Expandir";
+        btnLabel.classList.add("text-blue-400");
+      } else {
+        btnIcon.className = "ph ph-squares-four text-sm";
+        btnLabel.innerText = "Quadrados";
+        btnLabel.classList.remove("text-blue-400");
+      }
+    }
+
+    // ==== NAVEGAÇÃO E IFRAME ====
+    function openModule(title, fileUrl) {
+      document.getElementById('home-view').classList.add('hidden');
+      document.getElementById('module-iframe-wrapper').classList.remove('hidden');
+      
+      document.getElementById('header-home-content').classList.add('hidden');
+      document.getElementById('header-module-content').classList.remove('hidden');
+      document.getElementById('header-module-content').classList.add('flex');
+      
+      document.getElementById('active-module-title').innerText = title;
+      document.getElementById('module-iframe').src = fileUrl;
+    }
+
+    function closeModuleIframe() {
+      document.getElementById('module-iframe-wrapper').classList.add('hidden');
+      document.getElementById('home-view').classList.remove('hidden');
+      
+      document.getElementById('header-module-content').classList.add('hidden');
+      document.getElementById('header-module-content').classList.remove('flex');
+      document.getElementById('header-home-content').classList.remove('hidden');
+      
+      document.getElementById('module-iframe').src = 'about:blank';
+    }
+
+    // ==== DRAWER LATERAL ====
+    function toggleSidebarMenu(show) {
+      const menu = document.getElementById('sidebar-menu');
+      const backdrop = document.getElementById('sidebar-backdrop');
+      if (show) {
+        backdrop.classList.remove('hidden');
+        menu.classList.remove('sidebar-closed');
+        menu.classList.add('sidebar-open');
+      } else {
+        backdrop.classList.add('hidden');
+        menu.classList.remove('sidebar-open');
+        menu.classList.add('sidebar-closed');
+      }
+    }
+
+    function toggleCategoryGroup(groupId) {
+      const groupEl = document.getElementById(groupId);
+      const chevron = document.getElementById(`chevron-${groupId}`);
+      const isHidden = groupEl.classList.contains('hidden');
+      if (isHidden) {
+        groupEl.classList.remove('hidden');
+        chevron.style.transform = 'rotate(180deg)';
+      } else {
+        groupEl.classList.add('hidden');
+        chevron.style.transform = 'rotate(0deg)';
+      }
+    }
+
+    function openModuleFromSidebar(title, fileUrl) {
+      toggleSidebarMenu(false);
+      openModule(title, fileUrl);
+    }
+
+    function showHomeView() {
+      toggleSidebarMenu(false);
+      closeModuleIframe();
+    }
+
+    // ==== AUTENTICAÇÃO E ATUALIZAÇÃO DA UI ====
+    function updateUserUI() {
+      const sec = document.getElementById('user-auth-section');
+      const badge = document.getElementById('global-sync-badge');
+
+      if (activeUser) {
+        sec.innerHTML = `
+          <button onclick="handleLogout()" class="p-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 transition-colors flex items-center gap-1.5 text-xs font-bold" title="Conectado: ${activeUser.email} (Clique para desconectar)">
+            <i class="ph-fill ph-user-circle text-lg text-blue-400"></i>
+            <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+            <span class="hidden md:inline">${activeUser.email.split('@')[0]}</span>
+          </button>
         `;
-      });
-      headHTML += '</tr>';
-      thead.innerHTML = headHTML;
-
-      // 2. Renderiza Linhas
-      let bodyHTML = '';
-      tableData.rows.forEach((row, rowIndex) => {
-        bodyHTML += `<tr class="hover:bg-white/[0.015] group">`;
-        bodyHTML += `
-          <td class="px-2 py-2 text-center text-[10px] text-zinc-600 font-mono border-r border-matte-border/50">
-            <span class="group-hover:hidden">${rowIndex + 1}</span>
-            <button onclick="deleteRow(${rowIndex})" class="hidden group-hover:inline-block text-zinc-500 hover:text-red-400 p-0.5" title="Excluir Linha">
-              <i class="ph-bold ph-trash"></i>
-            </button>
-          </td>
+        badge.innerHTML = `
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+          <span>Nuvem Ativa</span>
         `;
-        row.forEach((cell, colIndex) => {
-          bodyHTML += `
-            <td contenteditable="true" onblur="updateCell(${rowIndex}, ${colIndex}, this.innerText)" class="px-3 py-2 text-zinc-200 border-r border-matte-border/50 whitespace-nowrap">
-              ${cell}
-            </td>
-          `;
-        });
-        bodyHTML += '</tr>';
-      });
-      tbody.innerHTML = bodyHTML;
-
-      document.getElementById('table-stats').innerText = `${tableData.rows.length} linhas • ${tableData.headers.length} colunas`;
-    }
-
-    function updateHeader(index, val) {
-      tableData.headers[index] = val.trim() || `Coluna ${index + 1}`;
-    }
-
-    function updateCell(row, col, val) {
-      if (tableData.rows[row]) {
-        tableData.rows[row][col] = val.trim();
+      } else {
+        sec.innerHTML = `
+          <button onclick="toggleAuthModal(true)" id="btn-login-trigger" class="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-500 transition-colors flex items-center gap-1.5 text-xs font-bold" title="Desconectado - Clique para conectar ao Supabase">
+            <i class="ph-fill ph-user-circle text-lg text-red-500"></i>
+            <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+            <span class="hidden md:inline">Desconectado</span>
+          </button>
+        `;
+        badge.innerHTML = `
+          <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+          <span>Modo Local</span>
+        `;
       }
     }
 
-    function addRow() {
-      const newRow = new Array(tableData.headers.length).fill('');
-      tableData.rows.push(newRow);
-      renderTable();
-    }
-
-    function addColumn() {
-      const colName = `Coluna ${tableData.headers.length + 1}`;
-      tableData.headers.push(colName);
-      tableData.rows.forEach(r => r.push(''));
-      renderTable();
-    }
-
-    function deleteRow(idx) {
-      tableData.rows.splice(idx, 1);
-      renderTable();
-    }
-
-    function deleteColumn(idx) {
-      if (tableData.headers.length <= 1) {
-        alert("A tabela precisa de pelo menos uma coluna.");
-        return;
+    async function handleLogout() {
+      if (confirm("Deseja realmente desconectar sua conta?")) {
+        await PortalDB.logout();
       }
-      tableData.headers.splice(idx, 1);
-      tableData.rows.forEach(r => r.splice(idx, 1));
-      renderTable();
     }
 
-    // ==== OPERAÇÕES DE DADOS ====
-    function transposeTable() {
-      if (tableData.rows.length === 0) return;
-      const newHeaders = ['Registro', ...tableData.rows.map((_, i) => `Linha ${i + 1}`)];
-      const newRows = [];
+    function toggleAuthModal(show) { document.getElementById('modal-auth').classList.toggle('hidden', !show); }
 
-      for (let c = 0; c < tableData.headers.length; c++) {
-        const row = [tableData.headers[c]];
-        for (let r = 0; r < tableData.rows.length; r++) {
-          row.push(tableData.rows[r][c] || '');
-        }
-        newRows.push(row);
-      }
-
-      tableData.headers = newHeaders;
-      tableData.rows = newRows;
-      renderTable();
-    }
-
-    function removeDuplicates() {
-      const seen = new Set();
-      tableData.rows = tableData.rows.filter(row => {
-        const key = JSON.stringify(row);
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-      renderTable();
-    }
-
-    function removeEmptyRows() {
-      tableData.rows = tableData.rows.filter(row => row.some(cell => cell && cell.trim() !== ''));
-      renderTable();
-    }
-
-    function resetTable() {
-      if (!confirm("Limpar toda a tabela?")) return;
-      tableData = { headers: ["Coluna 1", "Coluna 2"], rows: [["", ""]] };
-      renderTable();
-    }
-
-    function setPromptExample(text) {
-      document.getElementById('ai-prompt-input').value = text;
-      generateWithAI();
-    }
-
-    // ==== INTEGRAÇÃO GEMINI IA POR JSON ====
-    async function generateWithAI() {
-      const promptInput = document.getElementById('ai-prompt-input');
-      const prompt = promptInput.value.trim();
-      if (!prompt) return;
-
-      const btn = document.getElementById('btn-ai-generate');
-      const originalHTML = btn.innerHTML;
-      btn.innerHTML = `<i class="ph-bold ph-spinner animate-spin text-sm"></i> <span>Criando...</span>`;
+    async function handleAuthSubmit(e) {
+      e.preventDefault();
+      const email = document.getElementById('auth-email').value.trim();
+      const pass = document.getElementById('auth-pass').value;
+      const btn = document.getElementById('btn-auth-submit');
+      btn.innerText = "Processando...";
       btn.disabled = true;
 
       try {
-        if (!clientDB) throw new Error("Sistema do Hub não conectado.");
-
-        const systemInstructions = `Você é um assistente estruturador de dados. O usuário fornecerá um comando ou texto desestruturado.
-Retorne ESTRITAMENTE um objeto JSON válido no seguinte formato:
-{
-  "title": "Título sugerido para a tabela",
-  "headers": ["Nome Coluna 1", "Nome Coluna 2", "Nome Coluna 3"],
-  "rows": [
-    ["Dado 1", "Dado 2", "Dado 3"],
-    ["Dado 4", "Dado 5", "Dado 6"]
-  ]
-}
-Não inclua explicações, comentários ou markdown adicional fora do bloco JSON.`;
-
-        const fullPrompt = `${systemInstructions}\n\nSolicitação do usuário: ${prompt}`;
-        const response = await clientDB.callGeminiEdge(fullPrompt, { context: "data_tables" });
-        
-        let rawText = response.text || response.candidates?.[0]?.content?.parts?.[0]?.text || (typeof response === 'string' ? response : JSON.stringify(response));
-
-        // Limpeza de marcação markdown ```json caso retorne
-        rawText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-
-        const parsed = JSON.parse(rawText);
-        if (parsed.headers && Array.isArray(parsed.headers) && parsed.rows && Array.isArray(parsed.rows)) {
-          tableData = {
-            headers: parsed.headers,
-            rows: parsed.rows
-          };
-          if (parsed.title) {
-            document.getElementById('dataset-name').value = parsed.title;
+        let user;
+        try {
+          user = await PortalDB.login(email, pass);
+        } catch (loginErr) {
+          if (loginErr.message.toLowerCase().includes("invalid login credentials")) {
+            user = await PortalDB.register(email, pass);
+            alert("Conta criada com sucesso! Se a confirmação de e-mail estiver ativada, verifique sua caixa de entrada.");
+          } else {
+            throw loginErr;
           }
-          renderTable();
-          promptInput.value = '';
-        } else {
-          throw new Error("Formato de tabela inválido retornado pela IA.");
         }
 
+        activeUser = user;
+        updateUserUI();
+        toggleAuthModal(false);
       } catch (err) {
-        alert("Erro ao processar com a IA: " + err.message);
+        alert("Erro de autenticação: " + (err.message || err));
       } finally {
-        btn.innerHTML = originalHTML;
+        btn.innerText = "Entrar / Cadastrar";
         btn.disabled = false;
       }
     }
 
-    // ==== EXPORTAÇÃO E SINCRONIZAÇÃO ====
-    function toggleExportMenu() {
-      document.getElementById('export-dropdown').classList.toggle('hidden');
-    }
+    // ==== BUSCA GLOBAL INTEGRADA COM USER_ARTIFACTS ====
+    async function handleGlobalSearch(term) {
+      const panel = document.getElementById('global-search-results-panel');
+      const list = document.getElementById('global-search-items-list');
 
-    function exportData(format) {
-      document.getElementById('export-dropdown').classList.add('hidden');
-      const filename = (document.getElementById('dataset-name').value.trim() || 'tabela').replace(/\s+/g, '_');
-
-      if (format === 'csv') {
-        const csvContent = [
-          tableData.headers.map(h => `"${h.replace(/"/g, '""')}"`).join(','),
-          ...tableData.rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(','))
-        ].join('\n');
-        downloadFile(`${filename}.csv`, csvContent, 'text/csv;charset=utf-8;');
-      } 
-      else if (format === 'json') {
-        const jsonContent = tableData.rows.map(row => {
-          const obj = {};
-          tableData.headers.forEach((h, i) => obj[h] = row[i] || '');
-          return obj;
-        });
-        downloadFile(`${filename}.json`, JSON.stringify(jsonContent, null, 2), 'application/json');
+      if (!term || term.trim().length < 2) {
+        panel.classList.add('hidden');
+        return;
       }
-      else if (format === 'sql') {
-        const tableName = filename.toLowerCase();
-        const cols = tableData.headers.map(h => `"${h.toLowerCase().replace(/[^a-z0-9_]/g, '_')}"`).join(', ');
-        const sqlRows = tableData.rows.map(r => `(${r.map(c => `'${c.replace(/'/g, "''")}'`).join(', ')})`).join(',\n  ');
-        const sqlContent = `INSERT INTO "${tableName}" (${cols})\nVALUES\n  ${sqlRows};`;
-        downloadFile(`${filename}.sql`, sqlContent, 'text/plain');
-      }
-      else if (format === 'clipboard') {
-        const tsvContent = [
-          tableData.headers.join('\t'),
-          ...tableData.rows.map(r => r.join('\t'))
-        ].join('\n');
-        navigator.clipboard.writeText(tsvContent).then(() => {
-          alert("Dados copiados para a área de transferência no formato compatível com Excel / Sheets!");
-        });
-      }
-    }
 
-    function downloadFile(name, content, type) {
-      const blob = new Blob([content], { type });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = name;
-      link.click();
-    }
-
-    async function saveToCloud() {
-      const syncStatus = document.getElementById('sync-status');
-      syncStatus.innerText = "Salvando...";
-      syncStatus.className = "text-[10px] text-amber-400";
+      panel.classList.remove('hidden');
+      list.innerHTML = `<p class="text-xs text-zinc-500 py-2">Pesquisando registros...</p>`;
 
       try {
-        if (!clientDB) throw new Error("Supabase não disponível.");
-        const session = await clientDB.getSession();
-        if (!session) throw new Error("Conecte sua conta para salvar na nuvem.");
+        const session = await PortalDB.getSession();
+        if (!session) {
+          list.innerHTML = `<p class="text-xs text-zinc-500 py-2">Conecte sua conta para pesquisar seus documentos na nuvem.</p>`;
+          return;
+        }
 
-        const tableName = document.getElementById('dataset-name').value.trim() || 'Tabela Sem Título';
-
-        const { error } = await clientDB.supabase
+        const { data, error } = await supabase
           .from('user_artifacts')
-          .insert({
-            user_id: session.user.id,
-            name: tableName,
-            tool_type: 'tabelas',
-            data: tableData,
-            metadata: {
-              rowsCount: tableData.rows.length,
-              colsCount: tableData.headers.length
-            }
-          });
+          .select('id, name, tool_type, created_at')
+          .eq('user_id', session.user.id)
+          .is('deleted_at', null)
+          .ilike('name', `%${term.trim()}%`)
+          .order('created_at', { ascending: false })
+          .limit(8);
 
         if (error) throw error;
 
-        syncStatus.innerText = "Salvo na Nuvem";
-        syncStatus.className = "text-[10px] text-emerald-400";
-        setTimeout(() => { syncStatus.innerText = "Pronto"; syncStatus.className = "text-[10px] text-zinc-500"; }, 3000);
+        if (!data || data.length === 0) {
+          list.innerHTML = `<p class="text-xs text-zinc-500 py-2">Nenhum registro encontrado para "${term}".</p>`;
+          return;
+        }
 
-      } catch (err) {
-        syncStatus.innerText = "Erro ao salvar";
-        syncStatus.className = "text-[10px] text-red-400";
-        alert(err.message);
+        list.innerHTML = data.map(item => `
+          <div onclick="openModule('${item.name}', 'meus-dados.html')" class="p-2.5 rounded-xl border border-matte-border bg-white/[0.02] hover:bg-white/[0.05] cursor-pointer flex items-center justify-between text-xs transition-colors">
+            <span class="font-bold text-white truncate max-w-xs">${item.name}</span>
+            <span class="text-[10px] text-blue-400 font-bold uppercase tracking-wider">${item.tool_type}</span>
+          </div>
+        `).join('');
+
+      } catch (e) {
+        list.innerHTML = `<p class="text-xs text-red-400 py-2">Erro ao pesquisar: ${e.message}</p>`;
       }
+    }
+
+    function clearGlobalSearch() {
+      document.getElementById('global-search-input').value = '';
+      document.getElementById('global-search-results-panel').classList.add('hidden');
     }
   </script>
 </body>
