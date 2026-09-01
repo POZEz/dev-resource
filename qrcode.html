@@ -135,14 +135,19 @@
           </div>
 
           <!-- Nível de Correção de Erros -->
-          <div class="flex flex-col gap-1.5">
+          <div class="flex flex-col gap-1.5 custom-select-container relative">
             <label class="text-xs font-semibold text-zinc-300">Correção de Erro</label>
-            <select id="input-ecl" onchange="state.settings.errorCorrectionLevel = this.value; updateQRCode();" class="bg-white/[0.03] border border-matte-border rounded-xl p-2 text-xs text-white">
-              <option value="L">L (7% de recuperação)</option>
-              <option value="M" selected>M (15% de recuperação)</option>
-              <option value="Q">Q (25% de recuperação)</option>
-              <option value="H">H (30% de recuperação)</option>
-            </select>
+            <input type="hidden" id="input-ecl" value="M" onchange="state.settings.errorCorrectionLevel = this.value; updateQRCode();">
+            <button type="button" class="custom-select-btn w-full bg-white/[0.03] border border-matte-border rounded-xl p-2.5 text-xs text-white flex items-center justify-between focus:outline-none focus:border-emerald-500/50 transition-colors">
+              <span>M (15% de recuperação)</span>
+              <i class="ph-bold ph-caret-down text-zinc-500"></i>
+            </button>
+            <div class="custom-select-menu absolute top-full left-0 w-full mt-1 bg-matte-card border border-matte-border rounded-xl shadow-2xl hidden flex-col p-1 z-50">
+              <button type="button" class="custom-select-option px-3 py-2 text-left text-xs text-zinc-300 hover:text-white hover:bg-white/[0.05] rounded-lg" data-value="L">L (7% de recuperação)</button>
+              <button type="button" class="custom-select-option px-3 py-2 text-left text-xs text-zinc-300 hover:text-white hover:bg-white/[0.05] rounded-lg" data-value="M">M (15% de recuperação)</button>
+              <button type="button" class="custom-select-option px-3 py-2 text-left text-xs text-zinc-300 hover:text-white hover:bg-white/[0.05] rounded-lg" data-value="Q">Q (25% de recuperação)</button>
+              <button type="button" class="custom-select-option px-3 py-2 text-left text-xs text-zinc-300 hover:text-white hover:bg-white/[0.05] rounded-lg" data-value="H">H (30% de recuperação)</button>
+            </div>
           </div>
 
           <!-- Cor dos Módulos (Frente) -->
@@ -173,9 +178,9 @@
       <div class="w-full bg-matte-card border border-matte-border rounded-2xl p-6 flex flex-col items-center text-center shadow-xl">
         <h3 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4">Pré-Visualização do QR Code</h3>
         
-        <!-- Canvas do QR Code -->
-        <div id="qr-container" class="p-4 rounded-2xl bg-white border border-matte-border flex items-center justify-center shadow-inner my-2">
-          <canvas id="qr-canvas" class="max-w-full block"></canvas>
+        <!-- Imagem do QR Code -->
+        <div id="qr-container" class="p-4 rounded-2xl bg-white border border-matte-border flex items-center justify-center shadow-inner my-2 min-h-[200px]">
+          <img id="qr-image" src="" alt="QR Code Gerado" class="max-w-full block object-contain">
         </div>
 
         <p id="payload-preview" class="text-[10px] text-zinc-400 font-mono break-all max-w-xs mt-3 bg-white/[0.02] p-2 rounded-lg border border-matte-border">Carregando...</p>
@@ -355,13 +360,18 @@
                 <input type="password" id="field-wifi-pass" placeholder="Senha do Wi-Fi" value="${state.content.password || ''}" oninput="updateContentPayload()" class="bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500/50">
               </div>
             </div>
-            <div class="flex flex-col gap-1.5">
+            <div class="flex flex-col gap-1.5 custom-select-container relative">
               <label class="text-xs font-semibold text-zinc-300">Segurança</label>
-              <select id="field-wifi-type" onchange="updateContentPayload()" class="bg-white/[0.03] border border-matte-border rounded-xl p-3 text-xs text-white">
-                <option value="WPA">WPA/WPA2/WPA3</option>
-                <option value="WEP">WEP</option>
-                <option value="nopass">Sem Senha (Aberta)</option>
-              </select>
+              <input type="hidden" id="field-wifi-type" value="WPA" onchange="updateContentPayload()">
+              <button type="button" class="custom-select-btn w-full bg-white/[0.03] border border-matte-border rounded-xl p-2.5 text-xs text-white flex items-center justify-between focus:outline-none focus:border-emerald-500/50 transition-colors">
+                <span>WPA/WPA2/WPA3</span>
+                <i class="ph-bold ph-caret-down text-zinc-500"></i>
+              </button>
+              <div class="custom-select-menu absolute top-full left-0 w-full mt-1 bg-matte-card border border-matte-border rounded-xl shadow-2xl hidden flex-col p-1 z-50">
+                <button type="button" class="custom-select-option px-3 py-2 text-left text-xs text-zinc-300 hover:text-white hover:bg-white/[0.05] rounded-lg" data-value="WPA">WPA/WPA2/WPA3</button>
+                <button type="button" class="custom-select-option px-3 py-2 text-left text-xs text-zinc-300 hover:text-white hover:bg-white/[0.05] rounded-lg" data-value="WEP">WEP</button>
+                <button type="button" class="custom-select-option px-3 py-2 text-left text-xs text-zinc-300 hover:text-white hover:bg-white/[0.05] rounded-lg" data-value="nopass">Sem Senha (Aberta)</button>
+              </div>
             </div>`;
           break;
         case 'phone':
@@ -466,21 +476,58 @@
           break;
       }
 
+      // Atualiza o estado da aplicação e reflete no DOM
       state.formattedPayload = payload;
-      document.getElementById('payload-preview').innerText = payload || 'Payload vazio';
+      const previewEl = document.getElementById('payload-preview');
+      if (previewEl) previewEl.innerText = payload;
+      
       updateQRCode();
     }
 
-    // ==== GERAÇÃO EM CANVAS VIA LIBRARY ====
+    // Lógica Global para os Menus Select Estilizados (Custom Dropdowns)
+    document.addEventListener('click', (e) => {
+      const dropdownBtn = e.target.closest('.custom-select-btn');
+      if (dropdownBtn) {
+        const menu = dropdownBtn.nextElementSibling;
+        document.querySelectorAll('.custom-select-menu').forEach(m => {
+          if (m !== menu) m.classList.add('hidden');
+        });
+        menu.classList.toggle('hidden');
+        return;
+      }
+
+      const optionBtn = e.target.closest('.custom-select-option');
+      if (optionBtn) {
+        const menu = optionBtn.closest('.custom-select-menu');
+        const container = optionBtn.closest('.custom-select-container');
+        const btnText = container.querySelector('.custom-select-btn span');
+        const hiddenInput = container.querySelector('input[type="hidden"]');
+        
+        btnText.innerText = optionBtn.innerText;
+        if (hiddenInput) {
+            hiddenInput.value = optionBtn.dataset.value;
+            hiddenInput.dispatchEvent(new Event('change'));
+        }
+        menu.classList.add('hidden');
+        return;
+      }
+
+      // Fecha ao clicar fora
+      if (!e.target.closest('.custom-select-container')) {
+        document.querySelectorAll('.custom-select-menu').forEach(m => m.classList.add('hidden'));
+      }
+    });
+
+    // ==== GERAÇÃO VIA LIBRARY ====
     function updateQRCode() {
-      const canvas = document.getElementById('qr-canvas');
+      const img = document.getElementById('qr-image');
       if (!state.formattedPayload) return;
 
       // Sincronizar inputs de cor
       document.getElementById('input-fgcolor-text').value = state.settings.fgColor;
       document.getElementById('input-bgcolor-text').value = state.settings.bgColor;
 
-      QRCode.toCanvas(canvas, state.formattedPayload, {
+      QRCode.toDataURL(state.formattedPayload, {
         width: state.settings.size,
         margin: state.settings.margin,
         color: {
@@ -488,16 +535,22 @@
           light: state.settings.bgColor
         },
         errorCorrectionLevel: state.settings.errorCorrectionLevel
-      }, (error) => {
-        if (error) console.error("Erro ao gerar QR Code:", error);
+      }, (error, url) => {
+        if (error) {
+            console.error("Erro ao gerar QR Code:", error);
+            return;
+        }
+        img.src = url;
       });
     }
 
     // ==== DOWNLOADS LOCAIS (PNG / SVG) ====
     function downloadPNG() {
-      const canvas = document.getElementById('qr-canvas');
+      const img = document.getElementById('qr-image');
+      if (!img.src) return;
+      
       const link = document.createElement('a');
-      link.href = canvas.toDataURL('image/png');
+      link.href = img.src;
       link.download = `${state.name.replace(/\s+/g, '_')}.png`;
       link.click();
     }
