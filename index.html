@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#09090b">
   <title>My Hub</title>
 
-  <!-- CDN Supabase Oficial -->
+  <!-- CDNs Oficiais -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/@phosphor-icons/web"></script>
@@ -33,7 +33,7 @@
     .custom-scroll::-webkit-scrollbar-thumb { background: #27272a; border-radius: 99px; }
     .custom-scroll::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
 
-    /* Visual Normal Expandido dos Cards */
+    /* Visual dos Cards no Grid Principal */
     .module-card {
       background-color: #121214;
       border: 1px solid #27272a;
@@ -51,76 +51,62 @@
       box-shadow: 0 10px 25px rgba(0,0,0,0.5);
     }
 
-    /* Visão Compacta dos Cards (Quadrados Pequenos) */
-    .compact-mode #tools-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    }
-
-    @media (min-width: 640px) {
-      .compact-mode #tools-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
-    }
-    @media (min-width: 768px) {
-      .compact-mode #tools-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
-    }
-    @media (min-width: 1024px) {
-      .compact-mode #tools-grid { grid-template-columns: repeat(6, minmax(0, 1fr)) !important; }
-    }
-    @media (min-width: 1280px) {
-      .compact-mode #tools-grid { grid-template-columns: repeat(8, minmax(0, 1fr)) !important; }
-    }
+    /* Visão Compacta (Quadrados) */
+    .compact-mode #tools-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+    @media (min-width: 640px) { .compact-mode #tools-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; } }
+    @media (min-width: 768px) { .compact-mode #tools-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; } }
+    @media (min-width: 1024px) { .compact-mode #tools-grid { grid-template-columns: repeat(6, minmax(0, 1fr)) !important; } }
+    @media (min-width: 1280px) { .compact-mode #tools-grid { grid-template-columns: repeat(8, minmax(0, 1fr)) !important; } }
 
     .compact-mode .module-card {
       padding: 12px;
       border-radius: 12px;
       aspect-ratio: 1 / 1;
-      display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
       text-align: center;
     }
-    .compact-mode .module-card i {
-      font-size: 1.75rem !important;
-      margin-bottom: 6px !important;
-    }
-    .compact-mode .module-card h3 {
-      font-size: 0.75rem !important;
-      line-height: 1.1 !important;
-      margin-bottom: 0 !important;
-      text-align: center;
-    }
-    .compact-mode .module-card p {
-      display: none !important;
-    }
+    .compact-mode .module-card i { font-size: 1.75rem !important; margin-bottom: 6px !important; }
+    .compact-mode .module-card h3 { font-size: 0.75rem !important; line-height: 1.1 !important; margin-bottom: 0 !important; }
+    .compact-mode .module-card p { display: none !important; }
 
     /* Animação do Menu Lateral Drawer */
-    .sidebar-drawer {
-      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    }
+    .sidebar-drawer { transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
     .sidebar-closed { transform: translateX(-100%); }
     .sidebar-open { transform: translateX(0); }
+
+    /* Animação de Toasts */
+    @keyframes toastFade {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .toast-anim { animation: toastFade 0.25s ease forwards; }
   </style>
-</head>
-<body class="antialiased flex flex-col h-screen font-sans bg-matte-bg select-none overflow-hidden">
 
   <script>
     const SUPABASE_URL = 'https://zlsdlcvtcsrykfacjvhf.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_JnDv-fxHXPTzNaFX9n3Z0w_4mqt47Js';
-    const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+    
+    // Instanciação segura do cliente Supabase
+    var supabase = (window.supabase && window.supabase.createClient) 
+      ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) 
+      : null;
 
-    // Banco de Dados Local do Navegador para mídias pesadas
-    let localFileDB = null;
-    const dbReq = indexedDB.open("MyHubLocalMedia", 1);
-    dbReq.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains("heavy_files")) {
-        db.createObjectStore("heavy_files", { keyPath: "id" });
-      }
-    };
-    dbReq.onsuccess = (e) => { localFileDB = e.target.result; };
+    // Cache local IndexedDB
+    var localFileDB = null;
+    try {
+      var dbReq = indexedDB.open("MyHubLocalMedia", 1);
+      dbReq.onupgradeneeded = function(e) {
+        var db = e.target.result;
+        if (!db.objectStoreNames.contains("heavy_files")) {
+          db.createObjectStore("heavy_files", { keyPath: "id" });
+        }
+      };
+      dbReq.onsuccess = function(e) { localFileDB = e.target.result; };
+    } catch(e) { console.warn("IndexedDB indisponível:", e); }
 
-    // PortalDB Global para o Hub e todos os iframes
-    window.PortalDB = {
+    // Declaração do PortalDB no escopo global e em window
+    var PortalDB = window.PortalDB = {
       supabase: supabase,
 
       async getSession() {
@@ -128,7 +114,7 @@
           if (!supabase) return null;
           const { data, error } = await supabase.auth.getSession();
           if (error) throw error;
-          return data?.session;
+          return data?.session || null;
         } catch (error) {
           console.error("Erro ao obter sessão:", error);
           return null;
@@ -136,21 +122,23 @@
       },
 
       async login(email, password) {
-        if (!supabase) throw new Error("Supabase não inicializado.");
+        if (!supabase) throw new Error("Supabase não carregado.");
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         return data.user;
       },
 
       async register(email, password) {
-        if (!supabase) throw new Error("Supabase não inicializado.");
+        if (!supabase) throw new Error("Supabase não carregado.");
         const { data, error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
         return data.user;
       },
 
       async logout() {
-        if (supabase) await supabase.auth.signOut();
+        if (supabase) {
+          await supabase.auth.signOut();
+        }
       },
 
       async saveHeavyFileLocal(id, blob, metadata) {
@@ -185,7 +173,7 @@
         });
 
         if (!response.ok) {
-          const errData = await response.json();
+          const errData = await response.json().catch(() => ({}));
           throw new Error(errData.error || "Erro ao consultar a IA.");
         }
 
@@ -193,6 +181,8 @@
       }
     };
   </script>
+</head>
+<body class="antialiased flex flex-col h-screen font-sans bg-matte-bg select-none overflow-hidden">
 
   <header class="h-14 shrink-0 bg-matte-card border-b border-matte-border px-4 sm:px-6 flex items-center justify-between z-30">
     
@@ -244,9 +234,9 @@
 
   </header>
 
+  <!-- OVERLAY DO MENU LATERAL -->
   <div id="sidebar-backdrop" onclick="toggleSidebarMenu(false)" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-40 hidden transition-opacity"></div>
 
-  <!-- MENU LATERAL DRAWER -->
   <aside id="sidebar-menu" class="sidebar-drawer sidebar-closed fixed top-0 left-0 bottom-0 w-72 bg-matte-card border-r border-matte-border z-50 flex flex-col custom-scroll shadow-2xl">
     
     <div class="h-14 px-4 border-b border-matte-border flex items-center justify-between shrink-0">
@@ -534,18 +524,40 @@
     </div>
   </div>
 
+  <!-- CONTAINER DE NOTIFICAÇÕES TOAST -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
   <script>
-    let activeUser = null;
-    let isCompact = false;
+    var activeUser = null;
+    var isCompact = false;
+
+    // Função de Toast personalizada (sem usar alert())
+    function showNotification(msg, isError = false) {
+      const c = document.getElementById('toast-container');
+      const t = document.createElement('div');
+      t.className = `toast-anim px-4 py-2.5 rounded-xl text-xs font-semibold shadow-2xl flex items-center gap-2 pointer-events-auto ${
+        isError ? 'bg-red-500/90 text-white' : 'bg-zinc-800 text-white border border-zinc-700'
+      }`;
+      t.innerHTML = `<i class="ph-bold ${isError ? 'ph-warning-circle' : 'ph-check-circle'} text-base"></i><span>${msg}</span>`;
+      c.appendChild(t);
+      setTimeout(() => {
+        t.style.opacity = '0';
+        t.style.transition = 'opacity 0.3s ease';
+        setTimeout(() => t.remove(), 300);
+      }, 3500);
+    }
 
     window.addEventListener('DOMContentLoaded', async () => {
-      // 1. Recupera sessão inicial
-      const session = await PortalDB.getSession();
-      activeUser = session ? session.user : null;
-      updateUserUI();
+      // 1. Recupera sessão inicial usando window.PortalDB com fallback
+      const portal = window.PortalDB || PortalDB;
+      if (portal && portal.getSession) {
+        const session = await portal.getSession();
+        activeUser = session ? session.user : null;
+        updateUserUI();
+      }
 
-      // 2. Registra listener em tempo real para mudanças de autenticação
-      if (supabase) {
+      // 2. Listener em tempo real para mudanças de autenticação
+      if (supabase && supabase.auth) {
         supabase.auth.onAuthStateChange((event, session) => {
           activeUser = session ? session.user : null;
           updateUserUI();
@@ -668,9 +680,9 @@
     }
 
     async function handleLogout() {
-      if (confirm("Deseja realmente desconectar sua conta?")) {
-        await PortalDB.logout();
-      }
+      const portal = window.PortalDB || PortalDB;
+      await portal.logout();
+      showNotification("Você foi desconectado.");
     }
 
     function toggleAuthModal(show) { document.getElementById('modal-auth').classList.toggle('hidden', !show); }
@@ -680,17 +692,26 @@
       const email = document.getElementById('auth-email').value.trim();
       const pass = document.getElementById('auth-pass').value;
       const btn = document.getElementById('btn-auth-submit');
+      const portal = window.PortalDB || PortalDB;
+
+      if (!portal) {
+        showNotification("Erro: Cliente Supabase indisponível.", true);
+        return;
+      }
+
       btn.innerText = "Processando...";
       btn.disabled = true;
 
       try {
         let user;
         try {
-          user = await PortalDB.login(email, pass);
+          user = await portal.login(email, pass);
+          showNotification("Login realizado com sucesso!");
         } catch (loginErr) {
-          if (loginErr.message.toLowerCase().includes("invalid login credentials")) {
-            user = await PortalDB.register(email, pass);
-            alert("Conta criada com sucesso! Se a confirmação de e-mail estiver ativada, verifique sua caixa de entrada.");
+          const msg = (loginErr.message || "").toLowerCase();
+          if (msg.includes("invalid login credentials") || msg.includes("invalid credentials")) {
+            user = await portal.register(email, pass);
+            showNotification("Conta criada com sucesso!");
           } else {
             throw loginErr;
           }
@@ -700,14 +721,14 @@
         updateUserUI();
         toggleAuthModal(false);
       } catch (err) {
-        alert("Erro de autenticação: " + (err.message || err));
+        showNotification(err.message || "Erro de autenticação.", true);
       } finally {
         btn.innerText = "Entrar / Cadastrar";
         btn.disabled = false;
       }
     }
 
-    // ==== BUSCA GLOBAL INTEGRADA COM USER_ARTIFACTS ====
+    // ==== BUSCA GLOBAL INTEGRADA ====
     async function handleGlobalSearch(term) {
       const panel = document.getElementById('global-search-results-panel');
       const list = document.getElementById('global-search-items-list');
@@ -721,7 +742,8 @@
       list.innerHTML = `<p class="text-xs text-zinc-500 py-2">Pesquisando registros...</p>`;
 
       try {
-        const session = await PortalDB.getSession();
+        const portal = window.PortalDB || PortalDB;
+        const session = await portal.getSession();
         if (!session) {
           list.innerHTML = `<p class="text-xs text-zinc-500 py-2">Conecte sua conta para pesquisar seus documentos na nuvem.</p>`;
           return;
